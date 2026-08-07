@@ -23,6 +23,13 @@ public interface UserService {
 
     User getById(String id);
 
-    /** Soft delete — marks the profile instead of removing it. Does not affect the Keycloak account or login. */
-    void delete(String id);
+    /** Admin-only edit of another user's profile — same field semantics as {@link #updateProfile}. */
+    User updateUser(String id, ProfileFields fields);
+
+    /**
+     * Soft delete — marks the profile instead of removing it. Does not affect the Keycloak account or login.
+     * {@code requesterKeycloakId} guards against an admin deleting their own profile, which would leave them
+     * locked out of the admin UI (their own row would vanish) with no other admin necessarily available to fix it.
+     */
+    void delete(String id, String requesterKeycloakId);
 }

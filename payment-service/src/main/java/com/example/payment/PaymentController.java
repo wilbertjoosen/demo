@@ -34,7 +34,7 @@ public class PaymentController {
 
     /** Admin-only: force a method's mock gateway up/down to demonstrate the unavailable path. */
     @PatchMapping("/methods/{method}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FINANCE')")
     public Map<PaymentMethod, Boolean> setMethodAvailability(@PathVariable PaymentMethod method,
                                                                @RequestBody GatewayAvailabilityRequest request) {
         paymentService.setMethodAvailability(method, request.available());
@@ -42,7 +42,7 @@ public class PaymentController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FINANCE')")
     public ResponseEntity<Void> delete(@PathVariable String id) {
         paymentService.delete(id);
         return ResponseEntity.noContent().build();

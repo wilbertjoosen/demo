@@ -23,6 +23,10 @@ export const useUsersStore = defineStore('users', {
     async updateMe(payload: ProfileUpdate) {
       this.me = await usersApi.updateMe(payload)
     },
+    async update(id: string, payload: ProfileUpdate) {
+      await usersApi.update(id, payload)
+      await this.load()
+    },
     async remove(id: string) {
       await usersApi.remove(id)
       await this.load()

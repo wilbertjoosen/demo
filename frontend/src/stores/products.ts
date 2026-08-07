@@ -20,6 +20,10 @@ export const useProductsStore = defineStore('products', {
       await productsApi.create(payload)
       await this.load()
     },
+    async update(id: string, payload: { sku: string; name: string; price: number }) {
+      await productsApi.update(id, payload)
+      await this.load()
+    },
     async remove(id: string) {
       await productsApi.remove(id)
       await this.load()

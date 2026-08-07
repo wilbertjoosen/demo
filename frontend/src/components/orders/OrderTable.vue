@@ -1,8 +1,9 @@
 <script setup lang="ts">
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { OrderStatus, OrderView } from '../../models'
 
-defineProps<{ orders: OrderView[]; loading: boolean }>()
+const props = defineProps<{ orders: OrderView[]; loading: boolean }>()
 const emit = defineEmits<{ 'edit-address': [order: OrderView]; cancel: [order: OrderView]; track: [order: OrderView] }>()
 const { t } = useI18n()
 
@@ -16,10 +17,26 @@ const statusType: Record<OrderStatus, 'info' | 'success' | 'warning' | 'danger'>
   SHIPPING_FAILED: 'danger',
   DELIVERY_FAILED: 'danger',
 }
+
+const pageSize = 10
+const currentPage = ref(1)
+
+const pagedOrders = computed(() => {
+  const start = (currentPage.value - 1) * pageSize
+  return props.orders.slice(start, start + pageSize)
+})
+
+watch(
+  () => props.orders.length,
+  () => {
+    const maxPage = Math.max(1, Math.ceil(props.orders.length / pageSize))
+    if (currentPage.value > maxPage) currentPage.value = maxPage
+  },
+)
 </script>
 
 <template>
-  <el-table v-loading="loading" :data="orders" stripe>
+  <el-table v-loading="loading" :data="pagedOrders" stripe>
     <el-table-column prop="id" :label="t('orders.id')" width="80" />
     <el-table-column :label="t('orders.status')" width="160">
       <template #default="{ row }">
@@ -57,4 +74,12 @@ const statusType: Record<OrderStatus, 'info' | 'success' | 'warning' | 'danger'>
       </template>
     </el-table-column>
   </el-table>
+  <el-pagination
+    v-if="orders.length > pageSize"
+    class="mt-3 justify-end"
+    layout="prev, pager, next"
+    :page-size="pageSize"
+    :total="orders.length"
+    v-model:current-page="currentPage"
+  />
 </template>

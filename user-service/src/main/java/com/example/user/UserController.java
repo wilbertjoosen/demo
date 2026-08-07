@@ -54,6 +54,13 @@ public class UserController {
         return assembler.toModel(userService.getById(id));
     }
 
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public EntityModel<User> updateUser(@PathVariable String id, @Valid @RequestBody UpdateProfileRequest request) {
+        User updated = userService.updateUser(id, request.toFields());
+        return assembler.toModel(updated);
+    }
+
     public record CreateUserRequest(@NotBlank String keycloakId, @NotBlank String username, @NotBlank @Email String email,
                                      String displayName, @Valid Address shippingAddress, String nationalId, String phone,
                                      Map<String, String> customAttributes) {
@@ -72,8 +79,8 @@ public class UserController {
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Void> delete(@PathVariable String id) {
-        userService.delete(id);
+    public ResponseEntity<Void> delete(@AuthenticationPrincipal Jwt jwt, @PathVariable String id) {
+        userService.delete(id, jwt.getSubject());
         return ResponseEntity.noContent().build();
     }
 }

@@ -16,7 +16,10 @@
     "create": "Crear",
     "add": "Añadir",
     "backendUnavailable": "Los servicios del backend no están disponibles en este momento — algunas funciones no funcionarán hasta que vuelvan. Reintentando automáticamente...",
-    "serviceUnavailable": "Esta función no está disponible en este momento. Inténtalo de nuevo más tarde."
+    "serviceUnavailable": "Esta función no está disponible en este momento. Inténtalo de nuevo más tarde.",
+    "detail": "Detalle",
+    "edit": "Editar",
+    "close": "Cerrar"
   },
   "home": {
     "welcome": "Bienvenido, {name}",
@@ -100,7 +103,20 @@
     "userDeleteError": "No se pudo eliminar el usuario",
     "productCreateError": "No se pudo crear el producto",
     "productDeleteError": "No se pudo eliminar el producto",
-    "stockAddError": "No se pudo agregar el stock"
+    "stockAddError": "No se pudo agregar el stock",
+    "editProduct": "Editar producto",
+    "productDetailTitle": "Producto {sku}",
+    "createdAt": "Creado el",
+    "updatedAt": "Actualizado el",
+    "createdBy": "Creado por",
+    "lastModifiedBy": "Modificado por",
+    "editUserTitle": "Editar usuario {username}",
+    "userDetailTitle": "Usuario {username}",
+    "cannotDeleteSelf": "No puedes eliminar tu propia cuenta",
+    "productUpdated": "Producto actualizado",
+    "productUpdateError": "No se pudo actualizar el producto",
+    "userUpdated": "Usuario actualizado",
+    "userUpdateError": "No se pudo actualizar el usuario"
   },
   "address": {
     "street": "Calle",

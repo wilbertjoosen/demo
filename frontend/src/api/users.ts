@@ -23,6 +23,14 @@ export const usersApi = {
     const { data } = await http.get('/api/users')
     return unwrapCollection<User>(data)
   },
+  async get(id: string): Promise<User> {
+    const { data } = await http.get(`/api/users/${id}`)
+    return data
+  },
+  async update(id: string, payload: ProfileUpdate): Promise<User> {
+    const { data } = await http.put(`/api/users/${id}`, payload)
+    return data
+  },
   async remove(id: string): Promise<void> {
     await http.delete(`/api/users/${id}`)
   },

@@ -70,9 +70,19 @@ class UserServiceImpl implements UserService {
     }
 
     @Override
-    public void delete(String id) {
+    public User updateUser(String id, ProfileFields fields) {
+        User user = getById(id);
+        applyProfileFields(user, fields);
+        return userRepository.save(user);
+    }
+
+    @Override
+    public void delete(String id, String requesterKeycloakId) {
         User user = userRepository.findByIdAndDeletedFalse(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (user.getKeycloakId().equals(requesterKeycloakId)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "You cannot delete your own account");
+        }
         user.markDeleted();
         userRepository.save(user);
     }
