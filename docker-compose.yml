@@ -49,19 +49,21 @@ services:
     restart: unless-stopped
     ports:
       - "9092:9092"
+      - "9094:9094"
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
-      # Two advertised listeners, same trick used for Keycloak's issuer/JWKS split below: PLAINTEXT
-      # (localhost:9092) is for JVMs running on the host machine (the `mvn spring-boot:run` dev
-      # flow used throughout this project); PLAINTEXT_INTERNAL (kafka:29092) is for the
-      # containerized app services in *this* compose file — a broker's advertised address is baked
-      # into every produce/consume response, so a container using "localhost" here would be told to
-      # reconnect to itself instead of the broker.
-      KAFKA_LISTENERS: PLAINTEXT://:9092,PLAINTEXT_INTERNAL://:29092,CONTROLLER://:9093
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://kafka:29092
+      # Three advertised listeners — a broker's advertised address is baked into every
+      # produce/consume response, so each *kind* of client network needs its own: PLAINTEXT
+      # (localhost:9092) for JVMs on the host machine (the `mvn spring-boot:run` dev flow);
+      # PLAINTEXT_INTERNAL (kafka:29092) for containerized app services in *this* compose file;
+      # PLAINTEXT_K8S (host.k3d.internal:9094) for pods in the k3d cluster — k3d's DNS resolves
+      # that name to the host, where this same port is also published, but pods can't resolve
+      # "localhost" (themselves) or "kafka" (no such name in cluster DNS).
+      KAFKA_LISTENERS: PLAINTEXT://:9092,PLAINTEXT_INTERNAL://:29092,PLAINTEXT_K8S://:9094,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://kafka:29092,PLAINTEXT_K8S://host.k3d.internal:9094
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT,PLAINTEXT_K8S:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
@@ -82,6 +84,13 @@ services:
     environment:
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: admin
+      # Without a fixed hostname, Keycloak's dev mode derives each token's `iss` claim from
+      # whatever Host header the request used to reach it — fine for browser logins (always
+      # localhost:8081), but order-service's server-to-server client_credentials call goes through
+      # host.k3d.internal:8081 when running in the k3d cluster, which would mint a token with a
+      # DIFFERENT issuer than what every service's fixed KEYCLOAK_ISSUER_URI expects, and the
+      # receiving service's JwtIssuerValidator rejects it with 401.
+      KC_HOSTNAME: http://localhost:8081
     ports:
       - "8081:8080"
     volumes:
@@ -124,6 +133,55 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: demo-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    # Lets the container resolve host.docker.internal on Linux too (already built-in on Docker Desktop/macOS).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  loki:
+    image: grafana/loki:latest
+    container_name: demo-loki
+    restart: unless-stopped
+    ports:
+      - "3100:3100"
+    volumes:
+      - loki_data:/loki
+
+  promtail:
+    image: grafana/promtail:latest
+    container_name: demo-promtail
+    restart: unless-stopped
+    volumes:
+      - ./docker/promtail/promtail-config.yml:/etc/promtail/config.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command: -config.file=/etc/promtail/config.yml
+    depends_on:
+      - loki
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: demo-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+      - loki
 
   # --- App services -----------------------------------------------------------------------
   # Not meant to run alongside the local `mvn spring-boot:run` processes used throughout dev —
@@ -384,3 +442,6 @@ volumes:
   mongo_data:
   elasticsearch_data:
   redis_data:
+  prometheus_data:
+  loki_data:
+  grafana_data:
