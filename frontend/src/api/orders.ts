@@ -1,6 +1,6 @@
 import { http } from './http'
 import { unwrapCollection } from './hal'
-import type { Address, OrderView } from '../models'
+import type { Address, OrderView, PaymentMethod, ShippingCarrier } from '../models'
 
 export const ordersApi = {
   async list(): Promise<OrderView[]> {
@@ -11,7 +11,13 @@ export const ordersApi = {
     const { data } = await http.get(`/api/orders/${id}`)
     return data
   },
-  async place(payload: { productId: string; quantity: number; shippingAddress: Address }): Promise<OrderView> {
+  async place(payload: {
+    productId: string
+    quantity: number
+    shippingAddress: Address
+    paymentMethod: PaymentMethod
+    shippingCarrier: ShippingCarrier
+  }): Promise<OrderView> {
     const { data } = await http.post('/api/orders', payload)
     return data
   },

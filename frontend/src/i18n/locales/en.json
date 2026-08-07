@@ -36,7 +36,10 @@
     "quantity": "Quantity",
     "placeOrder": "Place order",
     "placedSuccess": "Order placed — track it under My Orders",
-    "placeError": "Could not place order (insufficient stock?)"
+    "placeError": "Could not place order (insufficient stock?)",
+    "paymentMethod": "Payment method",
+    "shippingCarrier": "Shipping carrier",
+    "shippingCost": "Shipping cost"
   },
   "orders": {
     "title": "My Orders",
@@ -52,7 +55,19 @@
     "cancelledSuccess": "Order cancelled",
     "cancelError": "Could not cancel — it may already be past the payment step",
     "addressUpdated": "Shipping address updated",
-    "addressUpdateError": "Could not update — order may already be past the payment step"
+    "addressUpdateError": "Could not update — order may already be past the payment step",
+    "paymentMethod": "Payment",
+    "shippingCarrier": "Carrier",
+    "track": "Track",
+    "trackingTitle": "Tracking — order {id}",
+    "noTrackingYet": "No tracking information yet",
+    "trackingStatus": {
+      "LABEL_CREATED": "Label created",
+      "PICKED_UP": "Picked up",
+      "IN_TRANSIT": "In transit",
+      "OUT_FOR_DELIVERY": "Out for delivery",
+      "DELIVERED": "Delivered"
+    }
   },
   "profile": {
     "title": "My Profile",
@@ -89,5 +104,21 @@
   },
   "notifications": {
     "empty": "No notifications yet"
+  },
+  "payment": {
+    "methods": {
+      "CREDIT_CARD": "Credit card",
+      "DEBIT_CARD": "Debit card",
+      "PAYPAL": "PayPal",
+      "PIX": "Pix",
+      "BOLETO": "Boleto"
+    },
+    "unavailable": "Currently unavailable"
+  },
+  "shipping": {
+    "carriers": {
+      "UPS": "UPS",
+      "DHL": "DHL"
+    }
   }
 }

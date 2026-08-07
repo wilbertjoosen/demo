@@ -1,6 +1,7 @@
 package com.example.product;
 
 import com.example.common.audit.JwtAuditorAware;
+import com.example.common.audit.AuditSchedulingConfig;
 import com.example.common.audit.KafkaAuditEventRepository;
 import com.example.common.audit.MongoAuditingEnabler;
 import com.example.common.audit.RestCallAuditAspect;
@@ -16,7 +17,7 @@ import org.springframework.context.annotation.Import;
 @SpringBootApplication
 @EnableCaching
 @Import({ResourceServerSecurityConfig.class, OpenApiConfig.class, MessageSourceConfig.class, ApiExceptionHandler.class,
-        KafkaAuditEventRepository.class, RestCallAuditAspect.class, JwtAuditorAware.class, MongoAuditingEnabler.class})
+        KafkaAuditEventRepository.class, AuditSchedulingConfig.class, RestCallAuditAspect.class, JwtAuditorAware.class, MongoAuditingEnabler.class})
 public class ProductServiceApplication {
 
     public static void main(String[] args) {

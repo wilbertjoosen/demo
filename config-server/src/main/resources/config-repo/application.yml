@@ -15,6 +15,13 @@ spring:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     producer:
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        # KafkaProducer.send() blocks the CALLING thread (not just the returned future) waiting for
+        # topic metadata on a broker it's never reached before — the 60s default turns "Kafka is
+        # down" into "every request thread that publishes an event hangs for a minute." 3s still
+        # gives a healthy broker plenty of time to answer, and bounds the worst case everywhere
+        # events get published, not just the audit trail (see common-audit's KafkaAuditEventRepository).
+        max.block.ms: 3000
     consumer:
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:

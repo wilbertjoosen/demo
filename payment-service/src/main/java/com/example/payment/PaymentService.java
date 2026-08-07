@@ -1,22 +1,35 @@
 package com.example.payment;
 
+import com.example.common.model.PaymentMethod;
+import com.example.common.model.ShippingCarrier;
+
 import java.util.List;
+import java.util.Map;
 
 public interface PaymentService {
 
     /**
      * Simulates charging for the order; publishes PAYMENT_COMPLETED or PAYMENT_FAILED.
-     * {@code quantity} is carried forward into the published event's payload — event-carried
-     * state transfer, so downstream saga participants (shipping/delivery) don't need a synchronous
-     * call back to order-service just to know what they're shipping.
+     * {@code quantity}/{@code shippingCarrier} are carried forward into the published event's
+     * payload — event-carried state transfer, so downstream saga participants (shipping/delivery)
+     * don't need a synchronous call back to order-service just to know what they're shipping and how.
+     * If {@code method}'s mock gateway is currently unavailable (see {@link PaymentGatewayAvailability}),
+     * fails immediately without attempting the charge, same as a real integration would refuse to
+     * call a processor its own health check already reported down.
      */
-    void charge(String orderId, String email, int quantity);
+    void charge(String orderId, String keycloakUserId, String email, int quantity, PaymentMethod method, ShippingCarrier shippingCarrier);
 
     /** Compensating action: publishes PAYMENT_REFUNDED for an already-completed payment. */
     void refund(String orderId);
 
     List<Payment> list();
 
-    /** Soft delete — an admin record-keeping action, does not touch the underlying payment/refund status. */
+    /** Admin-only soft delete — record-keeping action, does not touch the underlying payment/refund status. */
     void delete(String id);
+
+    /** Current mock availability per payment method, used to enable/disable methods in checkout UI. */
+    Map<PaymentMethod, Boolean> availableMethods();
+
+    /** Admin-only: force a method's mock gateway up/down to demonstrate the unavailable path. */
+    void setMethodAvailability(PaymentMethod method, boolean available);
 }

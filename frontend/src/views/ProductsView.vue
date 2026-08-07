@@ -7,7 +7,7 @@ import { useOrdersStore } from '../stores/orders'
 import { useUsersStore } from '../stores/users'
 import ProductTable from '../components/products/ProductTable.vue'
 import OrderDialog from '../components/products/OrderDialog.vue'
-import type { Address, Product } from '../models'
+import type { Address, PaymentMethod, Product, ShippingCarrier } from '../models'
 
 const { t } = useI18n()
 const products = useProductsStore()
@@ -30,11 +30,22 @@ async function openOrderDialog(product: Product) {
   dialogVisible.value = true
 }
 
-async function placeOrder(payload: { quantity: number; address: Address }) {
+async function placeOrder(payload: {
+  quantity: number
+  address: Address
+  paymentMethod: PaymentMethod
+  shippingCarrier: ShippingCarrier
+}) {
   if (!selected.value) return
   placing.value = true
   try {
-    await orders.place({ productId: selected.value.id, quantity: payload.quantity, shippingAddress: payload.address })
+    await orders.place({
+      productId: selected.value.id,
+      quantity: payload.quantity,
+      shippingAddress: payload.address,
+      paymentMethod: payload.paymentMethod,
+      shippingCarrier: payload.shippingCarrier,
+    })
     ElMessage.success(t('products.placedSuccess'))
     dialogVisible.value = false
   } catch {

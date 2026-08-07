@@ -1,6 +1,8 @@
 package com.example.order;
 
 import com.example.common.model.Address;
+import com.example.common.model.PaymentMethod;
+import com.example.common.model.ShippingCarrier;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
@@ -20,6 +22,8 @@ public class OrderView {
     private String productId;
     private int quantity;
     private Address shippingAddress;
+    private PaymentMethod paymentMethod;
+    private ShippingCarrier shippingCarrier;
     private OrderStatus status;
     private Instant createdAt;
     private Instant updatedAt;
@@ -36,6 +40,8 @@ public class OrderView {
         view.productId = order.getProductId();
         view.quantity = order.getQuantity();
         view.shippingAddress = order.getShippingAddress();
+        view.paymentMethod = order.getPaymentMethod();
+        view.shippingCarrier = order.getShippingCarrier();
         view.status = order.getStatus();
         view.createdAt = order.getCreatedAt();
         view.updatedAt = order.getUpdatedAt();
@@ -60,6 +66,14 @@ public class OrderView {
 
     public Address getShippingAddress() {
         return shippingAddress;
+    }
+
+    public PaymentMethod getPaymentMethod() {
+        return paymentMethod;
+    }
+
+    public ShippingCarrier getShippingCarrier() {
+        return shippingCarrier;
     }
 
     public void setShippingAddress(Address shippingAddress) {
