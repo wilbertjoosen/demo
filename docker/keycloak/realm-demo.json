@@ -14,8 +14,8 @@
       "enabled": true,
       "publicClient": true,
       "protocol": "openid-connect",
-      "redirectUris": ["http://localhost:5173/*", "http://demo.localhost:8090/*"],
-      "webOrigins": ["http://localhost:5173", "http://demo.localhost:8090"],
+      "redirectUris": ["http://localhost:5173/*", "http://demo.localhost:18090/*"],
+      "webOrigins": ["http://localhost:5173", "http://demo.localhost:18090"],
       "standardFlowEnabled": true,
       "directAccessGrantsEnabled": true,
       "attributes": { "pkce.code.challenge.method": "S256" }
