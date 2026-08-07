@@ -116,7 +116,11 @@
     "productUpdated": "Producto actualizado",
     "productUpdateError": "No se pudo actualizar el producto",
     "userUpdated": "Usuario actualizado",
-    "userUpdateError": "No se pudo actualizar el usuario"
+    "userUpdateError": "No se pudo actualizar el usuario",
+    "impersonate": "Suplantar",
+    "confirmImpersonate": "¿Iniciar sesión como {username}? Deberás cerrar sesión para volver a tu propia cuenta.",
+    "impersonateError": "No se pudo suplantar a este usuario",
+    "impersonating": "Estás viendo la app como {username} (suplantado por {admin}) — cierra sesión para volver a tu propia cuenta"
   },
   "address": {
     "street": "Calle",

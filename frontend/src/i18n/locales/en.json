@@ -116,7 +116,11 @@
     "productUpdated": "Product updated",
     "productUpdateError": "Could not update product",
     "userUpdated": "User updated",
-    "userUpdateError": "Could not update user"
+    "userUpdateError": "Could not update user",
+    "impersonate": "Impersonate",
+    "confirmImpersonate": "Log in as {username}? You will need to log out to return to your own account.",
+    "impersonateError": "Could not impersonate this user",
+    "impersonating": "You are viewing the app as {username} (impersonated by {admin}) — log out to return to your own account"
   },
   "address": {
     "street": "Street",

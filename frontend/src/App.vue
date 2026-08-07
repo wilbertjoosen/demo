@@ -48,6 +48,9 @@ onUnmounted(stopPolling)
     <el-alert v-if="!backendAvailable" type="warning" :closable="false" show-icon class="!rounded-none">
       <template #title>{{ t('common.backendUnavailable') }}</template>
     </el-alert>
+    <el-alert v-if="auth.impersonatorUsername" type="info" :closable="false" show-icon class="!rounded-none">
+      <template #title>{{ t('admin.impersonating', { username: auth.username, admin: auth.impersonatorUsername }) }}</template>
+    </el-alert>
 
     <main class="mx-auto max-w-5xl px-4 py-6">
       <router-view />

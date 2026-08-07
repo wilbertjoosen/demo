@@ -6,6 +6,7 @@ import { useAuthStore } from '../stores/auth'
 import { useUsersStore } from '../stores/users'
 import { useProductsStore } from '../stores/products'
 import { inventoryApi } from '../api/inventory'
+import { impersonateUser } from '../api/impersonation'
 import { extractErrorMessage } from '../composables/useApiError'
 import UserTable from '../components/admin/UserTable.vue'
 import UserFormDialog from '../components/admin/UserFormDialog.vue'
@@ -53,6 +54,19 @@ function openUserEdit(user: User) {
 function openUserDetail(user: User) {
   editingUser.value = user
   userDetailDialog.value = true
+}
+
+async function impersonate(user: User) {
+  try {
+    await ElMessageBox.confirm(t('admin.confirmImpersonate', { username: user.username }), t('common.confirm'), { type: 'warning' })
+  } catch {
+    return
+  }
+  try {
+    await impersonateUser(user.keycloakId)
+  } catch (error) {
+    ElMessage.error(extractErrorMessage(error, t('admin.impersonateError'), t('common.serviceUnavailable')))
+  }
 }
 
 async function saveUser(payload: { displayName: string; nationalId: string; phone: string; shippingAddress: Address }) {
@@ -145,6 +159,7 @@ onMounted(() => {
           @edit="openUserEdit"
           @detail="openUserDetail"
           @delete="deleteUser"
+          @impersonate="impersonate"
         />
       </el-tab-pane>
 
