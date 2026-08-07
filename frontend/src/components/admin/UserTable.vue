@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n'
 import type { User } from '../../models'
 
 const props = defineProps<{ users: User[]; loading: boolean; currentUserKeycloakId: string }>()
-const emit = defineEmits<{ edit: [user: User]; detail: [user: User]; delete: [user: User] }>()
+const emit = defineEmits<{ edit: [user: User]; detail: [user: User]; delete: [user: User]; impersonate: [user: User] }>()
 const { t } = useI18n()
 
 const pageSize = 10
@@ -29,10 +29,17 @@ watch(
     <el-table-column prop="username" :label="t('admin.username')" />
     <el-table-column prop="email" :label="t('admin.email')" />
     <el-table-column prop="displayName" :label="t('admin.displayName')" />
-    <el-table-column width="240">
+    <el-table-column width="320">
       <template #default="{ row }">
         <el-button size="small" @click="emit('detail', row)">{{ t('common.detail') }}</el-button>
         <el-button size="small" @click="emit('edit', row)">{{ t('common.edit') }}</el-button>
+        <el-button
+          v-if="row.keycloakId !== currentUserKeycloakId"
+          size="small"
+          @click="emit('impersonate', row)"
+        >
+          {{ t('admin.impersonate') }}
+        </el-button>
         <el-button
           size="small"
           type="danger"

@@ -67,7 +67,10 @@
           "temporary": false
         }
       ],
-      "realmRoles": ["offline_access", "uma_authorization", "user", "admin"]
+      "realmRoles": ["offline_access", "uma_authorization", "user", "admin"],
+      "clientRoles": {
+        "realm-management": ["impersonation"]
+      }
     },
     {
       "username": "manager",
