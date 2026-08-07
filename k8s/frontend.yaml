@@ -1,0 +1,31 @@
+# No runtime env vars — Vite bakes VITE_* into the build (frontend/.env.production), since the SPA
+# runs in the user's own browser on the host regardless of how the backend is deployed.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: demo
+  labels: { app: frontend }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: frontend } }
+  template:
+    metadata: { labels: { app: frontend } }
+    spec:
+      containers:
+        - name: frontend
+          image: demo/frontend:local
+          imagePullPolicy: IfNotPresent
+          ports: [{ containerPort: 80 }]
+          resources:
+            requests: { cpu: "100m", memory: "128Mi" }
+            limits: { cpu: "500m", memory: "256Mi" }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: demo
+spec:
+  selector: { app: frontend }
+  ports: [{ name: http, port: 80, targetPort: 80 }]
