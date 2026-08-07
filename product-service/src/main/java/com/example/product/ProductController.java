@@ -48,7 +48,7 @@ public class ProductController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PRODUCT_MANAGER')")
     public ResponseEntity<EntityModel<Product>> create(@Valid @RequestBody CreateProductRequest request) {
         Product saved = productService.create(new Product(request.sku(), request.name(), request.price()));
         EntityModel<Product> model = assembler.toModel(saved);
@@ -61,21 +61,21 @@ public class ProductController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PRODUCT_MANAGER')")
     public EntityModel<Product> update(@PathVariable String id, @Valid @RequestBody UpdateProductRequest request) {
         Product patch = new Product(request.sku(), request.name(), request.price());
         return assembler.toModel(productService.update(id, patch));
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PRODUCT_MANAGER')")
     public ResponseEntity<Void> delete(@PathVariable String id) {
         productService.delete(id);
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/import")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PRODUCT_MANAGER')")
     public ResponseEntity<Map<String, String>> importProducts() {
         try {
             var execution = jobLauncher.run(productImportJob,

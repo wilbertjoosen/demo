@@ -56,14 +56,14 @@ public class InventoryController {
     }
 
     @PostMapping("/{productId}/stock")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'INVENTORY_MANAGER')")
     public EntityModel<InventoryItem> addStock(@PathVariable String productId, @Valid @RequestBody AddStockRequest request) {
         return assembler.toModel(inventoryService.addStock(productId, request.warehouseId(), request.quantity()));
     }
 
     /** {@code itemId} is the specific per-warehouse line's own id, not the productId. */
     @DeleteMapping("/{productId}/warehouses/{itemId}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'INVENTORY_MANAGER')")
     public ResponseEntity<Void> delete(@PathVariable String productId, @PathVariable String itemId) {
         inventoryService.delete(itemId);
         return ResponseEntity.noContent().build();

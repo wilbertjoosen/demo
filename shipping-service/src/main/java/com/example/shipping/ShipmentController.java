@@ -37,7 +37,7 @@ public class ShipmentController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SHIPPING_MANAGER')")
     public ResponseEntity<Void> delete(@PathVariable String id) {
         shippingService.delete(id);
         return ResponseEntity.noContent().build();

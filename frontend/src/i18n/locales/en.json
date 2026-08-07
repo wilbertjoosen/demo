@@ -16,7 +16,10 @@
     "create": "Create",
     "add": "Add",
     "backendUnavailable": "Backend services are unavailable right now — some features won't work until they come back. Retrying automatically...",
-    "serviceUnavailable": "This feature is unavailable right now. Please try again later."
+    "serviceUnavailable": "This feature is unavailable right now. Please try again later.",
+    "detail": "Detail",
+    "edit": "Edit",
+    "close": "Close"
   },
   "home": {
     "welcome": "Welcome, {name}",
@@ -100,7 +103,20 @@
     "userDeleteError": "Could not delete user",
     "productCreateError": "Could not create product",
     "productDeleteError": "Could not delete product",
-    "stockAddError": "Could not add stock"
+    "stockAddError": "Could not add stock",
+    "editProduct": "Edit product",
+    "productDetailTitle": "Product {sku}",
+    "createdAt": "Created at",
+    "updatedAt": "Updated at",
+    "createdBy": "Created by",
+    "lastModifiedBy": "Last modified by",
+    "editUserTitle": "Edit user {username}",
+    "userDetailTitle": "User {username}",
+    "cannotDeleteSelf": "You can't delete your own account",
+    "productUpdated": "Product updated",
+    "productUpdateError": "Could not update product",
+    "userUpdated": "User updated",
+    "userUpdateError": "Could not update user"
   },
   "address": {
     "street": "Street",

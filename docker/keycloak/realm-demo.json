@@ -5,7 +5,11 @@
   "roles": {
     "realm": [
       { "name": "user", "description": "Regular authenticated user" },
-      { "name": "admin", "description": "Administrative access (product/inventory management)" }
+      { "name": "admin", "description": "Full administrative access — superset of every domain role below" },
+      { "name": "finance", "description": "Payment/refund administration: gateway availability toggles, payment record deletion" },
+      { "name": "product_manager", "description": "Product catalog administration: create/update/delete products, batch import" },
+      { "name": "shipping_manager", "description": "Shipment administration: carrier/tracking record deletion" },
+      { "name": "inventory_manager", "description": "Inventory administration: stock adjustments, warehouse reservations" }
     ]
   },
   "clients": [
@@ -64,6 +68,22 @@
         }
       ],
       "realmRoles": ["offline_access", "uma_authorization", "user", "admin"]
+    },
+    {
+      "username": "manager",
+      "enabled": true,
+      "email": "manager@example.com",
+      "emailVerified": true,
+      "firstName": "Ops",
+      "lastName": "Manager",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "manager",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["offline_access", "uma_authorization", "user", "finance", "product_manager", "shipping_manager", "inventory_manager"]
     }
   ]
 }
