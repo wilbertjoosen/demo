@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { useUsersStore } from '../stores/users'
 import { useProductsStore } from '../stores/products'
 import { inventoryApi } from '../api/inventory'
+import { extractErrorMessage } from '../composables/useApiError'
 import UserTable from '../components/admin/UserTable.vue'
 import AdminProductTable from '../components/admin/AdminProductTable.vue'
 import ProductFormDialog from '../components/admin/ProductFormDialog.vue'
@@ -25,14 +26,22 @@ async function deleteUser(user: User) {
   } catch {
     return
   }
-  await users.remove(user.id)
-  ElMessage.success(t('admin.userDeleted'))
+  try {
+    await users.remove(user.id)
+    ElMessage.success(t('admin.userDeleted'))
+  } catch (error) {
+    ElMessage.error(extractErrorMessage(error, t('admin.userDeleteError'), t('common.serviceUnavailable')))
+  }
 }
 
 async function createProduct(payload: { sku: string; name: string; price: number }) {
-  await products.create(payload)
-  ElMessage.success(t('admin.productCreated'))
-  productDialog.value = false
+  try {
+    await products.create(payload)
+    ElMessage.success(t('admin.productCreated'))
+    productDialog.value = false
+  } catch (error) {
+    ElMessage.error(extractErrorMessage(error, t('admin.productCreateError'), t('common.serviceUnavailable')))
+  }
 }
 
 async function deleteProduct(product: Product) {
@@ -41,8 +50,12 @@ async function deleteProduct(product: Product) {
   } catch {
     return
   }
-  await products.remove(product.id)
-  ElMessage.success(t('admin.productDeleted'))
+  try {
+    await products.remove(product.id)
+    ElMessage.success(t('admin.productDeleted'))
+  } catch (error) {
+    ElMessage.error(extractErrorMessage(error, t('admin.productDeleteError'), t('common.serviceUnavailable')))
+  }
 }
 
 function openStockDialog(product: Product) {
@@ -52,9 +65,13 @@ function openStockDialog(product: Product) {
 
 async function addStock(payload: { warehouseId: string; quantity: number }) {
   if (!stockTarget.value) return
-  await inventoryApi.addStock(stockTarget.value.id, payload.warehouseId, payload.quantity)
-  ElMessage.success(t('admin.stockAdded'))
-  stockDialog.value = false
+  try {
+    await inventoryApi.addStock(stockTarget.value.id, payload.warehouseId, payload.quantity)
+    ElMessage.success(t('admin.stockAdded'))
+    stockDialog.value = false
+  } catch (error) {
+    ElMessage.error(extractErrorMessage(error, t('admin.stockAddError'), t('common.serviceUnavailable')))
+  }
 }
 
 onMounted(() => {

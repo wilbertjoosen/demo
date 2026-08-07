@@ -14,7 +14,9 @@
     "confirm": "Confirmar",
     "delete": "Eliminar",
     "create": "Crear",
-    "add": "Añadir"
+    "add": "Añadir",
+    "backendUnavailable": "Los servicios del backend no están disponibles en este momento — algunas funciones no funcionarán hasta que vuelvan. Reintentando automáticamente...",
+    "serviceUnavailable": "Esta función no está disponible en este momento. Inténtalo de nuevo más tarde."
   },
   "home": {
     "welcome": "Bienvenido, {name}",
@@ -94,7 +96,11 @@
     "userDeleted": "Usuario eliminado",
     "productCreated": "Producto creado",
     "productDeleted": "Producto eliminado",
-    "stockAdded": "Existencias añadidas"
+    "stockAdded": "Existencias añadidas",
+    "userDeleteError": "No se pudo eliminar el usuario",
+    "productCreateError": "No se pudo crear el producto",
+    "productDeleteError": "No se pudo eliminar el producto",
+    "stockAddError": "No se pudo agregar el stock"
   },
   "address": {
     "street": "Calle",
@@ -120,5 +126,9 @@
       "UPS": "UPS",
       "DHL": "DHL"
     }
+  },
+  "validation": {
+    "required": "Este campo es obligatorio",
+    "positive": "Debe ser mayor que 0"
   }
 }

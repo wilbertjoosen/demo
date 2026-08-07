@@ -14,7 +14,9 @@
     "confirm": "Confirm",
     "delete": "Delete",
     "create": "Create",
-    "add": "Add"
+    "add": "Add",
+    "backendUnavailable": "Backend services are unavailable right now — some features won't work until they come back. Retrying automatically...",
+    "serviceUnavailable": "This feature is unavailable right now. Please try again later."
   },
   "home": {
     "welcome": "Welcome, {name}",
@@ -94,7 +96,11 @@
     "userDeleted": "User deleted",
     "productCreated": "Product created",
     "productDeleted": "Product deleted",
-    "stockAdded": "Stock added"
+    "stockAdded": "Stock added",
+    "userDeleteError": "Could not delete user",
+    "productCreateError": "Could not create product",
+    "productDeleteError": "Could not delete product",
+    "stockAddError": "Could not add stock"
   },
   "address": {
     "street": "Street",
@@ -120,5 +126,9 @@
       "UPS": "UPS",
       "DHL": "DHL"
     }
+  },
+  "validation": {
+    "required": "This field is required",
+    "positive": "Must be greater than 0"
   }
 }
