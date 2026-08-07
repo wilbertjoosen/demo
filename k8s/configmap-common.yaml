@@ -16,6 +16,7 @@ data:
   KEYCLOAK_ISSUER_URI: http://localhost:8081/realms/demo
   KEYCLOAK_JWK_SET_URI: http://host.k3d.internal:8081/realms/demo/protocol/openid-connect/certs
   KEYCLOAK_TOKEN_URI: http://host.k3d.internal:8081/realms/demo/protocol/openid-connect/token
+  KEYCLOAK_ADMIN_URI: http://host.k3d.internal:8081/admin/realms/demo
   MONGO_HOST: host.k3d.internal
   MONGO_PORT: "27017"
   REDIS_HOST: host.k3d.internal

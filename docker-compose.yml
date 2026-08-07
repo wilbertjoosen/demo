@@ -80,6 +80,19 @@ services:
     depends_on:
       - kafka
 
+  rancher:
+    image: rancher/rancher:latest
+    container_name: demo-rancher
+    restart: unless-stopped
+    privileged: true
+    environment:
+      CATTLE_BOOTSTRAP_PASSWORD: rancherdemo123
+    ports:
+      - "9080:80"
+      - "9443:443"
+    volumes:
+      - rancher_data:/var/lib/rancher
+
   mailpit:
     image: axllent/mailpit:latest
     container_name: demo-mailpit
@@ -136,6 +149,22 @@ services:
       - "5601:5601"
     depends_on:
       - elasticsearch
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:5601/api/status | grep -q '\"level\":\"available\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  kibana-dashboard-init:
+    image: curlimages/curl:latest
+    container_name: demo-kibana-dashboard-init
+    restart: "no"
+    depends_on:
+      kibana:
+        condition: service_healthy
+    volumes:
+      - ./docker/kibana:/kibana:ro
+    entrypoint: ["sh", "-c", "curl -s -X POST http://kibana:5601/api/saved_objects/_import?overwrite=true -H 'kbn-xsrf: true' --form file=@/kibana/audit-trail-dashboard.ndjson"]
 
   redis:
     image: redis:7-alpine
@@ -188,6 +217,7 @@ services:
       GF_SECURITY_ADMIN_PASSWORD: admin
     volumes:
       - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./docker/grafana/dashboards:/etc/grafana/dashboards:ro
       - grafana_data:/var/lib/grafana
     ports:
       - "3000:3000"
@@ -272,6 +302,8 @@ services:
       <<: *app-env
       EUREKA_INSTANCE_HOSTNAME: user-service
       MONGO_DB: users
+      KEYCLOAK_TOKEN_URI: http://keycloak:8080/realms/demo/protocol/openid-connect/token
+      KEYCLOAK_ADMIN_URI: http://keycloak:8080/admin/realms/demo
     ports:
       - "8082:8082"
     depends_on:
@@ -438,6 +470,72 @@ services:
       - kafka
       - keycloak
 
+  product-media-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+      args:
+        SERVICE: product-media-service
+    container_name: demo-product-media-service
+    restart: unless-stopped
+    environment:
+      <<: *app-env
+      EUREKA_INSTANCE_HOSTNAME: product-media-service
+      MONGO_DB: media
+      MEDIA_UPLOAD_DIR: /data/media-uploads
+    volumes:
+      - media_uploads:/data/media-uploads
+    ports:
+      - "8092:8092"
+    depends_on:
+      - eureka-server
+      - config-server
+      - mongodb
+      - kafka
+      - keycloak
+
+  product-review-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+      args:
+        SERVICE: product-review-service
+    container_name: demo-product-review-service
+    restart: unless-stopped
+    environment:
+      <<: *app-env
+      EUREKA_INSTANCE_HOSTNAME: product-review-service
+      MONGO_DB: reviews
+    ports:
+      - "8093:8093"
+    depends_on:
+      - eureka-server
+      - config-server
+      - mongodb
+      - kafka
+      - keycloak
+
+  chat-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+      args:
+        SERVICE: chat-service
+    container_name: demo-chat-service
+    restart: unless-stopped
+    environment:
+      <<: *app-env
+      EUREKA_INSTANCE_HOSTNAME: chat-service
+      MONGO_DB: chat
+    ports:
+      - "8094:8094"
+    depends_on:
+      - eureka-server
+      - config-server
+      - mongodb
+      - kafka
+      - keycloak
+
   notification-service:
     build:
       context: .
@@ -478,3 +576,5 @@ volumes:
   prometheus_data:
   loki_data:
   grafana_data:
+  rancher_data:
+  media_uploads:

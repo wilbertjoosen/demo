@@ -1,4 +1,45 @@
 {
+  "audit": {
+    "historyTitle": "Change history",
+    "noHistory": "No history recorded yet",
+    "loadError": "Could not load history",
+    "field": "Field",
+    "oldValue": "Old value",
+    "newValue": "New value",
+    "empty": "(empty)",
+    "action": {
+      "CREATED": "Created",
+      "UPDATED": "Updated",
+      "NO_CHANGE": "Resubmitted (no change)",
+      "VIEWED": "Viewed",
+      "FAILED": "Failed"
+    }
+  },
+  "media": {
+    "manage": "Manage media",
+    "manageTitle": "Media — {name}",
+    "type": "Type",
+    "url": "URL",
+    "caption": "Caption",
+    "preview": "Preview",
+    "add": "Add",
+    "uploadFile": "Upload file",
+    "typeAutoDetected": "Type is detected automatically from the file you choose.",
+    "uploaded": "File uploaded — URL filled in below",
+    "uploadError": "Could not upload file",
+    "added": "Media added",
+    "addError": "Could not add media",
+    "deleted": "Media deleted",
+    "deleteError": "Could not delete media",
+    "loadError": "Could not load media",
+    "confirmDelete": "Delete this media item?"
+  },
+  "chat": {
+    "viewHistory": "View chat history",
+    "historyTitle": "Chat history — {name}",
+    "empty": "No messages yet",
+    "loadError": "Could not load chat history"
+  },
   "nav": {
     "home": "Demo Shop",
     "products": "Products",
@@ -76,7 +117,7 @@
   },
   "profile": {
     "title": "My Profile",
-    "displayName": "Display name",
+    "identityFromKeycloak": "Username, email and name are managed in Keycloak and cannot be changed here.",
     "phone": "Phone",
     "nationalId": "National ID",
     "shippingAddress": "Shipping address",
@@ -89,7 +130,10 @@
     "products": "Products",
     "username": "Username",
     "email": "Email",
-    "displayName": "Display name",
+    "firstName": "First name",
+    "lastName": "Last name",
+    "name": "Name",
+    "history": "History",
     "newProduct": "New product",
     "addStock": "Add stock",
     "addStockTitle": "Add stock — {name}",
@@ -122,8 +166,8 @@
     "impersonateError": "Could not impersonate this user",
     "impersonating": "You are viewing the app as {username} (impersonated by {admin}) — log out to return to your own account",
     "newUser": "New user",
-    "keycloakId": "Keycloak ID",
-    "keycloakIdHint": "The person's Keycloak user UUID — this only creates a local profile record, not a login-capable account",
+    "temporaryPassword": "Temporary password",
+    "identityStoredInKeycloak": "Saving these updates the account directly in Keycloak.",
     "userCreated": "User created",
     "userCreateError": "Could not create user"
   },
@@ -164,6 +208,8 @@
     "placeholder": "Write a comment...",
     "post": "Post",
     "postError": "Could not post comment",
-    "deleteError": "Could not delete comment"
+    "deleteError": "Could not delete comment",
+    "editError": "Could not edit comment",
+    "edited": "edited"
   }
 }

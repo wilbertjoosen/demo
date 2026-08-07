@@ -34,6 +34,17 @@
       "directAccessGrantsEnabled": false,
       "serviceAccountsEnabled": true,
       "description": "Machine-to-machine client_credentials client — order-service uses this to call inventory-service"
+    },
+    {
+      "clientId": "user-service-admin-client",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "user-service-admin-secret",
+      "protocol": "openid-connect",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "description": "Machine-to-machine client_credentials client — user-service uses this to read (and admin-create) usernames/emails/names via Keycloak's own Admin REST API instead of duplicating them in Mongo"
     }
   ],
   "users": [
@@ -87,6 +98,14 @@
         }
       ],
       "realmRoles": ["offline_access", "uma_authorization", "user", "finance", "product_manager", "shipping_manager", "inventory_manager"]
+    },
+    {
+      "username": "service-account-user-service-admin-client",
+      "enabled": true,
+      "serviceAccountClientId": "user-service-admin-client",
+      "clientRoles": {
+        "realm-management": ["view-users", "manage-users", "query-users"]
+      }
     }
   ]
 }

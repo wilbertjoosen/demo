@@ -35,6 +35,16 @@ public class CommentController {
         return ResponseEntity.status(201).body(assembler.toModel(created));
     }
 
+    public record UpdateCommentRequest(@NotBlank String body) {
+    }
+
+    @PutMapping("/{id}")
+    public EntityModel<Comment> update(@AuthenticationPrincipal Jwt jwt, @PathVariable String id, @Valid @RequestBody UpdateCommentRequest request) {
+        boolean isAdmin = hasAdminRole(jwt);
+        Comment updated = commentService.update(id, jwt.getSubject(), isAdmin, request.body());
+        return assembler.toModel(updated);
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@AuthenticationPrincipal Jwt jwt, @PathVariable String id) {
         boolean isAdmin = hasAdminRole(jwt);

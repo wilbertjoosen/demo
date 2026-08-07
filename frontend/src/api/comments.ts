@@ -11,6 +11,10 @@ export const commentsApi = {
     const { data } = await http.post('/api/comments', payload)
     return data
   },
+  async update(id: string, body: string): Promise<Comment> {
+    const { data } = await http.put(`/api/comments/${id}`, { body })
+    return data
+  },
   async remove(id: string): Promise<void> {
     await http.delete(`/api/comments/${id}`)
   },

@@ -5,7 +5,8 @@ export interface User {
   keycloakId: string
   username: string
   email: string
-  displayName: string
+  firstName: string | null
+  lastName: string | null
   shippingAddress: Address | null
   nationalId: string | null
   phone: string | null

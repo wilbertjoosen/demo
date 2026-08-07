@@ -10,10 +10,11 @@ const emit = defineEmits<{
   'update:modelValue': [value: boolean]
   submit: [
     {
-      keycloakId?: string
       username?: string
       email?: string
-      displayName: string
+      firstName?: string
+      lastName?: string
+      password?: string
       nationalId: string
       phone: string
       shippingAddress: Address
@@ -27,32 +28,36 @@ const isCreate = computed(() => !props.user)
 const formRef = ref<FormInstance>()
 const emptyAddress: Address = { street: '', city: '', postalCode: '', country: '' }
 const form = reactive({
-  keycloakId: '',
   username: '',
   email: '',
-  displayName: '',
+  firstName: '',
+  lastName: '',
+  password: '',
   nationalId: '',
   phone: '',
   shippingAddress: { ...emptyAddress },
 })
 
-const rules: FormRules = {
-  keycloakId: [{ required: true, message: t('validation.required'), trigger: 'blur' }],
+const rules = computed<FormRules>(() => ({
   username: [{ required: true, message: t('validation.required'), trigger: 'blur' }],
   email: [
     { required: true, message: t('validation.required'), trigger: 'blur' },
     { type: 'email', message: t('validation.email'), trigger: 'blur' },
   ],
-}
+  firstName: [{ required: true, message: t('validation.required'), trigger: 'blur' }],
+  lastName: [{ required: true, message: t('validation.required'), trigger: 'blur' }],
+  ...(isCreate.value ? { password: [{ required: true, message: t('validation.required'), trigger: 'blur' }] } : {}),
+}))
 
 watch(
   () => props.modelValue,
   (open) => {
     if (!open) return
-    form.keycloakId = ''
     form.username = props.user?.username ?? ''
     form.email = props.user?.email ?? ''
-    form.displayName = props.user?.displayName ?? ''
+    form.firstName = props.user?.firstName ?? ''
+    form.lastName = props.user?.lastName ?? ''
+    form.password = ''
     form.nationalId = props.user?.nationalId ?? ''
     form.phone = props.user?.phone ?? ''
     form.shippingAddress = props.user?.shippingAddress ? { ...props.user.shippingAddress } : { ...emptyAddress }
@@ -61,13 +66,14 @@ watch(
 )
 
 async function submit() {
-  if (isCreate.value) {
-    const valid = await formRef.value?.validate().catch(() => false)
-    if (!valid) return
-  }
+  const valid = await formRef.value?.validate().catch(() => false)
+  if (!valid) return
   emit('submit', {
-    ...(isCreate.value ? { keycloakId: form.keycloakId, username: form.username, email: form.email } : {}),
-    displayName: form.displayName,
+    username: form.username,
+    email: form.email,
+    firstName: form.firstName,
+    lastName: form.lastName,
+    ...(isCreate.value ? { password: form.password } : {}),
     nationalId: form.nationalId,
     phone: form.phone,
     shippingAddress: form.shippingAddress,
@@ -82,20 +88,22 @@ async function submit() {
     width="420"
     @update:model-value="emit('update:modelValue', $event)"
   >
-    <el-form ref="formRef" :model="form" :rules="isCreate ? rules : {}" label-position="top">
-      <template v-if="isCreate">
-        <el-form-item :label="t('admin.keycloakId')" prop="keycloakId">
-          <el-input v-model="form.keycloakId" :placeholder="t('admin.keycloakIdHint')" />
-        </el-form-item>
-        <el-form-item :label="t('admin.username')" prop="username">
-          <el-input v-model="form.username" />
-        </el-form-item>
-        <el-form-item :label="t('admin.email')" prop="email">
-          <el-input v-model="form.email" />
-        </el-form-item>
-      </template>
-      <el-form-item :label="t('admin.displayName')">
-        <el-input v-model="form.displayName" />
+    <el-form ref="formRef" :model="form" :rules="rules" label-position="top">
+      <el-alert type="info" :closable="false" :title="t('admin.identityStoredInKeycloak')" class="mb-4" />
+      <el-form-item :label="t('admin.username')" prop="username">
+        <el-input v-model="form.username" />
+      </el-form-item>
+      <el-form-item :label="t('admin.email')" prop="email">
+        <el-input v-model="form.email" />
+      </el-form-item>
+      <el-form-item :label="t('admin.firstName')" prop="firstName">
+        <el-input v-model="form.firstName" />
+      </el-form-item>
+      <el-form-item :label="t('admin.lastName')" prop="lastName">
+        <el-input v-model="form.lastName" />
+      </el-form-item>
+      <el-form-item v-if="isCreate" :label="t('admin.temporaryPassword')" prop="password">
+        <el-input v-model="form.password" show-password />
       </el-form-item>
       <el-form-item :label="t('profile.nationalId')">
         <el-input v-model="form.nationalId" />

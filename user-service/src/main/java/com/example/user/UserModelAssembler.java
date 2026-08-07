@@ -9,17 +9,17 @@ import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.linkTo;
 import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.methodOn;
 
 @Component
-class UserModelAssembler implements RepresentationModelAssembler<User, EntityModel<User>> {
+class UserModelAssembler implements RepresentationModelAssembler<UserProfileView, EntityModel<UserProfileView>> {
 
     @Override
-    public EntityModel<User> toModel(User user) {
+    public EntityModel<UserProfileView> toModel(UserProfileView user) {
         return EntityModel.of(user,
-                linkTo(methodOn(UserController.class).getById(user.getId())).withSelfRel());
+                linkTo(methodOn(UserController.class).getById(user.id())).withSelfRel());
     }
 
     @Override
-    public CollectionModel<EntityModel<User>> toCollectionModel(Iterable<? extends User> users) {
-        CollectionModel<EntityModel<User>> model = RepresentationModelAssembler.super.toCollectionModel(users);
+    public CollectionModel<EntityModel<UserProfileView>> toCollectionModel(Iterable<? extends UserProfileView> users) {
+        CollectionModel<EntityModel<UserProfileView>> model = RepresentationModelAssembler.super.toCollectionModel(users);
         return model.add(linkTo(methodOn(UserController.class).list()).withSelfRel());
     }
 }

@@ -53,4 +53,8 @@ public class Comment {
         this.deleted = true;
         this.deletedAt = Instant.now();
     }
+
+    void updateBody(String body) {
+        this.body = body;
+    }
 }

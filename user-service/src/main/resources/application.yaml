@@ -19,6 +19,20 @@ spring:
       properties:
         spring.json.trusted.packages: "*"
 
+  security:
+    oauth2:
+      client:
+        registration:
+          keycloak-admin:
+            client-id: user-service-admin-client
+            client-secret: ${USER_SERVICE_ADMIN_CLIENT_SECRET:user-service-admin-secret}
+            authorization-grant-type: client_credentials
+        provider:
+          keycloak-admin:
+            # token-uri directly (skips OIDC discovery) — needs the internally-resolvable Keycloak
+            # address, same internal/external split as keycloak.jwk-set-uri below.
+            token-uri: ${KEYCLOAK_TOKEN_URI:http://localhost:8081/realms/demo/protocol/openid-connect/token}
+
 eureka:
   client:
     service-url:
@@ -30,6 +44,7 @@ eureka:
 keycloak:
   issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8081/realms/demo}
   jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://localhost:8081/realms/demo/protocol/openid-connect/certs}
+  admin-uri: ${KEYCLOAK_ADMIN_URI:http://localhost:8081/admin/realms/demo}
 
 management:
   endpoint:
