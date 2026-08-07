@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { View, Edit, Switch, Delete } from '@element-plus/icons-vue'
 import type { User } from '../../models'
 
 const props = defineProps<{ users: User[]; loading: boolean; currentUserKeycloakId: string }>()
@@ -29,26 +30,27 @@ watch(
     <el-table-column prop="username" :label="t('admin.username')" />
     <el-table-column prop="email" :label="t('admin.email')" />
     <el-table-column prop="displayName" :label="t('admin.displayName')" />
-    <el-table-column width="320">
+    <el-table-column width="170">
       <template #default="{ row }">
-        <el-button size="small" @click="emit('detail', row)">{{ t('common.detail') }}</el-button>
-        <el-button size="small" @click="emit('edit', row)">{{ t('common.edit') }}</el-button>
-        <el-button
-          v-if="row.keycloakId !== currentUserKeycloakId"
-          size="small"
-          @click="emit('impersonate', row)"
-        >
-          {{ t('admin.impersonate') }}
-        </el-button>
-        <el-button
-          size="small"
-          type="danger"
-          :disabled="row.keycloakId === currentUserKeycloakId"
-          :title="row.keycloakId === currentUserKeycloakId ? t('admin.cannotDeleteSelf') : ''"
-          @click="emit('delete', row)"
-        >
-          {{ t('common.delete') }}
-        </el-button>
+        <el-tooltip :content="t('common.detail')">
+          <el-button size="small" :icon="View" circle @click="emit('detail', row)" />
+        </el-tooltip>
+        <el-tooltip :content="t('common.edit')">
+          <el-button size="small" :icon="Edit" circle @click="emit('edit', row)" />
+        </el-tooltip>
+        <el-tooltip v-if="row.keycloakId !== currentUserKeycloakId" :content="t('admin.impersonate')">
+          <el-button size="small" :icon="Switch" circle @click="emit('impersonate', row)" />
+        </el-tooltip>
+        <el-tooltip :content="row.keycloakId === currentUserKeycloakId ? t('admin.cannotDeleteSelf') : t('common.delete')">
+          <el-button
+            size="small"
+            type="danger"
+            :icon="Delete"
+            circle
+            :disabled="row.keycloakId === currentUserKeycloakId"
+            @click="emit('delete', row)"
+          />
+        </el-tooltip>
       </template>
     </el-table-column>
   </el-table>

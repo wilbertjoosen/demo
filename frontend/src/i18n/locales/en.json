@@ -120,7 +120,12 @@
     "impersonate": "Impersonate",
     "confirmImpersonate": "Log in as {username}? You will need to log out to return to your own account.",
     "impersonateError": "Could not impersonate this user",
-    "impersonating": "You are viewing the app as {username} (impersonated by {admin}) — log out to return to your own account"
+    "impersonating": "You are viewing the app as {username} (impersonated by {admin}) — log out to return to your own account",
+    "newUser": "New user",
+    "keycloakId": "Keycloak ID",
+    "keycloakIdHint": "The person's Keycloak user UUID — this only creates a local profile record, not a login-capable account",
+    "userCreated": "User created",
+    "userCreateError": "Could not create user"
   },
   "address": {
     "street": "Street",
@@ -149,6 +154,16 @@
   },
   "validation": {
     "required": "This field is required",
-    "positive": "Must be greater than 0"
+    "positive": "Must be greater than 0",
+    "email": "Must be a valid email address"
+  },
+  "comments": {
+    "button": "Comments",
+    "title": "Comments — {name}",
+    "empty": "No comments yet — be the first to comment",
+    "placeholder": "Write a comment...",
+    "post": "Post",
+    "postError": "Could not post comment",
+    "deleteError": "Could not delete comment"
   }
 }

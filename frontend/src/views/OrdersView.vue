@@ -3,7 +3,7 @@ import { onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import { useOrdersStore } from '../stores/orders'
-import { extractErrorMessage } from '../composables/useApiError'
+import { showApiError } from '../composables/useApiError'
 import OrderTable from '../components/orders/OrderTable.vue'
 import OrderAddressDialog from '../components/orders/OrderAddressDialog.vue'
 import ShipmentTrackingDialog from '../components/orders/ShipmentTrackingDialog.vue'
@@ -33,7 +33,7 @@ async function cancelOrder(order: OrderView) {
     await orders.cancel(order.id)
     ElMessage.success(t('orders.cancelledSuccess'))
   } catch (error) {
-    ElMessage.error(extractErrorMessage(error, t('orders.cancelError'), t('common.serviceUnavailable')))
+    showApiError(error, t('orders.cancelError'), t('common.serviceUnavailable'))
   }
 }
 
@@ -50,7 +50,7 @@ async function saveAddress(address: Address) {
     ElMessage.success(t('orders.addressUpdated'))
     dialogVisible.value = false
   } catch (error) {
-    ElMessage.error(extractErrorMessage(error, t('orders.addressUpdateError'), t('common.serviceUnavailable')))
+    showApiError(error, t('orders.addressUpdateError'), t('common.serviceUnavailable'))
   } finally {
     saving.value = false
   }

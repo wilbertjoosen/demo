@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import type { FormInstance } from 'element-plus'
 import AddressForm from '../AddressForm.vue'
 import { paymentsApi } from '../../api/payments'
 import { shipmentsApi } from '../../api/shipments'
@@ -21,6 +22,7 @@ const { t } = useI18n()
 const paymentMethods: PaymentMethod[] = ['CREDIT_CARD', 'DEBIT_CARD', 'PAYPAL', 'PIX', 'BOLETO']
 const shippingCarriers: ShippingCarrier[] = ['UPS', 'DHL']
 
+const formRef = ref<FormInstance>()
 const form = reactive({
   quantity: 1,
   address: { street: '', city: '', postalCode: '', country: '' } as Address,
@@ -54,6 +56,7 @@ watch(
     form.shippingCarrier = 'UPS'
     methodAvailability.value = null
     refreshQuote()
+    formRef.value?.clearValidate()
     try {
       methodAvailability.value = await paymentsApi.methods()
     } catch {
@@ -64,7 +67,9 @@ watch(
 
 watch(() => [form.shippingCarrier, form.quantity], refreshQuote)
 
-function submit() {
+async function submit() {
+  const valid = await formRef.value?.validate().catch(() => false)
+  if (!valid) return
   emit('submit', {
     quantity: form.quantity,
     address: form.address,
@@ -77,11 +82,11 @@ function submit() {
 <template>
   <el-dialog :model-value="modelValue" :title="t('products.orderDialogTitle', { name: product?.name ?? '' })" width="460"
     @update:model-value="emit('update:modelValue', $event)">
-    <el-form label-position="top">
+    <el-form ref="formRef" :model="form" label-position="top">
       <el-form-item :label="t('products.quantity')">
         <el-input-number v-model="form.quantity" :min="1" />
       </el-form-item>
-      <AddressForm v-model="form.address" />
+      <AddressForm v-model="form.address" prop-prefix="address" />
       <el-form-item :label="t('products.paymentMethod')">
         <el-select v-model="form.paymentMethod" class="w-full">
           <el-option

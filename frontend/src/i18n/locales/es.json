@@ -120,7 +120,12 @@
     "impersonate": "Suplantar",
     "confirmImpersonate": "¿Iniciar sesión como {username}? Deberás cerrar sesión para volver a tu propia cuenta.",
     "impersonateError": "No se pudo suplantar a este usuario",
-    "impersonating": "Estás viendo la app como {username} (suplantado por {admin}) — cierra sesión para volver a tu propia cuenta"
+    "impersonating": "Estás viendo la app como {username} (suplantado por {admin}) — cierra sesión para volver a tu propia cuenta",
+    "newUser": "Nuevo usuario",
+    "keycloakId": "ID de Keycloak",
+    "keycloakIdHint": "El UUID de usuario de Keycloak de la persona — esto solo crea un registro de perfil local, no una cuenta con inicio de sesión",
+    "userCreated": "Usuario creado",
+    "userCreateError": "No se pudo crear el usuario"
   },
   "address": {
     "street": "Calle",
@@ -149,6 +154,16 @@
   },
   "validation": {
     "required": "Este campo es obligatorio",
-    "positive": "Debe ser mayor que 0"
+    "positive": "Debe ser mayor que 0",
+    "email": "Debe ser un correo electrónico válido"
+  },
+  "comments": {
+    "button": "Comentarios",
+    "title": "Comentarios — {name}",
+    "empty": "Aún no hay comentarios — sé el primero",
+    "placeholder": "Escribe un comentario...",
+    "post": "Publicar",
+    "postError": "No se pudo publicar el comentario",
+    "deleteError": "No se pudo eliminar el comentario"
   }
 }

@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { usersApi, type ProfileUpdate } from '../api/users'
+import { usersApi, type CreateUserPayload, type ProfileUpdate } from '../api/users'
 import type { User } from '../models'
 
 export const useUsersStore = defineStore('users', {
@@ -22,6 +22,10 @@ export const useUsersStore = defineStore('users', {
     },
     async updateMe(payload: ProfileUpdate) {
       this.me = await usersApi.updateMe(payload)
+    },
+    async create(payload: CreateUserPayload) {
+      await usersApi.create(payload)
+      await this.load()
     },
     async update(id: string, payload: ProfileUpdate) {
       await usersApi.update(id, payload)

@@ -1,9 +1,14 @@
 import { ElNotification } from 'element-plus'
+import type { NotificationHandle } from 'element-plus'
 import { useNotificationsStore, type NotificationEvent } from '../stores/notifications'
 
 let socket: WebSocket | null = null
 
-/** Opens (once) the live saga-event WebSocket and feeds every frame into the notifications store. */
+/** One saga (an order going through CREATED -> PAID -> SHIPPED -> ...) reuses a single toast, updated
+ * in place at each step, instead of stacking a new card per event — a fast-moving saga was piling up
+ * 4+ simultaneous notifications for one order. */
+const activeByOrderId = new Map<string, NotificationHandle>()
+
 export function useNotifications() {
   const store = useNotificationsStore()
 
@@ -16,12 +21,19 @@ export function useNotifications() {
       try {
         const parsed: NotificationEvent = JSON.parse(event.data)
         store.push(parsed)
-        ElNotification({
+
+        const key = parsed.orderId ?? parsed.eventType
+        activeByOrderId.get(key)?.close()
+        const handle = ElNotification({
           title: parsed.eventType.replaceAll('_', ' '),
           message: parsed.orderId ? `Order ${parsed.orderId}` : '',
           type: parsed.eventType.includes('FAILED') ? 'error' : 'success',
           duration: 4000,
+          onClose: () => {
+            if (activeByOrderId.get(key) === handle) activeByOrderId.delete(key)
+          },
         })
+        activeByOrderId.set(key, handle)
       } catch {
         // ignore malformed frames
       }

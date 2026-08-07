@@ -1,0 +1,18 @@
+# Reuses the same Traefik ingress controller and published k3d loadbalancer ports (18090/18453)
+# as k8s/ingress.yaml — no extra port-forward needed to reach the ArgoCD UI. Requires
+# argocd-server's Deployment to run with --insecure (serves plain HTTP) since Traefik proxies to
+# it directly rather than doing TLS passthrough to ArgoCD's own self-signed cert.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: argocd-ingress
+  namespace: argocd
+spec:
+  rules:
+    - host: argocd.localhost
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service: { name: argocd-server, port: { number: 80 } }

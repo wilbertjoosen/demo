@@ -1,30 +1,38 @@
 import { isAxiosError } from 'axios'
+import { ElMessage } from 'element-plus'
 
-/**
- * Backend validation failures come back from ApiExceptionHandler as
- * {"status":400,"message":"validation failed","errors":{field: message}} — surface those
- * per-field messages when present instead of a generic "something went wrong" toast.
- */
 /** Gateway/downstream-outage status codes — the request reached something, but not the actual service. */
 const SERVICE_UNAVAILABLE_STATUSES = new Set([502, 503, 504])
 
-export function extractErrorMessage(error: unknown, fallback: string, serviceUnavailableMessage?: string): string {
+function escapeHtml(value: string): string {
+  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+
+/**
+ * Backend validation failures come back from ApiExceptionHandler as
+ * {"status":400,"message":"validation failed","errors":{field: message}} — shown as a bullet list
+ * (one field per line) rather than a single semicolon-joined sentence. Network failures and
+ * 502/503/504 (reached the gateway, not the actual service) get a distinct "try again later"
+ * message instead of a generic failure.
+ */
+export function showApiError(error: unknown, fallback: string, serviceUnavailableMessage?: string): void {
   if (isAxiosError(error)) {
-    // No response at all (connection refused/timeout) means the request never reached anything
-    // that could return a proper error body; a 502/503/504 means it reached the gateway but the
-    // downstream service it routes to is down. Both are "try again later", not a rejected request.
     if (serviceUnavailableMessage && (!error.response || SERVICE_UNAVAILABLE_STATUSES.has(error.response.status))) {
-      return serviceUnavailableMessage
+      ElMessage.error(serviceUnavailableMessage)
+      return
     }
     const data = error.response?.data as { message?: string; errors?: Record<string, string> } | undefined
     if (data?.errors && Object.keys(data.errors).length > 0) {
-      return Object.entries(data.errors)
-        .map(([field, message]) => `${field}: ${message}`)
-        .join('; ')
+      const items = Object.entries(data.errors)
+        .map(([field, message]) => `<li>${escapeHtml(field)}: ${escapeHtml(message)}</li>`)
+        .join('')
+      ElMessage({ message: `<ul class="list-disc pl-4">${items}</ul>`, type: 'error', dangerouslyUseHTMLString: true })
+      return
     }
     if (data?.message) {
-      return data.message
+      ElMessage.error(data.message)
+      return
     }
   }
-  return fallback
+  ElMessage.error(fallback)
 }

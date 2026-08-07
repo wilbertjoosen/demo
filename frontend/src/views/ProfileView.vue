@@ -3,6 +3,7 @@ import { onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import { useUsersStore } from '../stores/users'
+import { showApiError } from '../composables/useApiError'
 import AddressForm from '../components/AddressForm.vue'
 import type { Address } from '../models'
 
@@ -48,8 +49,8 @@ async function save() {
       shippingAddress: form.address,
     })
     ElMessage.success(t('profile.updated'))
-  } catch {
-    ElMessage.error(t('profile.updateError'))
+  } catch (error) {
+    showApiError(error, t('profile.updateError'), t('common.serviceUnavailable'))
   } finally {
     saving.value = false
   }
@@ -72,7 +73,7 @@ onMounted(load)
         <el-input v-model="form.nationalId" />
       </el-form-item>
       <el-divider>{{ t('profile.shippingAddress') }}</el-divider>
-      <AddressForm v-model="form.address" />
+      <AddressForm v-model="form.address" prop-prefix="address" :required="false" />
       <el-button type="primary" :loading="saving" @click="save">{{ t('common.save') }}</el-button>
     </el-form>
   </div>
