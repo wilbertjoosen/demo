@@ -13,7 +13,6 @@ const loading = ref(false)
 const saving = ref(false)
 
 const form = reactive({
-  displayName: '',
   phone: '',
   nationalId: '',
   address: { street: '', city: '', postalCode: '', country: '' } as Address,
@@ -23,7 +22,6 @@ watch(
   () => users.me,
   (me) => {
     if (!me) return
-    form.displayName = me.displayName ?? ''
     form.phone = me.phone ?? ''
     form.nationalId = me.nationalId ?? ''
     if (me.shippingAddress) form.address = { ...me.shippingAddress }
@@ -43,7 +41,6 @@ async function save() {
   saving.value = true
   try {
     await users.updateMe({
-      displayName: form.displayName,
       phone: form.phone,
       nationalId: form.nationalId,
       shippingAddress: form.address,
@@ -62,10 +59,14 @@ onMounted(load)
 <template>
   <div class="max-w-lg">
     <h1 class="mb-4 text-xl font-semibold">{{ t('profile.title') }}</h1>
+    <el-descriptions v-if="users.me" :column="1" border class="mb-6">
+      <el-descriptions-item :label="t('admin.username')">{{ users.me.username }}</el-descriptions-item>
+      <el-descriptions-item :label="t('admin.email')">{{ users.me.email }}</el-descriptions-item>
+      <el-descriptions-item :label="t('admin.firstName')">{{ users.me.firstName ?? '—' }}</el-descriptions-item>
+      <el-descriptions-item :label="t('admin.lastName')">{{ users.me.lastName ?? '—' }}</el-descriptions-item>
+    </el-descriptions>
+    <p class="mb-4 text-sm text-gray-500">{{ t('profile.identityFromKeycloak') }}</p>
     <el-form v-loading="loading" label-position="top">
-      <el-form-item :label="t('profile.displayName')">
-        <el-input v-model="form.displayName" />
-      </el-form-item>
       <el-form-item :label="t('profile.phone')">
         <el-input v-model="form.phone" />
       </el-form-item>

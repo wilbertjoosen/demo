@@ -24,6 +24,17 @@ class CommentServiceImpl implements CommentService {
     }
 
     @Override
+    public Comment update(String id, String requesterKeycloakId, boolean isAdmin, String body) {
+        Comment comment = commentRepository.findByIdAndDeletedFalse(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (!isAdmin && !comment.getKeycloakUserId().equals(requesterKeycloakId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You can only edit your own comments");
+        }
+        comment.updateBody(body);
+        return commentRepository.save(comment);
+    }
+
+    @Override
     public void delete(String id, String requesterKeycloakId, boolean isAdmin) {
         Comment comment = commentRepository.findByIdAndDeletedFalse(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));

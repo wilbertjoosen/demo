@@ -3,7 +3,6 @@ import { unwrapCollection } from './hal'
 import type { Address, User } from '../models'
 
 export interface ProfileUpdate {
-  displayName?: string
   shippingAddress?: Address
   nationalId?: string
   phone?: string
@@ -11,9 +10,11 @@ export interface ProfileUpdate {
 }
 
 export interface CreateUserPayload extends ProfileUpdate {
-  keycloakId: string
   username: string
   email: string
+  firstName: string
+  lastName: string
+  password: string
 }
 
 export const usersApi = {

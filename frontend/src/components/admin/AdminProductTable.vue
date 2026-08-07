@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { View, Edit, Box, Delete } from '@element-plus/icons-vue'
+import { View, Edit, Box, Delete, Clock, Picture, ChatDotRound } from '@element-plus/icons-vue'
 import type { Product } from '../../models'
 
 const props = defineProps<{ products: Product[]; loading: boolean }>()
@@ -10,6 +10,9 @@ const emit = defineEmits<{
   edit: [product: Product]
   detail: [product: Product]
   delete: [product: Product]
+  history: [product: Product]
+  media: [product: Product]
+  chat: [product: Product]
 }>()
 const { t } = useI18n()
 
@@ -37,13 +40,22 @@ watch(
     <el-table-column :label="t('products.price')" width="100">
       <template #default="{ row }">${{ row.price.toFixed(2) }}</template>
     </el-table-column>
-    <el-table-column width="170">
+    <el-table-column width="290">
       <template #default="{ row }">
         <el-tooltip :content="t('common.detail')">
           <el-button size="small" :icon="View" circle @click="emit('detail', row)" />
         </el-tooltip>
         <el-tooltip :content="t('common.edit')">
           <el-button size="small" :icon="Edit" circle @click="emit('edit', row)" />
+        </el-tooltip>
+        <el-tooltip :content="t('admin.history')">
+          <el-button size="small" :icon="Clock" circle @click="emit('history', row)" />
+        </el-tooltip>
+        <el-tooltip :content="t('media.manage')">
+          <el-button size="small" :icon="Picture" circle @click="emit('media', row)" />
+        </el-tooltip>
+        <el-tooltip :content="t('chat.viewHistory')">
+          <el-button size="small" :icon="ChatDotRound" circle @click="emit('chat', row)" />
         </el-tooltip>
         <el-tooltip :content="t('admin.addStock')">
           <el-button size="small" :icon="Box" circle @click="emit('add-stock', row)" />

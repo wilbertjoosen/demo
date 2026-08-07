@@ -37,6 +37,9 @@
         <module>delivery-service</module>
         <module>notification-service</module>
         <module>product-comment-service</module>
+        <module>product-media-service</module>
+        <module>product-review-service</module>
+        <module>chat-service</module>
     </modules>
 
     <dependencyManagement>

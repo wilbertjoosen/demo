@@ -22,7 +22,8 @@ function formatAddress(user: User): string {
     <el-descriptions v-if="user" :column="1" border>
       <el-descriptions-item :label="t('admin.username')">{{ user.username }}</el-descriptions-item>
       <el-descriptions-item :label="t('admin.email')">{{ user.email }}</el-descriptions-item>
-      <el-descriptions-item :label="t('admin.displayName')">{{ user.displayName }}</el-descriptions-item>
+      <el-descriptions-item :label="t('admin.firstName')">{{ user.firstName ?? '—' }}</el-descriptions-item>
+      <el-descriptions-item :label="t('admin.lastName')">{{ user.lastName ?? '—' }}</el-descriptions-item>
       <el-descriptions-item :label="t('profile.nationalId')">{{ user.nationalId ?? '—' }}</el-descriptions-item>
       <el-descriptions-item :label="t('profile.phone')">{{ user.phone ?? '—' }}</el-descriptions-item>
       <el-descriptions-item :label="t('profile.shippingAddress')">{{ formatAddress(user) }}</el-descriptions-item>

@@ -16,6 +16,9 @@ import AdminProductTable from '../components/admin/AdminProductTable.vue'
 import ProductFormDialog from '../components/admin/ProductFormDialog.vue'
 import ProductDetailDialog from '../components/admin/ProductDetailDialog.vue'
 import StockDialog from '../components/admin/StockDialog.vue'
+import RecordHistoryDialog from '../components/admin/RecordHistoryDialog.vue'
+import AdminMediaDialog from '../components/admin/AdminMediaDialog.vue'
+import AdminChatHistoryDialog from '../components/admin/AdminChatHistoryDialog.vue'
 import type { Address, Product, User } from '../models'
 
 const { t } = useI18n()
@@ -32,6 +35,22 @@ const stockTarget = ref<Product | null>(null)
 const userFormDialog = ref(false)
 const userDetailDialog = ref(false)
 const editingUser = ref<User | null>(null)
+
+const historyDialog = ref(false)
+const historyRecordId = ref<string | null>(null)
+const historyTitle = ref('')
+
+function openUserHistory(user: User) {
+  historyRecordId.value = user.id
+  historyTitle.value = t('audit.historyTitle') + ` — ${user.username}`
+  historyDialog.value = true
+}
+
+function openProductHistory(product: Product) {
+  historyRecordId.value = product.id
+  historyTitle.value = t('audit.historyTitle') + ` — ${product.sku}`
+  historyDialog.value = true
+}
 
 async function deleteUser(user: User) {
   try {
@@ -76,10 +95,11 @@ async function impersonate(user: User) {
 }
 
 async function saveUser(payload: {
-  keycloakId?: string
   username?: string
   email?: string
-  displayName: string
+  firstName?: string
+  lastName?: string
+  password?: string
   nationalId: string
   phone: string
   shippingAddress: Address
@@ -112,6 +132,22 @@ function openProductEdit(product: Product) {
 function openProductDetail(product: Product) {
   editingProduct.value = product
   productDetailDialog.value = true
+}
+
+const mediaDialog = ref(false)
+const mediaTarget = ref<Product | null>(null)
+
+function openProductMedia(product: Product) {
+  mediaTarget.value = product
+  mediaDialog.value = true
+}
+
+const chatHistoryDialog = ref(false)
+const chatHistoryTarget = ref<Product | null>(null)
+
+function openProductChatHistory(product: Product) {
+  chatHistoryTarget.value = product
+  chatHistoryDialog.value = true
 }
 
 async function saveProduct(payload: { sku: string; name: string; price: number }) {
@@ -182,6 +218,7 @@ onMounted(() => {
           @detail="openUserDetail"
           @delete="deleteUser"
           @impersonate="impersonate"
+          @history="openUserHistory"
         />
       </el-tab-pane>
 
@@ -196,6 +233,9 @@ onMounted(() => {
           @edit="openProductEdit"
           @detail="openProductDetail"
           @delete="deleteProduct"
+          @history="openProductHistory"
+          @media="openProductMedia"
+          @chat="openProductChatHistory"
         />
       </el-tab-pane>
     </el-tabs>
@@ -205,5 +245,8 @@ onMounted(() => {
     <StockDialog v-model="stockDialog" :product="stockTarget" @submit="addStock" />
     <UserFormDialog v-model="userFormDialog" :user="editingUser" @submit="saveUser" />
     <UserDetailDialog v-model="userDetailDialog" :user="editingUser" />
+    <RecordHistoryDialog v-model="historyDialog" :record-id="historyRecordId" :title="historyTitle" />
+    <AdminMediaDialog v-model="mediaDialog" :product="mediaTarget" />
+    <AdminChatHistoryDialog v-model="chatHistoryDialog" :product="chatHistoryTarget" />
   </div>
 </template>

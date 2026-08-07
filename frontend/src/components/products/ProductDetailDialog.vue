@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 import ProductComments from './ProductComments.vue'
+import ProductMediaGallery from './ProductMediaGallery.vue'
 import type { Product } from '../../models'
 
 const props = defineProps<{ modelValue: boolean; product: Product | null }>()
@@ -14,6 +15,7 @@ const { t } = useI18n()
       <el-descriptions-item :label="t('products.sku')">{{ product.sku }}</el-descriptions-item>
       <el-descriptions-item :label="t('products.price')">${{ product.price.toFixed(2) }}</el-descriptions-item>
     </el-descriptions>
+    <ProductMediaGallery :product-id="props.product?.id ?? null" class="mb-4" />
     <el-divider>{{ t('comments.button') }}</el-divider>
     <ProductComments :product-id="props.product?.id ?? null" />
     <template #footer>

@@ -1,4 +1,45 @@
 {
+  "audit": {
+    "historyTitle": "Historial de cambios",
+    "noHistory": "Aún no hay historial registrado",
+    "loadError": "No se pudo cargar el historial",
+    "field": "Campo",
+    "oldValue": "Valor anterior",
+    "newValue": "Valor nuevo",
+    "empty": "(vacío)",
+    "action": {
+      "CREATED": "Creado",
+      "UPDATED": "Actualizado",
+      "NO_CHANGE": "Reenviado (sin cambios)",
+      "VIEWED": "Visto",
+      "FAILED": "Fallido"
+    }
+  },
+  "media": {
+    "manage": "Gestionar contenido multimedia",
+    "manageTitle": "Multimedia — {name}",
+    "type": "Tipo",
+    "url": "URL",
+    "caption": "Descripción",
+    "preview": "Vista previa",
+    "add": "Añadir",
+    "uploadFile": "Subir archivo",
+    "typeAutoDetected": "El tipo se detecta automáticamente según el archivo elegido.",
+    "uploaded": "Archivo subido — URL completada abajo",
+    "uploadError": "No se pudo subir el archivo",
+    "added": "Contenido añadido",
+    "addError": "No se pudo añadir el contenido",
+    "deleted": "Contenido eliminado",
+    "deleteError": "No se pudo eliminar el contenido",
+    "loadError": "No se pudo cargar el contenido",
+    "confirmDelete": "¿Eliminar este contenido multimedia?"
+  },
+  "chat": {
+    "viewHistory": "Ver historial de chat",
+    "historyTitle": "Historial de chat — {name}",
+    "empty": "Aún no hay mensajes",
+    "loadError": "No se pudo cargar el historial de chat"
+  },
   "nav": {
     "home": "Tienda Demo",
     "products": "Productos",
@@ -76,7 +117,7 @@
   },
   "profile": {
     "title": "Mi Perfil",
-    "displayName": "Nombre visible",
+    "identityFromKeycloak": "El usuario, correo electrónico y nombre se gestionan en Keycloak y no se pueden cambiar aquí.",
     "phone": "Teléfono",
     "nationalId": "Documento de identidad",
     "shippingAddress": "Dirección de envío",
@@ -89,7 +130,10 @@
     "products": "Productos",
     "username": "Usuario",
     "email": "Correo electrónico",
-    "displayName": "Nombre visible",
+    "firstName": "Nombre",
+    "lastName": "Apellido",
+    "name": "Nombre completo",
+    "history": "Historial",
     "newProduct": "Nuevo producto",
     "addStock": "Añadir existencias",
     "addStockTitle": "Añadir existencias — {name}",
@@ -122,8 +166,8 @@
     "impersonateError": "No se pudo suplantar a este usuario",
     "impersonating": "Estás viendo la app como {username} (suplantado por {admin}) — cierra sesión para volver a tu propia cuenta",
     "newUser": "Nuevo usuario",
-    "keycloakId": "ID de Keycloak",
-    "keycloakIdHint": "El UUID de usuario de Keycloak de la persona — esto solo crea un registro de perfil local, no una cuenta con inicio de sesión",
+    "temporaryPassword": "Contraseña temporal",
+    "identityStoredInKeycloak": "Al guardar, estos datos se actualizan directamente en Keycloak.",
     "userCreated": "Usuario creado",
     "userCreateError": "No se pudo crear el usuario"
   },
@@ -164,6 +208,8 @@
     "placeholder": "Escribe un comentario...",
     "post": "Publicar",
     "postError": "No se pudo publicar el comentario",
-    "deleteError": "No se pudo eliminar el comentario"
+    "deleteError": "No se pudo eliminar el comentario",
+    "editError": "No se pudo editar el comentario",
+    "edited": "editado"
   }
 }

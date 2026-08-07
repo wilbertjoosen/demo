@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Delete } from '@element-plus/icons-vue'
+import { Delete, Edit } from '@element-plus/icons-vue'
 import { commentsApi } from '../../api/comments'
 import { showApiError } from '../../composables/useApiError'
 import { useAuthStore } from '../../stores/auth'
@@ -15,6 +15,10 @@ const comments = ref<Comment[]>([])
 const loading = ref(false)
 const newBody = ref('')
 const posting = ref(false)
+
+const editingId = ref<string | null>(null)
+const editBody = ref('')
+const savingEdit = ref(false)
 
 async function load() {
   if (!props.productId) return
@@ -44,6 +48,30 @@ async function post() {
   }
 }
 
+function startEdit(comment: Comment) {
+  editingId.value = comment.id
+  editBody.value = comment.body
+}
+
+function cancelEdit() {
+  editingId.value = null
+  editBody.value = ''
+}
+
+async function saveEdit(comment: Comment) {
+  if (!editBody.value.trim()) return
+  savingEdit.value = true
+  try {
+    await commentsApi.update(comment.id, editBody.value.trim())
+    editingId.value = null
+    await load()
+  } catch (error) {
+    showApiError(error, t('comments.editError'), t('common.serviceUnavailable'))
+  } finally {
+    savingEdit.value = false
+  }
+}
+
 async function remove(comment: Comment) {
   try {
     await commentsApi.remove(comment.id)
@@ -61,18 +89,24 @@ async function remove(comment: Comment) {
       <div class="flex items-center justify-between">
         <span class="font-medium">{{ comment.authorName }}</span>
         <div class="flex items-center gap-2">
-          <span class="text-xs text-gray-400">{{ new Date(comment.createdAt).toLocaleString() }}</span>
-          <el-button
-            v-if="auth.isAdmin || comment.keycloakUserId === auth.keycloakId"
-            size="small"
-            text
-            type="danger"
-            :icon="Delete"
-            @click="remove(comment)"
-          />
+          <span class="text-xs text-gray-400">
+            {{ new Date(comment.createdAt).toLocaleString() }}
+            <template v-if="comment.updatedAt !== comment.createdAt">· {{ t('comments.edited') }}</template>
+          </span>
+          <template v-if="auth.isAdmin || comment.keycloakUserId === auth.keycloakId">
+            <el-button size="small" text :icon="Edit" @click="startEdit(comment)" />
+            <el-button size="small" text type="danger" :icon="Delete" @click="remove(comment)" />
+          </template>
         </div>
       </div>
-      <p class="text-sm text-gray-700">{{ comment.body }}</p>
+      <div v-if="editingId === comment.id" class="mt-1">
+        <el-input v-model="editBody" type="textarea" :rows="2" />
+        <div class="mt-1 flex justify-end gap-2">
+          <el-button size="small" @click="cancelEdit">{{ t('common.cancel') }}</el-button>
+          <el-button size="small" type="primary" :loading="savingEdit" @click="saveEdit(comment)">{{ t('common.save') }}</el-button>
+        </div>
+      </div>
+      <p v-else class="text-sm text-gray-700">{{ comment.body }}</p>
     </div>
     <el-form class="mt-4" @submit.prevent="post">
       <el-form-item>

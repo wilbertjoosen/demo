@@ -22,12 +22,8 @@ public class User {
     @Id
     private String id;
 
+    /** Everything identity-related (username/email/firstName/lastName) lives in Keycloak, not here — see KeycloakAdminClient. */
     private String keycloakId;
-    private String username;
-    private String email;
-
-    @Setter
-    private String displayName;
 
     @Setter
     private Address shippingAddress;
@@ -57,16 +53,12 @@ public class User {
     @LastModifiedBy
     private String lastModifiedBy;
 
-    public User(String keycloakId, String username, String email, String displayName) {
+    public User(String keycloakId) {
         this.keycloakId = keycloakId;
-        this.username = username;
-        this.email = email;
-        this.displayName = displayName;
     }
 
-    /** Admin-created placeholder profile — see UserService#createUser for the known limitation. */
-    public User(String keycloakId, String username, String email, String displayName, Address shippingAddress) {
-        this(keycloakId, username, email, displayName);
+    public User(String keycloakId, Address shippingAddress) {
+        this(keycloakId);
         this.shippingAddress = shippingAddress;
     }
 
