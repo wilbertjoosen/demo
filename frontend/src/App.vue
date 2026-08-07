@@ -30,20 +30,23 @@ onUnmounted(stopPolling)
   </div>
 
   <div v-else class="min-h-screen bg-gray-50">
-    <el-menu mode="horizontal" router :ellipsis="false" class="!px-6">
-      <el-menu-item index="/">{{ t('nav.home') }}</el-menu-item>
-      <el-menu-item index="/products">{{ t('nav.products') }}</el-menu-item>
-      <el-menu-item index="/orders">{{ t('nav.orders') }}</el-menu-item>
-      <el-menu-item index="/profile">{{ t('nav.profile') }}</el-menu-item>
-      <el-menu-item v-if="auth.isAdmin" index="/admin">{{ t('nav.admin') }}</el-menu-item>
-      <div class="flex-grow" />
-      <el-select :model-value="locale" size="small" class="!w-28" @update:model-value="setLocale">
-        <el-option v-for="l in SUPPORTED_LOCALES" :key="l.code" :value="l.code" :label="l.label" />
-      </el-select>
-      <NotificationBell class="ml-4" />
-      <span class="flex items-center px-4 text-sm text-gray-500">{{ auth.username }}</span>
-      <el-menu-item index="logout" @click="auth.logout">{{ t('nav.logout') }}</el-menu-item>
-    </el-menu>
+    <div class="flex items-center border-b border-gray-200 bg-white pr-6">
+      <el-menu mode="horizontal" router :ellipsis="false" class="!border-b-0 flex-1">
+        <el-menu-item index="/">{{ t('nav.home') }}</el-menu-item>
+        <el-menu-item index="/products">{{ t('nav.products') }}</el-menu-item>
+        <el-menu-item index="/orders">{{ t('nav.orders') }}</el-menu-item>
+        <el-menu-item index="/profile">{{ t('nav.profile') }}</el-menu-item>
+        <el-menu-item v-if="auth.isAdmin" index="/admin">{{ t('nav.admin') }}</el-menu-item>
+      </el-menu>
+      <div class="flex items-center gap-4">
+        <el-select :model-value="locale" size="small" class="!w-28" @update:model-value="setLocale">
+          <el-option v-for="l in SUPPORTED_LOCALES" :key="l.code" :value="l.code" :label="l.label" />
+        </el-select>
+        <NotificationBell />
+        <span class="text-sm text-gray-500">{{ auth.username }}</span>
+        <el-button text @click="auth.logout">{{ t('nav.logout') }}</el-button>
+      </div>
+    </div>
 
     <el-alert v-if="!backendAvailable" type="warning" :closable="false" show-icon class="!rounded-none">
       <template #title>{{ t('common.backendUnavailable') }}</template>

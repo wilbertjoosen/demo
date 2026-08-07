@@ -68,6 +68,18 @@ services:
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
 
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: demo-kafka-ui
+    restart: unless-stopped
+    environment:
+      KAFKA_CLUSTERS_0_NAME: demo
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+    ports:
+      - "8095:8080"
+    depends_on:
+      - kafka
+
   mailpit:
     image: axllent/mailpit:latest
     container_name: demo-mailpit
@@ -404,6 +416,27 @@ services:
       - kafka
       - keycloak
       - redis
+
+  product-comment-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+      args:
+        SERVICE: product-comment-service
+    container_name: demo-product-comment-service
+    restart: unless-stopped
+    environment:
+      <<: *app-env
+      EUREKA_INSTANCE_HOSTNAME: product-comment-service
+      MONGO_DB: comments
+    ports:
+      - "8091:8091"
+    depends_on:
+      - eureka-server
+      - config-server
+      - mongodb
+      - kafka
+      - keycloak
 
   notification-service:
     build:

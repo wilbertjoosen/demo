@@ -43,6 +43,10 @@ spring:
               uri: lb://audit-service
               predicates:
                 - Path=/api/audit/**
+            - id: product-comment-service
+              uri: lb://product-comment-service
+              predicates:
+                - Path=/api/comments/**
     # Failover: if a route resolves to a service with 2+ instances registered in Eureka and one is
     # down/erroring, the LoadBalancer retries against a *different* instance automatically (enabled
     # by default; retry-on-all-operations is off by default since retrying a POST/PUT across

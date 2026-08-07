@@ -36,6 +36,7 @@
         <module>shipping-service</module>
         <module>delivery-service</module>
         <module>notification-service</module>
+        <module>product-comment-service</module>
     </modules>
 
     <dependencyManagement>

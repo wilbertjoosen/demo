@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { View, Edit, Box, Delete } from '@element-plus/icons-vue'
 import type { Product } from '../../models'
 
 const props = defineProps<{ products: Product[]; loading: boolean }>()
@@ -36,12 +37,20 @@ watch(
     <el-table-column :label="t('products.price')" width="100">
       <template #default="{ row }">${{ row.price.toFixed(2) }}</template>
     </el-table-column>
-    <el-table-column width="340">
+    <el-table-column width="170">
       <template #default="{ row }">
-        <el-button size="small" @click="emit('detail', row)">{{ t('common.detail') }}</el-button>
-        <el-button size="small" @click="emit('edit', row)">{{ t('common.edit') }}</el-button>
-        <el-button size="small" @click="emit('add-stock', row)">{{ t('admin.addStock') }}</el-button>
-        <el-button size="small" type="danger" @click="emit('delete', row)">{{ t('common.delete') }}</el-button>
+        <el-tooltip :content="t('common.detail')">
+          <el-button size="small" :icon="View" circle @click="emit('detail', row)" />
+        </el-tooltip>
+        <el-tooltip :content="t('common.edit')">
+          <el-button size="small" :icon="Edit" circle @click="emit('edit', row)" />
+        </el-tooltip>
+        <el-tooltip :content="t('admin.addStock')">
+          <el-button size="small" :icon="Box" circle @click="emit('add-stock', row)" />
+        </el-tooltip>
+        <el-tooltip :content="t('common.delete')">
+          <el-button size="small" type="danger" :icon="Delete" circle @click="emit('delete', row)" />
+        </el-tooltip>
       </template>
     </el-table-column>
   </el-table>

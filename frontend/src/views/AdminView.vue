@@ -7,7 +7,8 @@ import { useUsersStore } from '../stores/users'
 import { useProductsStore } from '../stores/products'
 import { inventoryApi } from '../api/inventory'
 import { impersonateUser } from '../api/impersonation'
-import { extractErrorMessage } from '../composables/useApiError'
+import type { CreateUserPayload } from '../api/users'
+import { showApiError } from '../composables/useApiError'
 import UserTable from '../components/admin/UserTable.vue'
 import UserFormDialog from '../components/admin/UserFormDialog.vue'
 import UserDetailDialog from '../components/admin/UserDetailDialog.vue'
@@ -42,8 +43,13 @@ async function deleteUser(user: User) {
     await users.remove(user.id)
     ElMessage.success(t('admin.userDeleted'))
   } catch (error) {
-    ElMessage.error(extractErrorMessage(error, t('admin.userDeleteError'), t('common.serviceUnavailable')))
+    showApiError(error, t('admin.userDeleteError'), t('common.serviceUnavailable'))
   }
+}
+
+function openUserCreate() {
+  editingUser.value = null
+  userFormDialog.value = true
 }
 
 function openUserEdit(user: User) {
@@ -65,18 +71,31 @@ async function impersonate(user: User) {
   try {
     await impersonateUser(user.keycloakId)
   } catch (error) {
-    ElMessage.error(extractErrorMessage(error, t('admin.impersonateError'), t('common.serviceUnavailable')))
+    showApiError(error, t('admin.impersonateError'), t('common.serviceUnavailable'))
   }
 }
 
-async function saveUser(payload: { displayName: string; nationalId: string; phone: string; shippingAddress: Address }) {
-  if (!editingUser.value) return
+async function saveUser(payload: {
+  keycloakId?: string
+  username?: string
+  email?: string
+  displayName: string
+  nationalId: string
+  phone: string
+  shippingAddress: Address
+}) {
   try {
-    await users.update(editingUser.value.id, payload)
-    ElMessage.success(t('admin.userUpdated'))
+    if (editingUser.value) {
+      await users.update(editingUser.value.id, payload)
+      ElMessage.success(t('admin.userUpdated'))
+    } else {
+      await users.create(payload as CreateUserPayload)
+      ElMessage.success(t('admin.userCreated'))
+    }
     userFormDialog.value = false
   } catch (error) {
-    ElMessage.error(extractErrorMessage(error, t('admin.userUpdateError'), t('common.serviceUnavailable')))
+    const fallback = editingUser.value ? t('admin.userUpdateError') : t('admin.userCreateError')
+    showApiError(error, fallback, t('common.serviceUnavailable'))
   }
 }
 
@@ -107,7 +126,7 @@ async function saveProduct(payload: { sku: string; name: string; price: number }
     productDialog.value = false
   } catch (error) {
     const fallback = editingProduct.value ? t('admin.productUpdateError') : t('admin.productCreateError')
-    ElMessage.error(extractErrorMessage(error, fallback, t('common.serviceUnavailable')))
+    showApiError(error, fallback, t('common.serviceUnavailable'))
   }
 }
 
@@ -121,7 +140,7 @@ async function deleteProduct(product: Product) {
     await products.remove(product.id)
     ElMessage.success(t('admin.productDeleted'))
   } catch (error) {
-    ElMessage.error(extractErrorMessage(error, t('admin.productDeleteError'), t('common.serviceUnavailable')))
+    showApiError(error, t('admin.productDeleteError'), t('common.serviceUnavailable'))
   }
 }
 
@@ -137,7 +156,7 @@ async function addStock(payload: { warehouseId: string; quantity: number }) {
     ElMessage.success(t('admin.stockAdded'))
     stockDialog.value = false
   } catch (error) {
-    ElMessage.error(extractErrorMessage(error, t('admin.stockAddError'), t('common.serviceUnavailable')))
+    showApiError(error, t('admin.stockAddError'), t('common.serviceUnavailable'))
   }
 }
 
@@ -152,6 +171,9 @@ onMounted(() => {
     <h1 class="mb-4 text-xl font-semibold">{{ t('admin.title') }}</h1>
     <el-tabs>
       <el-tab-pane :label="t('admin.users')">
+        <div class="mb-3">
+          <el-button type="primary" @click="openUserCreate">{{ t('admin.newUser') }}</el-button>
+        </div>
         <UserTable
           :users="users.items"
           :loading="users.loading"

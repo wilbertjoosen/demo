@@ -5,9 +5,10 @@ import { useI18n } from 'vue-i18n'
 import { useProductsStore } from '../stores/products'
 import { useOrdersStore } from '../stores/orders'
 import { useUsersStore } from '../stores/users'
-import { extractErrorMessage } from '../composables/useApiError'
+import { showApiError } from '../composables/useApiError'
 import ProductTable from '../components/products/ProductTable.vue'
 import OrderDialog from '../components/products/OrderDialog.vue'
+import ProductDetailDialog from '../components/products/ProductDetailDialog.vue'
 import type { Address, PaymentMethod, Product, ShippingCarrier } from '../models'
 
 const { t } = useI18n()
@@ -18,6 +19,13 @@ const users = useUsersStore()
 const dialogVisible = ref(false)
 const placing = ref(false)
 const selected = ref<Product | null>(null)
+const detailDialog = ref(false)
+const detailTarget = ref<Product | null>(null)
+
+function openDetail(product: Product) {
+  detailTarget.value = product
+  detailDialog.value = true
+}
 
 async function openOrderDialog(product: Product) {
   selected.value = product
@@ -50,7 +58,7 @@ async function placeOrder(payload: {
     ElMessage.success(t('products.placedSuccess'))
     dialogVisible.value = false
   } catch (error) {
-    ElMessage.error(extractErrorMessage(error, t('products.placeError'), t('common.serviceUnavailable')))
+    showApiError(error, t('products.placeError'), t('common.serviceUnavailable'))
   } finally {
     placing.value = false
   }
@@ -62,7 +70,7 @@ onMounted(() => products.load())
 <template>
   <div>
     <h1 class="mb-4 text-xl font-semibold">{{ t('products.title') }}</h1>
-    <ProductTable :products="products.items" :loading="products.loading" @order="openOrderDialog" />
+    <ProductTable :products="products.items" :loading="products.loading" @order="openOrderDialog" @detail="openDetail" />
     <OrderDialog
       v-model="dialogVisible"
       :product="selected"
@@ -70,5 +78,6 @@ onMounted(() => products.load())
       :submitting="placing"
       @submit="placeOrder"
     />
+    <ProductDetailDialog v-model="detailDialog" :product="detailTarget" />
   </div>
 </template>

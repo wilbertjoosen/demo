@@ -10,6 +10,12 @@ export interface ProfileUpdate {
   customAttributes?: Record<string, string>
 }
 
+export interface CreateUserPayload extends ProfileUpdate {
+  keycloakId: string
+  username: string
+  email: string
+}
+
 export const usersApi = {
   async me(): Promise<User> {
     const { data } = await http.get('/api/users/me')
@@ -22,6 +28,10 @@ export const usersApi = {
   async list(): Promise<User[]> {
     const { data } = await http.get('/api/users')
     return unwrapCollection<User>(data)
+  },
+  async create(payload: CreateUserPayload): Promise<User> {
+    const { data } = await http.post('/api/users', payload)
+    return data
   },
   async get(id: string): Promise<User> {
     const { data } = await http.get(`/api/users/${id}`)
