@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { useProductsStore } from '../stores/products'
 import { useOrdersStore } from '../stores/orders'
 import { useUsersStore } from '../stores/users'
+import { extractErrorMessage } from '../composables/useApiError'
 import ProductTable from '../components/products/ProductTable.vue'
 import OrderDialog from '../components/products/OrderDialog.vue'
 import type { Address, PaymentMethod, Product, ShippingCarrier } from '../models'
@@ -48,8 +49,8 @@ async function placeOrder(payload: {
     })
     ElMessage.success(t('products.placedSuccess'))
     dialogVisible.value = false
-  } catch {
-    ElMessage.error(t('products.placeError'))
+  } catch (error) {
+    ElMessage.error(extractErrorMessage(error, t('products.placeError'), t('common.serviceUnavailable')))
   } finally {
     placing.value = false
   }

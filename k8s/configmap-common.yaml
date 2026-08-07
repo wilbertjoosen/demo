@@ -27,4 +27,4 @@ data:
   MAIL_HOST: host.k3d.internal
   MAIL_PORT: "1025"
   INVENTORY_SERVICE_URI: http://inventory-service:8089
-  CORS_ALLOWED_ORIGINS: http://localhost:5173
+  CORS_ALLOWED_ORIGINS: http://localhost:5173,http://demo.localhost:18090

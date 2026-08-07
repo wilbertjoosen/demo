@@ -1,18 +1,23 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from './stores/auth'
 import { useNotifications } from './composables/useNotifications'
+import { useBackendHealth } from './composables/useBackendHealth'
 import NotificationBell from './components/NotificationBell.vue'
 import { SUPPORTED_LOCALES, setLocale } from './i18n'
 
 const auth = useAuthStore()
 const { locale, t } = useI18n()
 const { connect } = useNotifications()
+const { available: backendAvailable, startPolling, stopPolling } = useBackendHealth()
 
 onMounted(() => {
   if (auth.isAuthenticated) connect()
+  startPolling()
 })
+
+onUnmounted(stopPolling)
 </script>
 
 <template>
@@ -39,6 +44,10 @@ onMounted(() => {
       <span class="flex items-center px-4 text-sm text-gray-500">{{ auth.username }}</span>
       <el-menu-item index="logout" @click="auth.logout">{{ t('nav.logout') }}</el-menu-item>
     </el-menu>
+
+    <el-alert v-if="!backendAvailable" type="warning" :closable="false" show-icon class="!rounded-none">
+      <template #title>{{ t('common.backendUnavailable') }}</template>
+    </el-alert>
 
     <main class="mx-auto max-w-5xl px-4 py-6">
       <router-view />

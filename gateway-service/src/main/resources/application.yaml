@@ -60,7 +60,10 @@ spring:
 # The SPA connects to notification-service's WebSocket port directly instead of through the gateway.
 
 cors:
-  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
+  # localhost:5173 is the Vite dev server; demo.localhost:18090 is the k3d ingress the built SPA is
+  # served from — the SPA's own API calls always target localhost:8080 (see frontend/.env.production)
+  # regardless of which origin served the page itself, so both need to be allowed here.
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://demo.localhost:18090}
 
 eureka:
   client:
@@ -75,3 +78,11 @@ management:
     health:
       probes:
         enabled: true
+  endpoints:
+    web:
+      # Actuator endpoints are wired by Boot's own autoconfiguration, separate from CorsConfig's
+      # WebMvcConfigurer mapping — without this, the SPA's health-check ping to /actuator/health
+      # gets a 200 with no CORS headers, which the browser then blocks reading.
+      cors:
+        allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://demo.localhost:18090}
+        allowed-methods: GET
