@@ -1,3 +1,17 @@
+# Shared by every containerized app service below — addresses use in-network service names
+# (mongodb, kafka:29092, keycloak's internal port) rather than the localhost:* defaults each
+# service's application.yaml falls back to for the `mvn spring-boot:run` host-JVM dev flow.
+# KEYCLOAK_ISSUER_URI stays external (localhost:8081): it must match the `iss` claim of tokens
+# issued to the browser-based SPA, regardless of where the validating service itself runs.
+x-app-env: &app-env
+  CONFIG_SERVER_URI: http://config-server:8888
+  EUREKA_URI: http://eureka-server:8761/eureka
+  KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+  KEYCLOAK_ISSUER_URI: http://localhost:8081/realms/demo
+  KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/demo/protocol/openid-connect/certs
+  MONGO_HOST: mongodb
+  REDIS_HOST: redis
+
 services:
   mysql:
     image: mysql:8.4
@@ -38,10 +52,17 @@ services:
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
-      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      # Two advertised listeners, same trick used for Keycloak's issuer/JWKS split below: PLAINTEXT
+      # (localhost:9092) is for JVMs running on the host machine (the `mvn spring-boot:run` dev
+      # flow used throughout this project); PLAINTEXT_INTERNAL (kafka:29092) is for the
+      # containerized app services in *this* compose file — a broker's advertised address is baked
+      # into every produce/consume response, so a container using "localhost" here would be told to
+      # reconnect to itself instead of the broker.
+      KAFKA_LISTENERS: PLAINTEXT://:9092,PLAINTEXT_INTERNAL://:29092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://kafka:29092
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
 
@@ -66,6 +87,300 @@ services:
     volumes:
       - ./docker/keycloak:/opt/keycloak/data/import
 
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.1.0
+    container_name: demo-elasticsearch
+    restart: unless-stopped
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -q '\"status\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:9.1.0
+    container_name: demo-kibana
+    restart: unless-stopped
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+
+  redis:
+    image: redis:7-alpine
+    container_name: demo-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  # --- App services -----------------------------------------------------------------------
+  # Not meant to run alongside the local `mvn spring-boot:run` processes used throughout dev —
+  # both bind the same host ports. Run `docker compose up -d mysql mongodb kafka mailpit keycloak
+  # elasticsearch redis` for infra-only (the local-JVM flow), or `docker compose up -d --build` for
+  # the fully containerized stack.
+
+  eureka-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+      args:
+        SERVICE: eureka-server
+    container_name: demo-eureka-server
+    restart: unless-stopped
+    ports:
+      - "8761:8761"
+
+  config-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+      args:
+        SERVICE: config-server
+    container_name: demo-config-server
+    restart: unless-stopped
+    ports:
+      - "8888:8888"
+
+  gateway-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+      args:
+        SERVICE: gateway-service
+    container_name: demo-gateway-service
+    restart: unless-stopped
+    environment:
+      <<: *app-env
+      EUREKA_INSTANCE_HOSTNAME: gateway-service
+    ports:
+      - "8080:8080"
+    depends_on:
+      - eureka-server
+      - config-server
+
+  audit-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+      args:
+        SERVICE: audit-service
+    container_name: demo-audit-service
+    restart: unless-stopped
+    environment:
+      <<: *app-env
+      EUREKA_INSTANCE_HOSTNAME: audit-service
+      ELASTICSEARCH_URI: http://elasticsearch:9200
+    ports:
+      - "8090:8090"
+    depends_on:
+      - eureka-server
+      - config-server
+      - kafka
+      - elasticsearch
+
+  user-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+      args:
+        SERVICE: user-service
+    container_name: demo-user-service
+    restart: unless-stopped
+    environment:
+      <<: *app-env
+      EUREKA_INSTANCE_HOSTNAME: user-service
+      MONGO_DB: users
+    ports:
+      - "8082:8082"
+    depends_on:
+      - eureka-server
+      - config-server
+      - mongodb
+      - kafka
+      - keycloak
+
+  product-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+      args:
+        SERVICE: product-service
+    container_name: demo-product-service
+    restart: unless-stopped
+    environment:
+      <<: *app-env
+      EUREKA_INSTANCE_HOSTNAME: product-service
+      MONGO_DB: products
+    ports:
+      - "8083:8083"
+    depends_on:
+      - eureka-server
+      - config-server
+      - mongodb
+      - kafka
+      - keycloak
+      - redis
+
+  order-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+      args:
+        SERVICE: order-service
+    container_name: demo-order-service
+    restart: unless-stopped
+    environment:
+      <<: *app-env
+      EUREKA_INSTANCE_HOSTNAME: order-service
+      MONGO_DB: orders
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: demo
+      DB_USERNAME: demo
+      DB_PASSWORD: demo
+      KEYCLOAK_TOKEN_URI: http://keycloak:8080/realms/demo/protocol/openid-connect/token
+      INVENTORY_SERVICE_URI: http://inventory-service:8089
+    ports:
+      - "8084:8084"
+    depends_on:
+      - eureka-server
+      - config-server
+      - mysql
+      - mongodb
+      - kafka
+      - keycloak
+
+  payment-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+      args:
+        SERVICE: payment-service
+    container_name: demo-payment-service
+    restart: unless-stopped
+    environment:
+      <<: *app-env
+      EUREKA_INSTANCE_HOSTNAME: payment-service
+      MONGO_DB: payments
+    ports:
+      - "8086:8086"
+    depends_on:
+      - eureka-server
+      - config-server
+      - mongodb
+      - kafka
+      - keycloak
+
+  shipping-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+      args:
+        SERVICE: shipping-service
+    container_name: demo-shipping-service
+    restart: unless-stopped
+    environment:
+      <<: *app-env
+      EUREKA_INSTANCE_HOSTNAME: shipping-service
+      MONGO_DB: shipments
+    ports:
+      - "8088:8088"
+    depends_on:
+      - eureka-server
+      - config-server
+      - mongodb
+      - kafka
+      - keycloak
+
+  delivery-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+      args:
+        SERVICE: delivery-service
+    container_name: demo-delivery-service
+    restart: unless-stopped
+    environment:
+      <<: *app-env
+      EUREKA_INSTANCE_HOSTNAME: delivery-service
+      MONGO_DB: deliveries
+    ports:
+      - "8087:8087"
+    depends_on:
+      - eureka-server
+      - config-server
+      - mongodb
+      - kafka
+      - keycloak
+
+  inventory-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+      args:
+        SERVICE: inventory-service
+    container_name: demo-inventory-service
+    restart: unless-stopped
+    environment:
+      <<: *app-env
+      EUREKA_INSTANCE_HOSTNAME: inventory-service
+      MONGO_DB: inventory
+    ports:
+      - "8089:8089"
+    depends_on:
+      - eureka-server
+      - config-server
+      - mongodb
+      - kafka
+      - keycloak
+      - redis
+
+  notification-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+      args:
+        SERVICE: notification-service
+    container_name: demo-notification-service
+    restart: unless-stopped
+    environment:
+      <<: *app-env
+      EUREKA_INSTANCE_HOSTNAME: notification-service
+      MAIL_HOST: mailpit
+      MAIL_PORT: 1025
+    ports:
+      - "8085:8085"
+    depends_on:
+      - eureka-server
+      - config-server
+      - kafka
+      - mailpit
+      - keycloak
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: demo-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      - gateway-service
+
 volumes:
   mysql_data:
   mongo_data:
+  elasticsearch_data:
+  redis_data:

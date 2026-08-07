@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.example</groupId>
+        <artifactId>demo</artifactId>
+        <version>0.0.1-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+    <artifactId>common-model</artifactId>
+    <name>common-model</name>
+    <description>Small shared value types used by more than one service (e.g. Address) — kept
+        deliberately minimal since sharing domain types couples deploys; only genuinely
+        cross-cutting value objects belong here, not entities or business logic.</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <!-- Just the @Embeddable annotation API so order-service's JPA entity can embed this
+                 directly — doesn't pull in Hibernate/JPA runtime for services (like user-service)
+                 that don't otherwise use JPA. -->
+            <groupId>jakarta.persistence</groupId>
+            <artifactId>jakarta.persistence-api</artifactId>
+        </dependency>
+        <dependency>
+            <!-- Just the annotation API — every consuming service already has hibernate-validator
+                 on its runtime classpath transitively via springdoc (common-security). -->
+            <groupId>jakarta.validation</groupId>
+            <artifactId>jakarta.validation-api</artifactId>
+        </dependency>
+    </dependencies>
+
+</project>

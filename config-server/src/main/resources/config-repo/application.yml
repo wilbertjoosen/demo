@@ -1,0 +1,38 @@
+# Applies to every config-server client regardless of spring.application.name (Spring Cloud
+# Config convention: a file literally named "application.yml" is global defaults, lower
+# precedence than each client's own {application-name}.yml below it).
+keycloak:
+  issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8081/realms/demo}
+  jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://localhost:8081/realms/demo/protocol/openid-connect/certs}
+
+notifications:
+  mail:
+    from-email: ${MAIL_FROM:demo@example.com}
+  fallback-email: ${NOTIFICATIONS_FALLBACK_EMAIL:admin@example.com}
+
+spring:
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    consumer:
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "*"
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URI:http://localhost:8761/eureka}
+  instance:
+    # This dev machine's InetAddress.getLocalHost() resolves to a bogus public IP (observed:
+    # ec2-*.amazonaws.com / a random public address) rather than anything reachable — force
+    # localhost explicitly instead of trusting hostname/IP auto-detection.
+    hostname: ${EUREKA_INSTANCE_HOSTNAME:localhost}
+    prefer-ip-address: false
+
+management:
+  endpoint:
+    health:
+      probes:
+        enabled: true

@@ -1,0 +1,93 @@
+{
+  "nav": {
+    "home": "Tienda Demo",
+    "products": "Productos",
+    "orders": "Mis Pedidos",
+    "profile": "Perfil",
+    "admin": "Administración",
+    "logout": "Cerrar sesión",
+    "login": "Iniciar sesión"
+  },
+  "common": {
+    "cancel": "Cancelar",
+    "save": "Guardar",
+    "confirm": "Confirmar",
+    "delete": "Eliminar",
+    "create": "Crear",
+    "add": "Añadir"
+  },
+  "home": {
+    "welcome": "Bienvenido, {name}",
+    "description": "Esta es una tienda de demostración basada en una arquitectura de microservicios con Spring Cloud: una saga coreografiada con Kafka lleva cada pedido a través de pago, envío y entrega. Las actualizaciones de estado llegan en vivo por WebSocket como notificaciones.",
+    "browseProducts": "Ver Productos",
+    "browseProductsDesc": "Realiza un pedido y obsérvalo avanzar por la saga.",
+    "myOrders": "Mis Pedidos",
+    "myOrdersDesc": "Consulta el estado, cancela o actualiza la dirección de envío.",
+    "admin": "Administración",
+    "adminDesc": "Gestiona usuarios, productos y existencias."
+  },
+  "products": {
+    "title": "Productos",
+    "sku": "SKU",
+    "name": "Nombre",
+    "price": "Precio",
+    "order": "Pedir",
+    "orderDialogTitle": "Pedir {name}",
+    "quantity": "Cantidad",
+    "placeOrder": "Realizar pedido",
+    "placedSuccess": "Pedido realizado — síguelo en Mis Pedidos",
+    "placeError": "No se pudo realizar el pedido (¿stock insuficiente?)"
+  },
+  "orders": {
+    "title": "Mis Pedidos",
+    "id": "ID",
+    "status": "Estado",
+    "quantity": "Cant.",
+    "shippingAddress": "Dirección de envío",
+    "updated": "Actualizado",
+    "editAddress": "Editar dirección",
+    "cancelOrder": "Cancelar",
+    "updateAddressTitle": "Actualizar dirección de envío",
+    "confirmCancel": "¿Cancelar el pedido {id}?",
+    "cancelledSuccess": "Pedido cancelado",
+    "cancelError": "No se pudo cancelar — puede que ya haya pasado la etapa de pago",
+    "addressUpdated": "Dirección de envío actualizada",
+    "addressUpdateError": "No se pudo actualizar — puede que ya haya pasado la etapa de pago"
+  },
+  "profile": {
+    "title": "Mi Perfil",
+    "displayName": "Nombre visible",
+    "phone": "Teléfono",
+    "nationalId": "Documento de identidad",
+    "shippingAddress": "Dirección de envío",
+    "updated": "Perfil actualizado",
+    "updateError": "No se pudo actualizar el perfil"
+  },
+  "admin": {
+    "title": "Administración",
+    "users": "Usuarios",
+    "products": "Productos",
+    "username": "Usuario",
+    "email": "Correo electrónico",
+    "displayName": "Nombre visible",
+    "newProduct": "Nuevo producto",
+    "addStock": "Añadir existencias",
+    "addStockTitle": "Añadir existencias — {name}",
+    "warehouse": "Almacén",
+    "confirmDeleteUser": "¿Eliminar al usuario {username}?",
+    "confirmDeleteProduct": "¿Eliminar el producto {name}?",
+    "userDeleted": "Usuario eliminado",
+    "productCreated": "Producto creado",
+    "productDeleted": "Producto eliminado",
+    "stockAdded": "Existencias añadidas"
+  },
+  "address": {
+    "street": "Calle",
+    "city": "Ciudad",
+    "postalCode": "Código postal",
+    "country": "País"
+  },
+  "notifications": {
+    "empty": "Aún no hay notificaciones"
+  }
+}

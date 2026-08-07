@@ -1,0 +1,15 @@
+# Shared build for every Spring Boot module in the reactor — build context must be the repo root
+# so the multi-module build can see sibling common-* modules. Select the module via --build-arg
+# SERVICE=order-service (etc.), set as the `build.args.SERVICE` per-service in docker-compose.yml.
+FROM maven:3.9-eclipse-temurin-26 AS build
+ARG SERVICE
+WORKDIR /build
+COPY . .
+RUN --mount=type=cache,target=/root/.m2 \
+    ./mvnw -q -pl ${SERVICE} -am -DskipTests package
+
+FROM eclipse-temurin:26-jre
+ARG SERVICE
+WORKDIR /app
+COPY --from=build /build/${SERVICE}/target/*.jar app.jar
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]

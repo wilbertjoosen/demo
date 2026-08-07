@@ -1,0 +1,36 @@
+server:
+  port: 8090
+
+spring:
+  application:
+    name: audit-service
+  config:
+    import: optional:configserver:${CONFIG_SERVER_URI:http://localhost:8888}
+
+  elasticsearch:
+    uris: ${ELASTICSEARCH_URI:http://localhost:9200}
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "*"
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URI:http://localhost:8761/eureka}
+  instance:
+    hostname: ${EUREKA_INSTANCE_HOSTNAME:localhost}
+    prefer-ip-address: false
+
+keycloak:
+  issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8081/realms/demo}
+  jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://localhost:8081/realms/demo/protocol/openid-connect/certs}
+
+management:
+  endpoint:
+    health:
+      probes:
+        enabled: true
