@@ -1,6 +1,8 @@
 package com.example.order;
 
 import com.example.common.model.Address;
+import com.example.common.model.PaymentMethod;
+import com.example.common.model.ShippingCarrier;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -27,14 +29,17 @@ public class OrderController {
     public record PlaceOrderRequest(
             @NotBlank String productId,
             @Min(1) int quantity,
-            @NotNull @Valid Address shippingAddress) {
+            @NotNull @Valid Address shippingAddress,
+            @NotNull PaymentMethod paymentMethod,
+            @NotNull ShippingCarrier shippingCarrier) {
     }
 
     @PostMapping
     public ResponseEntity<EntityModel<OrderView>> placeOrder(@AuthenticationPrincipal Jwt jwt,
                                                                @Valid @RequestBody PlaceOrderRequest request) {
         Order order = orderService.placeOrder(jwt.getSubject(), jwt.getClaimAsString("email"),
-                request.productId(), request.quantity(), request.shippingAddress());
+                request.productId(), request.quantity(), request.shippingAddress(),
+                request.paymentMethod(), request.shippingCarrier());
         EntityModel<OrderView> model = assembler.toModel(orderService.getOrderView(order.getId().toString()));
         return ResponseEntity.created(URI.create(model.getRequiredLink("self").getHref())).body(model);
     }

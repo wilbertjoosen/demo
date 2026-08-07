@@ -1,6 +1,8 @@
 package com.example.order;
 
 import com.example.common.model.Address;
+import com.example.common.model.PaymentMethod;
+import com.example.common.model.ShippingCarrier;
 
 import java.util.List;
 
@@ -11,8 +13,11 @@ public interface OrderService {
      * {@code email} (from the JWT, not stored) is carried forward into every downstream saga
      * event's payload — event-carried state transfer, so notification-service can email the actual
      * customer instead of a hardcoded address, without any service needing to call user-service.
+     * {@code paymentMethod}/{@code shippingCarrier} are likewise carried forward so payment-service
+     * and shipping-service can act on the customer's choice without calling back to order-service.
      */
-    Order placeOrder(String keycloakUserId, String email, String productId, int quantity, Address shippingAddress);
+    Order placeOrder(String keycloakUserId, String email, String productId, int quantity, Address shippingAddress,
+                      PaymentMethod paymentMethod, ShippingCarrier shippingCarrier);
 
     /** Query side (CQRS): served from the Mongo read model, not MySQL. */
     List<OrderView> listOrders(String keycloakUserId);

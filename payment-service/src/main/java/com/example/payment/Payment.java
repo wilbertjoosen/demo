@@ -1,5 +1,6 @@
 package com.example.payment;
 
+import com.example.common.model.PaymentMethod;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedBy;
@@ -21,7 +22,10 @@ public class Payment {
 
     private String orderId;
     private String email;
+    private PaymentMethod method;
     private PaymentStatus status;
+    /** Set when status is FAILED because the method's mock gateway was unavailable, rather than a declined charge. */
+    private String failureReason;
 
     @CreatedDate
     private Instant createdAt;
@@ -38,10 +42,12 @@ public class Payment {
     private boolean deleted = false;
     private Instant deletedAt;
 
-    public Payment(String orderId, String email, PaymentStatus status) {
+    public Payment(String orderId, String email, PaymentMethod method, PaymentStatus status, String failureReason) {
         this.orderId = orderId;
         this.email = email;
+        this.method = method;
         this.status = status;
+        this.failureReason = failureReason;
     }
 
     void setStatus(PaymentStatus status) {

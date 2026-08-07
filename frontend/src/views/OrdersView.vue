@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { useOrdersStore } from '../stores/orders'
 import OrderTable from '../components/orders/OrderTable.vue'
 import OrderAddressDialog from '../components/orders/OrderAddressDialog.vue'
+import ShipmentTrackingDialog from '../components/orders/ShipmentTrackingDialog.vue'
 import type { Address, OrderView } from '../models'
 
 const { t } = useI18n()
@@ -13,6 +14,13 @@ const orders = useOrdersStore()
 const dialogVisible = ref(false)
 const saving = ref(false)
 const editing = ref<OrderView | null>(null)
+const trackingVisible = ref(false)
+const tracking = ref<OrderView | null>(null)
+
+function openTracking(order: OrderView) {
+  tracking.value = order
+  trackingVisible.value = true
+}
 
 async function cancelOrder(order: OrderView) {
   try {
@@ -53,12 +61,13 @@ onMounted(() => orders.load())
 <template>
   <div>
     <h1 class="mb-4 text-xl font-semibold">{{ t('orders.title') }}</h1>
-    <OrderTable :orders="orders.items" :loading="orders.loading" @edit-address="openEdit" @cancel="cancelOrder" />
+    <OrderTable :orders="orders.items" :loading="orders.loading" @edit-address="openEdit" @cancel="cancelOrder" @track="openTracking" />
     <OrderAddressDialog
       v-model="dialogVisible"
       :initial-address="editing?.shippingAddress ?? null"
       :saving="saving"
       @submit="saveAddress"
     />
+    <ShipmentTrackingDialog v-model="trackingVisible" :order-id="tracking?.id ?? null" />
   </div>
 </template>

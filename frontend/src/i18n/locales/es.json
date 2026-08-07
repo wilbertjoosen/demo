@@ -36,7 +36,10 @@
     "quantity": "Cantidad",
     "placeOrder": "Realizar pedido",
     "placedSuccess": "Pedido realizado — síguelo en Mis Pedidos",
-    "placeError": "No se pudo realizar el pedido (¿stock insuficiente?)"
+    "placeError": "No se pudo realizar el pedido (¿stock insuficiente?)",
+    "paymentMethod": "Método de pago",
+    "shippingCarrier": "Transportista",
+    "shippingCost": "Costo de envío"
   },
   "orders": {
     "title": "Mis Pedidos",
@@ -52,7 +55,19 @@
     "cancelledSuccess": "Pedido cancelado",
     "cancelError": "No se pudo cancelar — puede que ya haya pasado la etapa de pago",
     "addressUpdated": "Dirección de envío actualizada",
-    "addressUpdateError": "No se pudo actualizar — puede que ya haya pasado la etapa de pago"
+    "addressUpdateError": "No se pudo actualizar — puede que ya haya pasado la etapa de pago",
+    "paymentMethod": "Pago",
+    "shippingCarrier": "Transportista",
+    "track": "Rastrear",
+    "trackingTitle": "Seguimiento — pedido {id}",
+    "noTrackingYet": "Aún no hay información de seguimiento",
+    "trackingStatus": {
+      "LABEL_CREATED": "Etiqueta creada",
+      "PICKED_UP": "Recogido",
+      "IN_TRANSIT": "En tránsito",
+      "OUT_FOR_DELIVERY": "En reparto",
+      "DELIVERED": "Entregado"
+    }
   },
   "profile": {
     "title": "Mi Perfil",
@@ -89,5 +104,21 @@
   },
   "notifications": {
     "empty": "Aún no hay notificaciones"
+  },
+  "payment": {
+    "methods": {
+      "CREDIT_CARD": "Tarjeta de crédito",
+      "DEBIT_CARD": "Tarjeta de débito",
+      "PAYPAL": "PayPal",
+      "PIX": "Pix",
+      "BOLETO": "Boleto"
+    },
+    "unavailable": "No disponible actualmente"
+  },
+  "shipping": {
+    "carriers": {
+      "UPS": "UPS",
+      "DHL": "DHL"
+    }
   }
 }

@@ -1,4 +1,6 @@
 import type { Address } from './address'
+import type { PaymentMethod } from './payment'
+import type { ShippingCarrier } from './shipment'
 
 export type OrderStatus =
   | 'PENDING_PAYMENT'
@@ -16,6 +18,8 @@ export interface OrderView {
   productId: string
   quantity: number
   shippingAddress: Address | null
+  paymentMethod: PaymentMethod | null
+  shippingCarrier: ShippingCarrier | null
   status: OrderStatus
   createdAt: string
   updatedAt: string

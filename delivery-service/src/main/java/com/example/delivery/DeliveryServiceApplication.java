@@ -1,6 +1,7 @@
 package com.example.delivery;
 
 import com.example.common.audit.JwtAuditorAware;
+import com.example.common.audit.AuditSchedulingConfig;
 import com.example.common.audit.KafkaAuditEventRepository;
 import com.example.common.audit.MongoAuditingEnabler;
 import com.example.common.audit.RestCallAuditAspect;
@@ -11,7 +12,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Import;
 
 @SpringBootApplication
-@Import({ResourceServerSecurityConfig.class, OpenApiConfig.class, KafkaAuditEventRepository.class, RestCallAuditAspect.class,
+@Import({ResourceServerSecurityConfig.class, OpenApiConfig.class, KafkaAuditEventRepository.class, AuditSchedulingConfig.class, RestCallAuditAspect.class,
         JwtAuditorAware.class, MongoAuditingEnabler.class})
 public class DeliveryServiceApplication {
 

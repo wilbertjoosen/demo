@@ -4,6 +4,8 @@ import com.example.common.events.DomainEvent;
 import com.example.common.events.EventTypes;
 import com.example.common.events.Topics;
 import com.example.common.model.Address;
+import com.example.common.model.PaymentMethod;
+import com.example.common.model.ShippingCarrier;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
@@ -32,13 +34,14 @@ class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional
-    public Order placeOrder(String keycloakUserId, String email, String productId, int quantity, Address shippingAddress) {
+    public Order placeOrder(String keycloakUserId, String email, String productId, int quantity, Address shippingAddress,
+                             PaymentMethod paymentMethod, ShippingCarrier shippingCarrier) {
         boolean reserved = inventoryServiceClient.reserve(productId, quantity);
         if (!reserved) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, message("order.insufficientStock"));
         }
 
-        Order order = new Order(keycloakUserId, email, productId, quantity, shippingAddress, OrderStatus.PENDING_PAYMENT);
+        Order order = new Order(keycloakUserId, email, productId, quantity, shippingAddress, paymentMethod, shippingCarrier, OrderStatus.PENDING_PAYMENT);
         order = orderRepository.save(order);
         orderViewRepository.save(OrderView.from(order));
 
@@ -46,7 +49,9 @@ class OrderServiceImpl implements OrderService {
                 "userId", keycloakUserId,
                 "email", email == null ? "" : email,
                 "productId", productId,
-                "quantity", quantity
+                "quantity", quantity,
+                "paymentMethod", paymentMethod.name(),
+                "shippingCarrier", shippingCarrier.name()
         )));
 
         return order;

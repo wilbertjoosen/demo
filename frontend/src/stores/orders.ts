@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ordersApi } from '../api/orders'
-import type { Address, OrderView } from '../models'
+import type { Address, OrderView, PaymentMethod, ShippingCarrier } from '../models'
 
 export const useOrdersStore = defineStore('orders', {
   state: () => ({
@@ -16,7 +16,13 @@ export const useOrdersStore = defineStore('orders', {
         this.loading = false
       }
     },
-    async place(payload: { productId: string; quantity: number; shippingAddress: Address }) {
+    async place(payload: {
+      productId: string
+      quantity: number
+      shippingAddress: Address
+      paymentMethod: PaymentMethod
+      shippingCarrier: ShippingCarrier
+    }) {
       await ordersApi.place(payload)
       await this.load()
     },

@@ -1,6 +1,8 @@
 package com.example.order;
 
 import com.example.common.model.Address;
+import com.example.common.model.PaymentMethod;
+import com.example.common.model.ShippingCarrier;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -48,6 +50,18 @@ public class Order {
     @Embedded
     private Address shippingAddress;
 
+    /**
+     * Not DB-NOT-NULL: {@code @NotNull} on OrderController's PlaceOrderRequest already guarantees
+     * every new order has one, but a hard NOT NULL here would break Hibernate's ddl-auto=update
+     * against pre-existing rows from before this field existed — nullable at the column level,
+     * mandatory at the API level.
+     */
+    @Enumerated(EnumType.STRING)
+    private PaymentMethod paymentMethod;
+
+    @Enumerated(EnumType.STRING)
+    private ShippingCarrier shippingCarrier;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private OrderStatus status;
@@ -72,12 +86,15 @@ public class Order {
 
     private Instant deletedAt;
 
-    public Order(String keycloakUserId, String email, String productId, int quantity, Address shippingAddress, OrderStatus status) {
+    public Order(String keycloakUserId, String email, String productId, int quantity, Address shippingAddress,
+                 PaymentMethod paymentMethod, ShippingCarrier shippingCarrier, OrderStatus status) {
         this.keycloakUserId = keycloakUserId;
         this.email = email;
         this.productId = productId;
         this.quantity = quantity;
         this.shippingAddress = shippingAddress;
+        this.paymentMethod = paymentMethod;
+        this.shippingCarrier = shippingCarrier;
         this.status = status;
     }
 
