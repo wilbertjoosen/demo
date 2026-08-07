@@ -1,0 +1,29 @@
+import { http } from './http'
+import { unwrapCollection } from './hal'
+import type { Address, User } from '../models'
+
+export interface ProfileUpdate {
+  displayName?: string
+  shippingAddress?: Address
+  nationalId?: string
+  phone?: string
+  customAttributes?: Record<string, string>
+}
+
+export const usersApi = {
+  async me(): Promise<User> {
+    const { data } = await http.get('/api/users/me')
+    return data
+  },
+  async updateMe(payload: ProfileUpdate): Promise<User> {
+    const { data } = await http.put('/api/users/me', payload)
+    return data
+  },
+  async list(): Promise<User[]> {
+    const { data } = await http.get('/api/users')
+    return unwrapCollection<User>(data)
+  },
+  async remove(id: string): Promise<void> {
+    await http.delete(`/api/users/${id}`)
+  },
+}

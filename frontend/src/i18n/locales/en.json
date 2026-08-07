@@ -1,0 +1,93 @@
+{
+  "nav": {
+    "home": "Demo Shop",
+    "products": "Products",
+    "orders": "My Orders",
+    "profile": "Profile",
+    "admin": "Admin",
+    "logout": "Logout",
+    "login": "Log in"
+  },
+  "common": {
+    "cancel": "Cancel",
+    "save": "Save",
+    "confirm": "Confirm",
+    "delete": "Delete",
+    "create": "Create",
+    "add": "Add"
+  },
+  "home": {
+    "welcome": "Welcome, {name}",
+    "description": "This is a demo storefront backed by a Spring Cloud microservices architecture: a choreographed Kafka saga takes each order through payment, shipping and delivery. Order status updates arrive live via WebSocket as toast notifications.",
+    "browseProducts": "Browse Products",
+    "browseProductsDesc": "Place an order and watch it move through the saga.",
+    "myOrders": "My Orders",
+    "myOrdersDesc": "Track status, cancel, or update the shipping address.",
+    "admin": "Admin",
+    "adminDesc": "Manage users, products and stock."
+  },
+  "products": {
+    "title": "Products",
+    "sku": "SKU",
+    "name": "Name",
+    "price": "Price",
+    "order": "Order",
+    "orderDialogTitle": "Order {name}",
+    "quantity": "Quantity",
+    "placeOrder": "Place order",
+    "placedSuccess": "Order placed — track it under My Orders",
+    "placeError": "Could not place order (insufficient stock?)"
+  },
+  "orders": {
+    "title": "My Orders",
+    "id": "ID",
+    "status": "Status",
+    "quantity": "Qty",
+    "shippingAddress": "Shipping address",
+    "updated": "Updated",
+    "editAddress": "Edit address",
+    "cancelOrder": "Cancel",
+    "updateAddressTitle": "Update shipping address",
+    "confirmCancel": "Cancel order {id}?",
+    "cancelledSuccess": "Order cancelled",
+    "cancelError": "Could not cancel — it may already be past the payment step",
+    "addressUpdated": "Shipping address updated",
+    "addressUpdateError": "Could not update — order may already be past the payment step"
+  },
+  "profile": {
+    "title": "My Profile",
+    "displayName": "Display name",
+    "phone": "Phone",
+    "nationalId": "National ID",
+    "shippingAddress": "Shipping address",
+    "updated": "Profile updated",
+    "updateError": "Could not update profile"
+  },
+  "admin": {
+    "title": "Admin",
+    "users": "Users",
+    "products": "Products",
+    "username": "Username",
+    "email": "Email",
+    "displayName": "Display name",
+    "newProduct": "New product",
+    "addStock": "Add stock",
+    "addStockTitle": "Add stock — {name}",
+    "warehouse": "Warehouse",
+    "confirmDeleteUser": "Delete user {username}?",
+    "confirmDeleteProduct": "Delete product {name}?",
+    "userDeleted": "User deleted",
+    "productCreated": "Product created",
+    "productDeleted": "Product deleted",
+    "stockAdded": "Stock added"
+  },
+  "address": {
+    "street": "Street",
+    "city": "City",
+    "postalCode": "Postal code",
+    "country": "Country"
+  },
+  "notifications": {
+    "empty": "No notifications yet"
+  }
+}

@@ -2,16 +2,34 @@
   "realm": "demo",
   "enabled": true,
   "sslRequired": "none",
+  "roles": {
+    "realm": [
+      { "name": "user", "description": "Regular authenticated user" },
+      { "name": "admin", "description": "Administrative access (product/inventory management)" }
+    ]
+  },
   "clients": [
     {
-      "clientId": "demo-client",
+      "clientId": "demo-spa",
+      "enabled": true,
+      "publicClient": true,
+      "protocol": "openid-connect",
+      "redirectUris": ["http://localhost:5173/*", "http://demo.localhost:8090/*"],
+      "webOrigins": ["http://localhost:5173", "http://demo.localhost:8090"],
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "attributes": { "pkce.code.challenge.method": "S256" }
+    },
+    {
+      "clientId": "order-service-client",
       "enabled": true,
       "publicClient": false,
-      "secret": "demo-secret",
-      "redirectUris": ["http://localhost:8080/*"],
-      "webOrigins": ["http://localhost:8080"],
-      "standardFlowEnabled": true,
-      "directAccessGrantsEnabled": true
+      "secret": "order-service-secret",
+      "protocol": "openid-connect",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "description": "Machine-to-machine client_credentials client — order-service uses this to call inventory-service"
     }
   ],
   "users": [
@@ -29,7 +47,23 @@
           "temporary": false
         }
       ],
-      "realmRoles": ["offline_access", "uma_authorization"]
+      "realmRoles": ["offline_access", "uma_authorization", "user"]
+    },
+    {
+      "username": "admin",
+      "enabled": true,
+      "email": "admin@example.com",
+      "emailVerified": true,
+      "firstName": "Admin",
+      "lastName": "User",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "admin",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["offline_access", "uma_authorization", "user", "admin"]
     }
   ]
 }
