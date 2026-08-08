@@ -17,7 +17,7 @@ public class OrderSagaListener {
 
     private final OrderService orderService;
 
-    @KafkaListener(topics = Topics.PAYMENT_EVENTS, groupId = "order-service")
+    @KafkaListener(topics = Topics.PAYMENT_EVENTS, groupId = "${order-service.saga-consumer-group:order-service}")
     public void onPaymentEvent(DomainEvent event) {
         Long orderId = Long.valueOf(event.orderId());
         switch (event.eventType()) {
@@ -27,7 +27,7 @@ public class OrderSagaListener {
         }
     }
 
-    @KafkaListener(topics = Topics.SHIPPING_EVENTS, groupId = "order-service")
+    @KafkaListener(topics = Topics.SHIPPING_EVENTS, groupId = "${order-service.saga-consumer-group:order-service}")
     public void onShippingEvent(DomainEvent event) {
         if (EventTypes.SHIPPED.equals(event.eventType())) {
             orderService.advanceStatus(Long.valueOf(event.orderId()), OrderStatus.SHIPPED);
@@ -36,7 +36,7 @@ public class OrderSagaListener {
         // to the resulting PAYMENT_REFUNDED event above rather than duplicating that logic here.
     }
 
-    @KafkaListener(topics = Topics.DELIVERY_EVENTS, groupId = "order-service")
+    @KafkaListener(topics = Topics.DELIVERY_EVENTS, groupId = "${order-service.saga-consumer-group:order-service}")
     public void onDeliveryEvent(DomainEvent event) {
         if (EventTypes.DELIVERED.equals(event.eventType())) {
             orderService.advanceStatus(Long.valueOf(event.orderId()), OrderStatus.CONFIRMED);
