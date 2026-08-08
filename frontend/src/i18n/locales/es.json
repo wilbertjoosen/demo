@@ -45,6 +45,7 @@
     "products": "Productos",
     "orders": "Mis Pedidos",
     "profile": "Perfil",
+    "messages": "Mensajes",
     "admin": "Administración",
     "logout": "Cerrar sesión",
     "login": "Iniciar sesión"
@@ -200,6 +201,26 @@
     "required": "Este campo es obligatorio",
     "positive": "Debe ser mayor que 0",
     "email": "Debe ser un correo electrónico válido"
+  },
+  "messages": {
+    "title": "Mensajes",
+    "inbox": "Bandeja de entrada",
+    "newConversation": "Nuevo mensaje",
+    "emptyInbox": "Aún no hay conversaciones",
+    "noMessagesYet": "Aún no hay mensajes",
+    "selectConversation": "Selecciona una conversación para leerla",
+    "placeholder": "Escribe un mensaje...",
+    "send": "Enviar",
+    "searchUsers": "Buscar usuarios...",
+    "noUsersFound": "No se encontraron usuarios",
+    "message": "Mensaje",
+    "loadError": "No se pudieron cargar los mensajes",
+    "directoryLoadError": "No se pudo cargar la lista de usuarios",
+    "startError": "No se pudo iniciar la conversación",
+    "typing": "escribiendo...",
+    "statusSent": "Enviado",
+    "statusDelivered": "Entregado",
+    "statusRead": "Leído"
   },
   "comments": {
     "button": "Comentarios",

@@ -2,22 +2,30 @@
 import { onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from './stores/auth'
+import { useMessagesStore } from './stores/messages'
 import { useNotifications } from './composables/useNotifications'
 import { useBackendHealth } from './composables/useBackendHealth'
 import NotificationBell from './components/NotificationBell.vue'
 import { SUPPORTED_LOCALES, setLocale } from './i18n'
 
 const auth = useAuthStore()
+const messages = useMessagesStore()
 const { locale, t } = useI18n()
 const { connect } = useNotifications()
 const { available: backendAvailable, startPolling, stopPolling } = useBackendHealth()
 
 onMounted(() => {
-  if (auth.isAuthenticated) connect()
   startPolling()
+  if (auth.isAuthenticated) {
+    connect()
+    messages.startPolling()
+  }
 })
 
-onUnmounted(stopPolling)
+onUnmounted(() => {
+  stopPolling()
+  messages.stopPolling()
+})
 </script>
 
 <template>
@@ -36,6 +44,10 @@ onUnmounted(stopPolling)
         <el-menu-item index="/products">{{ t('nav.products') }}</el-menu-item>
         <el-menu-item index="/orders">{{ t('nav.orders') }}</el-menu-item>
         <el-menu-item index="/profile">{{ t('nav.profile') }}</el-menu-item>
+        <el-menu-item index="/messages">
+          {{ t('nav.messages') }}
+          <el-badge v-if="messages.totalUnread > 0" :value="messages.totalUnread" class="ml-1" />
+        </el-menu-item>
         <el-menu-item v-if="auth.isAdmin" index="/admin">{{ t('nav.admin') }}</el-menu-item>
       </el-menu>
       <div class="flex items-center gap-4">

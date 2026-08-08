@@ -1,6 +1,6 @@
 import { http } from './http'
 import { unwrapCollection } from './hal'
-import type { Address, User } from '../models'
+import type { Address, DirectoryEntry, User } from '../models'
 
 export interface ProfileUpdate {
   shippingAddress?: Address
@@ -29,6 +29,11 @@ export const usersApi = {
   async list(): Promise<User[]> {
     const { data } = await http.get('/api/users')
     return unwrapCollection<User>(data)
+  },
+  /** Any authenticated user — minimal, PII-free list for picking someone to message. */
+  async directory(): Promise<DirectoryEntry[]> {
+    const { data } = await http.get('/api/users/directory')
+    return data
   },
   async create(payload: CreateUserPayload): Promise<User> {
     const { data } = await http.post('/api/users', payload)

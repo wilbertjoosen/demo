@@ -13,9 +13,12 @@ public class WebSocketConfig implements WebSocketConfigurer {
 
     private final ChatWebSocketHandler handler;
     private final ChatHandshakeInterceptor interceptor;
+    private final DirectMessageWebSocketHandler directMessageHandler;
+    private final DirectMessageHandshakeInterceptor directMessageInterceptor;
 
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
         registry.addHandler(handler, "/ws/chat/*").addInterceptors(interceptor).setAllowedOrigins("*");
+        registry.addHandler(directMessageHandler, "/ws/conversations/*").addInterceptors(directMessageInterceptor).setAllowedOrigins("*");
     }
 }

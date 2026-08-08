@@ -19,7 +19,9 @@ import java.util.concurrent.ConcurrentHashMap;
 public class ChatWebSocketHandler extends TextWebSocketHandler {
 
     private final ChatService chatService;
-    private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
+    /** The Spring-managed bean (not a locally `new`'d one) so Instant serializes as ISO-8601, matching
+     * Spring Boot's default Jackson config — a bare `new ObjectMapper()` writes it as epoch-seconds instead. */
+    private final ObjectMapper objectMapper;
 
     private final Map<String, Set<WebSocketSession>> rooms = new ConcurrentHashMap<>();
 

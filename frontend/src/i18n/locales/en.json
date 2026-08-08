@@ -45,6 +45,7 @@
     "products": "Products",
     "orders": "My Orders",
     "profile": "Profile",
+    "messages": "Messages",
     "admin": "Admin",
     "logout": "Logout",
     "login": "Log in"
@@ -200,6 +201,26 @@
     "required": "This field is required",
     "positive": "Must be greater than 0",
     "email": "Must be a valid email address"
+  },
+  "messages": {
+    "title": "Messages",
+    "inbox": "Inbox",
+    "newConversation": "New message",
+    "emptyInbox": "No conversations yet",
+    "noMessagesYet": "No messages yet",
+    "selectConversation": "Select a conversation to start reading",
+    "placeholder": "Write a message...",
+    "send": "Send",
+    "searchUsers": "Search users...",
+    "noUsersFound": "No users found",
+    "message": "Message",
+    "loadError": "Could not load messages",
+    "directoryLoadError": "Could not load the user list",
+    "startError": "Could not start the conversation",
+    "typing": "typing...",
+    "statusSent": "Sent",
+    "statusDelivered": "Delivered",
+    "statusRead": "Read"
   },
   "comments": {
     "button": "Comments",
