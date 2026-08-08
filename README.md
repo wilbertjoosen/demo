@@ -44,6 +44,8 @@ Kafka topics: `user-events`, `product-events`, `order-events`, `payment-events`,
 
 ## Patterns demonstrated
 
+### Distributed systems
+
 - **Saga (choreography)** — `order → payment → shipping → delivery`, each step reacting to the
   previous step's Kafka event. No orchestrator. Compensation on failure always flows back through
   `payment-service` (refund) and `product-service` (stock release), regardless of which step failed.
@@ -61,6 +63,65 @@ Kafka topics: `user-events`, `product-events`, `order-events`, `payment-events`,
 - **Audit trail without per-service instrumentation** — `common-audit`'s `RestCallAuditAspect` captures
   every REST request/response generically; `audit-service` reconstructs field-level diffs by comparing
   consecutive snapshots for the same record ID, rather than requiring Envers-style per-entity setup.
+
+### Object-oriented & domain design
+
+These are graded honestly below — only claiming what's actually in the code, including where a pattern
+is a partial or pragmatic fit rather than textbook.
+
+**Design patterns**
+
+- **Repository** — every persistence-facing interface (16 `*Repository` interfaces across the reactor)
+  is a Spring Data abstraction over MongoDB or JPA; service code never touches a driver or
+  `EntityManager` directly.
+- **Adapter** — one `*ModelAssembler` per service (`UserModelAssembler`, `OrderViewModelAssembler`, 11
+  in total) converts a persistence/domain object into its HATEOAS-linked API representation, keeping
+  wire format decoupled from storage format.
+- **Template Method** — `ChatWebSocketHandler`, `DirectMessageWebSocketHandler`, and
+  `NotificationWebSocketHandler` all extend Spring's `TextWebSocketHandler`, overriding only the
+  lifecycle hooks each one needs (`afterConnectionEstablished`, `handleTextMessage`); the
+  connection-bookkeeping skeleton stays in the base class.
+- **Interceptor** — `ChatHandshakeInterceptor` / `DirectMessageHandshakeInterceptor` hook into the
+  WebSocket handshake to extract and (for direct messages) cryptographically verify identity before
+  the handler ever sees a session — the same shape as a servlet filter chain.
+- **Factory Method** — `DomainEvent.of(eventType, orderId, payload)` is the only way any saga event
+  gets constructed, so the timestamp can't be forgotten at a call site.
+- **Aspect-Oriented Programming** — `common-audit`'s `RestCallAuditAspect` captures every REST call's
+  request/response with one `@Around` advice, instead of every controller method calling an audit
+  helper by hand.
+
+**SOLID**
+
+- **SRP** — each service owns exactly one bounded context (see DDD below); within a service,
+  controller/service/repository/assembler are separate classes, each with one reason to change.
+- **DIP** — controllers depend on a `*Service` interface (`ConversationService`, `ChatService`,
+  `UserService`, ...), never the `*Impl` directly, so an alternate implementation could swap in
+  without touching any caller.
+- **ISP** — those service interfaces stay narrow and use-case-shaped rather than one god interface per
+  service — `ConversationService` is 7 methods, all conversation-lifecycle operations, nothing else.
+- **OCP is the weakest fit here, honestly** — extension mostly happens by adding an enum constant plus
+  an `if`/`switch` (`PaymentMethod`, `MediaType`) rather than a polymorphic strategy class per variant.
+  Worth knowing as a limitation of this codebase, not a pattern to go looking for.
+
+**Domain-Driven Design**
+
+- **Bounded contexts** — each microservice *is* a bounded context: `order-service` only knows a
+  `Shipment` as an event payload field, `chat-service` only knows a `Product` as an opaque ID. The
+  service boundary and the Maven module boundary are the same boundary.
+- **Domain events** — every Kafka message is a `DomainEvent` (`common-security/.../events/DomainEvent.java`),
+  published after a state change and consumed to drive the next saga step — closer to a true DDD domain
+  event than to a generic message-bus payload.
+- **Value objects** — `Address` (`common-model`) has no identity of its own and is embedded wherever
+  needed (a user's default address, an order's shipping snapshot); it's shared *because* both services
+  mean the literal same concept, not out of laziness. Caveat: it's Lombok-`@Setter` mutable, not a
+  textbook immutable VO — a pragmatic shortcut, not a purist one.
+- **Aggregates** — `Order` (order-service, MySQL) and `Conversation` (chat-service, MongoDB) are each
+  the aggregate root and consistency boundary for their own writes; `OrderView` and
+  `ConversationSummary` are deliberately separate read models, not the aggregate leaking out through
+  the API.
+- **Ubiquitous language** — service names, event types (`ORDER_CREATED`, `PAYMENT_COMPLETED`,
+  `SHIPPED`), and REST paths all use the vocabulary a product owner would use — no translation layer
+  between "the business" and "the code."
 
 ## Quick start
 
