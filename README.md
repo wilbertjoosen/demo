@@ -129,6 +129,26 @@ Realm: `demo`. Client: `demo-spa` (public, PKCE).
 > bootstrap admin. Application users (`demo`, `admin`, `manager`, everyone created through the app)
 > live in the **`demo`** realm — switch realms via the dropdown in the top-left before looking for them.
 
+### Infrastructure connection ports
+
+For connecting a DB client, `redis-cli`, `kcat`, etc. directly rather than through a UI:
+
+| Service | Host:Port | Notes |
+|---|---|---|
+| MySQL | `localhost:3306` | `order-service`'s write model (db `demo`, user/pass `demo`/`demo`) |
+| MongoDB | `localhost:27017` | every other service's store, one logical DB per service |
+| Kafka (host clients) | `localhost:9092` | `PLAINTEXT` listener for local JVM services / host tools |
+| Kafka (k8s pods) | `host.k3d.internal:9094` | dedicated `PLAINTEXT_K8S` listener, only reachable from inside the k3d cluster |
+| Redis | `localhost:6379` | Resilience4j response caching |
+| Elasticsearch | `localhost:9200` | `audit-service`'s store |
+| Loki | `localhost:3100` | log storage; query via Grafana's Explore tab rather than the raw API |
+| Mailpit SMTP | `localhost:1025` | what `notification-service` actually sends to; `:8025` above is its web inbox |
+| Rancher (HTTP) | `http://localhost:9080` | redirects to the HTTPS UI at `:9443` |
+
+k3d cluster ports (`k3d cluster create`, see [Kubernetes / GitOps](#kubernetes--gitops)): `18090` →
+Traefik HTTP (frontend + ArgoCD ingress), `18453` → Traefik HTTPS, `6550` → the k8s API server
+(`kubectl` uses this automatically via your kubeconfig context, not something you visit directly).
+
 ## Kubernetes / GitOps
 
 `k8s/` holds every application manifest. ArgoCD itself is installed once into an `argocd` namespace
