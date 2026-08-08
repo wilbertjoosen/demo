@@ -122,7 +122,7 @@ Realm: `demo`. Client: `demo-spa` (public, PKCE).
 | Kibana | http://localhost:5601 | — |
 | Kafka UI | http://localhost:8095 | — |
 | Mailpit (SMTP inbox) | http://localhost:8025 | — |
-| Rancher (Docker container) | https://localhost:9443 | set on first launch |
+| Rancher (Docker container) | https://localhost:9443 | bootstrap password `rancherdemo123` (set via `CATTLE_BOOTSTRAP_PASSWORD` in `docker-compose.yml`) |
 | ArgoCD | http://argocd.localhost:18090 (via `k8s-argocd/ingress.yaml`) | `admin` / `kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' \| base64 -d` |
 
 > **Keycloak gotcha:** the admin console defaults to the `master` realm, which only ever contains the
