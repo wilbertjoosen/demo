@@ -11,7 +11,10 @@ import org.springframework.data.elasticsearch.annotations.FieldType;
 import java.time.Instant;
 import java.util.Map;
 
-@Document(indexName = "audit-log", createIndex = false)
+// Property-placeholder indexName (Spring Data Elasticsearch resolves it via the Environment at
+// startup) so environments sharing one Elasticsearch instance — see docker-compose.qa.yml — can
+// still keep their audit trails apart, e.g. AUDIT_ES_INDEX=audit-log-qa for the QA environment.
+@Document(indexName = "${AUDIT_ES_INDEX:audit-log}", createIndex = false)
 @Getter
 @Setter
 @NoArgsConstructor
