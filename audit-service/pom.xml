@@ -9,6 +9,7 @@
         <relativePath>../pom.xml</relativePath>
     </parent>
     <artifactId>audit-service</artifactId>
+    <version>1.0.0</version>
     <name>audit-service</name>
     <description>Consumes audit-events from every service, indexes into Elasticsearch, exposes admin-only search</description>
 
@@ -40,12 +41,12 @@
         <dependency>
             <groupId>com.example</groupId>
             <artifactId>common-security</artifactId>
-            <version>${project.version}</version>
+            <version>${project.parent.version}</version>
         </dependency>
         <dependency>
             <groupId>com.example</groupId>
             <artifactId>common-audit</artifactId>
-            <version>${project.version}</version>
+            <version>${project.parent.version}</version>
         </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>

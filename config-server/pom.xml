@@ -9,6 +9,7 @@
         <relativePath>../pom.xml</relativePath>
     </parent>
     <artifactId>config-server</artifactId>
+    <version>1.0.0</version>
     <name>config-server</name>
     <description>Centralized config, native filesystem backend</description>
 

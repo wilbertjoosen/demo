@@ -9,6 +9,7 @@
         <relativePath>../pom.xml</relativePath>
     </parent>
     <artifactId>gateway-service</artifactId>
+    <version>1.0.0</version>
     <name>gateway-service</name>
     <description>Spring Cloud Gateway — pure reverse proxy + CORS, routes to every backend service</description>
 

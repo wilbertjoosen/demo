@@ -9,6 +9,7 @@
         <relativePath>../pom.xml</relativePath>
     </parent>
     <artifactId>notification-service</artifactId>
+    <version>1.0.0</version>
     <name>notification-service</name>
     <description>Kafka fan-out to WebSocket + Mailpit</description>
 
@@ -48,12 +49,12 @@
         <dependency>
             <groupId>com.example</groupId>
             <artifactId>common-security</artifactId>
-            <version>${project.version}</version>
+            <version>${project.parent.version}</version>
         </dependency>
         <dependency>
             <groupId>com.example</groupId>
             <artifactId>common-audit</artifactId>
-            <version>${project.version}</version>
+            <version>${project.parent.version}</version>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
