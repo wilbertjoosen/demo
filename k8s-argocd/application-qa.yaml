@@ -1,0 +1,24 @@
+# QA counterpart to application.yaml — same repo, but tracks the testing branch (whose k8s/*.yaml
+# targets namespace demo-qa and the isolated QA infra from docker-compose.qa.yml) instead of main.
+# Not applied by the demo-qa namespace's own kubectl apply — this is ArgoCD's own Application CR,
+# applied once into the argocd namespace to tell it what to sync and from where.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: demo-qa
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/wilbertjoosen/demo.git
+    targetRevision: testing
+    path: k8s
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: demo-qa
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
