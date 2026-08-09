@@ -21,7 +21,7 @@ spec:
             - configMapRef: { name: demo-common-config }
           env:
             - { name: EUREKA_INSTANCE_HOSTNAME, value: chat-service }
-            - { name: MONGO_DB, value: chat }
+            - { name: MONGO_DB, value: chat_qa }
           resources:
             requests: { cpu: "200m", memory: "384Mi" }
             limits: { cpu: "750m", memory: "640Mi" }

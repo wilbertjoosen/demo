@@ -1,41 +1,22 @@
-# Fully isolated infra for the QA/testing environment — separate containers, separate volumes,
-# separate host ports from docker-compose.yml's production stack, so the two can run side by side
-# without ever sharing data. Scoped to what app pods actually connect to at runtime (mirrors
-# k8s/configmap-common.yaml's variable set) — observability tooling (Grafana/Prometheus/Loki/Kibana)
-# stays out of QA; it's dashboards for humans, not something a service depends on to function.
+# QA/testing environment infra. The heavy stateful stores (MySQL, MongoDB, Elasticsearch) AND
+# Keycloak are all SHARED with docker-compose.yml's production instances — QA gets its own
+# database/index names and its own Keycloak realm ("demo-qa", see docker/keycloak/realm-demo-qa.json,
+# imported by the SAME prod Keycloak container) instead of its own containers, to avoid running two
+# of everything on one machine. What actually needs real isolation stays separate here: Kafka
+# (shared topics would mean QA test traffic triggering prod's saga and vice versa), Redis, Mailpit.
+# The actual build/deploy path (k8s namespace, ArgoCD Application) is fully separate regardless —
+# see the testing branch's own k8s/*.yaml.
+#
+# One-time setup on the shared MySQL (run once, not part of any automated flow):
+#   docker exec demo-mysql mysql -uroot -proot -e \
+#     "CREATE DATABASE IF NOT EXISTS demo_qa; GRANT ALL PRIVILEGES ON demo_qa.* TO 'demo'@'%'; FLUSH PRIVILEGES;"
+# MongoDB and Elasticsearch need no such step — Mongo creates a database on first write, and
+# Elasticsearch auto-creates an index on first write (action.auto_create_index defaults to true).
+# Keycloak picks up the new realm file on its next restart (--import-realm scans the whole mounted
+# directory) — restart the prod keycloak container once after adding the realm file.
 #
 # Usage: docker compose -f docker-compose.qa.yml -p demo-qa up -d
 services:
-  mysql-qa:
-    image: mysql:8.4
-    container_name: demo-qa-mysql
-    restart: unless-stopped
-    environment:
-      MYSQL_DATABASE: demo
-      MYSQL_USER: demo
-      MYSQL_PASSWORD: demo
-      MYSQL_ROOT_PASSWORD: root
-    ports:
-      - "3307:3306"
-    volumes:
-      - mysql_qa_data:/var/lib/mysql
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
-  mongodb-qa:
-    image: mongo:7
-    container_name: demo-qa-mongodb
-    restart: unless-stopped
-    environment:
-      MONGO_INITDB_DATABASE: demo
-    ports:
-      - "27018:27017"
-    volumes:
-      - mongo_qa_data:/data/db
-
   kafka-qa:
     image: apache/kafka:3.8.0
     container_name: demo-qa-kafka
@@ -56,22 +37,6 @@ services:
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
 
-  keycloak-qa:
-    image: quay.io/keycloak/keycloak:latest
-    container_name: demo-qa-keycloak
-    restart: unless-stopped
-    command: start-dev --import-realm
-    environment:
-      KEYCLOAK_ADMIN: admin
-      KEYCLOAK_ADMIN_PASSWORD: admin
-      # Same rationale as prod's KC_HOSTNAME (see docker-compose.yml) — fixed so every service's
-      # KEYCLOAK_ISSUER_URI validator agrees on the token issuer regardless of which network reached it.
-      KC_HOSTNAME: http://localhost:8082
-    ports:
-      - "8082:8080"
-    volumes:
-      - ./docker/keycloak:/opt/keycloak/data/import
-
   redis-qa:
     image: redis:7-alpine
     container_name: demo-qa-redis
@@ -80,24 +45,6 @@ services:
       - "6380:6379"
     volumes:
       - redis_qa_data:/data
-
-  elasticsearch-qa:
-    image: docker.elastic.co/elasticsearch/elasticsearch:9.1.0
-    container_name: demo-qa-elasticsearch
-    restart: unless-stopped
-    environment:
-      discovery.type: single-node
-      xpack.security.enabled: "false"
-      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
-    ports:
-      - "9201:9200"
-    volumes:
-      - elasticsearch_qa_data:/usr/share/elasticsearch/data
-    healthcheck:
-      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -q '\"status\"'"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
 
   mailpit-qa:
     image: axllent/mailpit:latest
@@ -108,7 +55,4 @@ services:
       - "8026:8025" # Web UI
 
 volumes:
-  mysql_qa_data:
-  mongo_qa_data:
   redis_qa_data:
-  elasticsearch_qa_data:

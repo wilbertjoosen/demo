@@ -21,7 +21,7 @@ spec:
             - configMapRef: { name: demo-common-config }
           env:
             - { name: EUREKA_INSTANCE_HOSTNAME, value: delivery-service }
-            - { name: MONGO_DB, value: deliveries }
+            - { name: MONGO_DB, value: deliveries_qa }
           resources:
             requests: { cpu: "200m", memory: "384Mi" }
             limits: { cpu: "750m", memory: "640Mi" }
