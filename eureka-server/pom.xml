@@ -9,7 +9,7 @@
         <relativePath>../pom.xml</relativePath>
     </parent>
     <artifactId>eureka-server</artifactId>
-    <version>1.0.0</version>
+    <version>1.0.1</version>
     <name>eureka-server</name>
     <description>Service discovery registry</description>
 
