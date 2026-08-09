@@ -10,6 +10,8 @@ spec:
   template:
     metadata: { labels: { app: audit-service, monitored: "true" } }
     spec:
+      imagePullSecrets:
+        - name: ghcr-pull-secret
       containers:
         - name: audit-service
           image: demo/audit-service:local

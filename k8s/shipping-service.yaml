@@ -10,6 +10,8 @@ spec:
   template:
     metadata: { labels: { app: shipping-service, monitored: "true" } }
     spec:
+      imagePullSecrets:
+        - name: ghcr-pull-secret
       containers:
         - name: shipping-service
           image: demo/shipping-service:local

@@ -28,6 +28,8 @@ spec:
   template:
     metadata: { labels: { app: order-service, monitored: "true" } }
     spec:
+      imagePullSecrets:
+        - name: ghcr-pull-secret
       containers:
         - name: order-service
           image: demo/order-service:local

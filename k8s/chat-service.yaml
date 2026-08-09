@@ -10,6 +10,8 @@ spec:
   template:
     metadata: { labels: { app: chat-service, monitored: "true" } }
     spec:
+      imagePullSecrets:
+        - name: ghcr-pull-secret
       containers:
         - name: chat-service
           image: demo/chat-service:local

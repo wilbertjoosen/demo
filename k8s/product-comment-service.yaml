@@ -10,6 +10,8 @@ spec:
   template:
     metadata: { labels: { app: product-comment-service, monitored: "true" } }
     spec:
+      imagePullSecrets:
+        - name: ghcr-pull-secret
       containers:
         - name: product-comment-service
           image: demo/product-comment-service:local
