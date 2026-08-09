@@ -8,7 +8,7 @@ wire it up. Every pattern below exists because a concrete problem in this domain
 **Stack:** Spring Boot 4 / Java 26 backend (19 modules), Vue 3 + TypeScript + Element Plus frontend,
 MySQL + MongoDB + Kafka + Redis + Elasticsearch, Keycloak (OAuth2/OIDC), Eureka + Spring Cloud Gateway,
 Prometheus + Grafana + Loki + Kibana, Docker Compose for local infra, k3d + ArgoCD for a local
-Kubernetes/GitOps loop.
+Kubernetes/GitOps loop, GitHub Actions → GHCR for CI/CD across a production and a QA environment.
 
 ## Architecture
 
@@ -155,10 +155,11 @@ kubectl apply -f k8s/
 ```
 
 App: http://demo.localhost:18090 — infra (MySQL/Mongo/Kafka/Keycloak/etc.) still runs via Docker
-Compose on the host; pods reach it through `host.k3d.internal`. See [Kubernetes / GitOps](#kubernetes--gitops)
-for how ArgoCD takes over from here, and note the one manual step k3d always needs: **new/changed
-Docker images must be `k3d image import`ed** — there's no registry, so ArgoCD only manages manifests,
-never image builds.
+Compose on the host; pods reach it through `host.k3d.internal`. `kubectl apply -f k8s/` here is a
+one-time bootstrap — from then on, ArgoCD watches the repo and CI/CD (see [CI/CD & versioning](#cicd--versioning))
+handles building, pushing to GHCR, and bumping the manifests ArgoCD syncs; there's no `k3d image import`
+step in the normal flow, since images live in a real registry now. (`k3d image import` is still the
+right tool if you want to test a *local, unpushed* code change without going through CI.)
 
 ## Default credentials
 
@@ -168,73 +169,147 @@ never image builds.
 | `admin` | `admin` | `user`, `admin` |
 | `manager` | `manager` | `finance`, `product_manager`, `shipping_manager`, `inventory_manager` |
 
-Realm: `demo`. Client: `demo-spa` (public, PKCE).
+Realm: `demo` (prod) / `demo-qa` (QA) — same users/passwords in both. Client: `demo-spa` (public, PKCE).
 
 ## Useful URLs
 
 | Tool | URL | Credentials |
 |---|---|---|
 | Frontend (dev) | http://localhost:5173 | — |
-| Frontend (k8s) | http://demo.localhost:18090 | — |
-| Keycloak admin | http://localhost:8081 | `admin` / `admin` (realm: **`demo`**, not `master` — see note below) |
+| Frontend (k8s, prod) | http://demo.localhost:18090 | — |
+| Frontend (k8s, QA) | http://qa.demo.localhost:18090 | — (realm `demo-qa`, same users as above) |
+| Keycloak admin | http://localhost:8081 | `admin` / `admin` (realm: **`demo`** for prod, **`demo-qa`** for QA — not `master`, see note below) |
 | Swagger UI (aggregated) | http://localhost:8080/swagger-ui.html | — |
-| Grafana | http://localhost:3000 | `admin` / `admin` |
-| Prometheus | http://localhost:9090 | — |
+| Grafana | http://localhost:3000 | `admin` / `admin` — datasources: **Prometheus** (host-JVM/compose flow), **Prometheus (k8s)** (both k8s namespaces), **Loki** |
+| Prometheus (host-JVM/compose) | http://localhost:9090 | — |
+| Prometheus (k8s, prod + QA) | http://prometheus.demo.localhost:18090 | — |
 | Kibana | http://localhost:5601 | — |
-| Kafka UI | http://localhost:8095 | — |
-| Mailpit (SMTP inbox) | http://localhost:8025 | — |
+| Kafka UI | http://localhost:8095 | prod Kafka only — QA's Kafka has no UI wired up |
+| Mailpit (SMTP inbox, prod) | http://localhost:8025 | — |
+| Mailpit (SMTP inbox, QA) | http://localhost:8026 | — |
 | Rancher (Docker container) | https://localhost:9443 | bootstrap password `rancherdemo123` (set via `CATTLE_BOOTSTRAP_PASSWORD` in `docker-compose.yml`) |
-| ArgoCD | http://argocd.localhost:18090 (via `k8s-argocd/ingress.yaml`) | `admin` / `kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' \| base64 -d` |
+| ArgoCD | http://argocd.localhost:18090 (via `k8s-argocd/ingress.yaml`) | `admin` / `kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' \| base64 -d` — manages two Applications, `demo` (prod) and `demo-qa` |
 
 > **Keycloak gotcha:** the admin console defaults to the `master` realm, which only ever contains the
 > bootstrap admin. Application users (`demo`, `admin`, `manager`, everyone created through the app)
-> live in the **`demo`** realm — switch realms via the dropdown in the top-left before looking for them.
+> live in the **`demo`** realm (prod) or **`demo-qa`** realm (QA) — switch realms via the dropdown in
+> the top-left before looking for them. Same one Keycloak server hosts both.
 
 ### Infrastructure connection ports
 
-For connecting a DB client, `redis-cli`, `kcat`, etc. directly rather than through a UI:
+For connecting a DB client, `redis-cli`, `kcat`, etc. directly rather than through a UI. MySQL,
+MongoDB, Elasticsearch, and Keycloak are **shared** between prod and QA (same server, QA uses its own
+database/index/realm names — see [QA / testing environment](#qa--testing-environment)); Kafka, Redis,
+and Mailpit are genuinely separate instances per environment.
 
 | Service | Host:Port | Notes |
 |---|---|---|
-| MySQL | `localhost:3306` | `order-service`'s write model (db `demo`, user/pass `demo`/`demo`) |
-| MongoDB | `localhost:27017` | every other service's store, one logical DB per service |
-| Kafka (host clients) | `localhost:9092` | `PLAINTEXT` listener for local JVM services / host tools |
-| Kafka (k8s pods) | `host.k3d.internal:9094` | dedicated `PLAINTEXT_K8S` listener, only reachable from inside the k3d cluster |
-| Redis | `localhost:6379` | Resilience4j response caching |
-| Elasticsearch | `localhost:9200` | `audit-service`'s store |
-| Loki | `localhost:3100` | log storage; query via Grafana's Explore tab rather than the raw API |
-| Mailpit SMTP | `localhost:1025` | what `notification-service` actually sends to; `:8025` above is its web inbox |
+| MySQL | `localhost:3306` | `order-service`'s write model — db `demo` (prod) / `demo_qa` (QA), user/pass `demo`/`demo` |
+| MongoDB | `localhost:27017` | every other service's store, one logical DB per service, `_qa`-suffixed for QA |
+| Kafka (host clients, prod) | `localhost:9092` | `PLAINTEXT` listener for local JVM services / host tools |
+| Kafka (k8s pods, prod) | `host.k3d.internal:9094` | dedicated `PLAINTEXT_K8S` listener, only reachable from inside the k3d cluster |
+| Kafka (host clients, QA) | `localhost:9192` | separate broker — shared topics would mean QA test traffic triggering prod's saga |
+| Kafka (k8s pods, QA) | `host.k3d.internal:9194` | QA's own `PLAINTEXT_K8S` listener |
+| Redis (prod) | `localhost:6379` | Resilience4j response caching |
+| Redis (QA) | `localhost:6380` | separate instance (cheap either way, kept isolated for simplicity) |
+| Elasticsearch | `localhost:9200` | `audit-service`'s store — index `audit-log` (prod) / `audit-log-qa` (QA) |
+| Loki | `localhost:3100` | log storage; query via Grafana's Explore tab rather than the raw API — one shared instance, filter by the `namespace` label (`demo`/`demo-qa`) |
+| Mailpit SMTP (prod) | `localhost:1025` | what `notification-service` actually sends to; `:8025` above is its web inbox |
+| Mailpit SMTP (QA) | `localhost:1026` | QA's own instance; `:8026` above is its web inbox |
 | Rancher (HTTP) | `http://localhost:9080` | redirects to the HTTPS UI at `:9443` |
 
 k3d cluster ports (`k3d cluster create`, see [Kubernetes / GitOps](#kubernetes--gitops)): `18090` →
-Traefik HTTP (frontend + ArgoCD ingress), `18453` → Traefik HTTPS, `6550` → the k8s API server
-(`kubectl` uses this automatically via your kubeconfig context, not something you visit directly).
+Traefik HTTP (routes every `*.demo.localhost` ingress by hostname — frontend, ArgoCD, Prometheus, both
+environments), `18453` → Traefik HTTPS, `6550` → the k8s API server (`kubectl` uses this automatically
+via your kubeconfig context, not something you visit directly).
+
+## CI/CD & versioning
+
+`.github/workflows/ci-cd.yml` runs on every push to `main` or `testing`:
+
+1. **Test** — full Maven reactor `verify` (unit + Testcontainers-backed integration tests, Checkstyle,
+   SpotBugs) and the frontend's `lint` + typecheck + build. Nothing downstream runs if this fails.
+2. **Detect changed services** — path-filters the diff so only services that actually changed get
+   rebuilt (a shared module or `Dockerfile.service` changing forces a full rebuild, since every image
+   build is `mvnw -pl <service> -am`). A manual `workflow_dispatch` run (Actions tab → "Run workflow")
+   skips the filter and rebuilds everything — useful after a change that doesn't touch any single
+   service's own path but every service still needs picking up.
+3. **Build & push** — each changed service's image goes to GHCR (`ghcr.io/<owner>/demo-<service>`),
+   tagged with both the commit SHA and that service's own `pom.xml`/`package.json` version (each
+   service versions independently, starting at `1.0.0` — bump it by hand when you want to mark a
+   release). Images are `linux/arm64` only, matching this k3d cluster's nodes.
+4. **Update manifests** — bumps the changed services' `image:` lines in `k8s/*.yaml` to their new
+   version tag and commits straight back to whichever branch triggered the run, gated behind the
+   images already existing in GHCR — ArgoCD's `selfHeal` never sees a manifest pointing at an
+   unpullable image. **Note:** deploying by version tag (not the SHA) means a push that doesn't bump a
+   service's version produces the same tag as last time, so that service's manifest won't change and
+   won't redeploy — `imagePullPolicy: Always` at least guarantees any rollout that *does* happen for
+   another reason re-pulls the latest content pushed under that tag.
+
+GHCR packages are private, so every Deployment references `imagePullSecrets: ghcr-pull-secret` — a
+`kubernetes.io/dockerconfigjson` Secret created directly in each namespace (`demo`, `demo-qa`) via
+`kubectl create secret docker-registry`, never committed to git.
 
 ## Kubernetes / GitOps
 
-`k8s/` holds every application manifest. ArgoCD itself is installed once into an `argocd` namespace
+`k8s/` holds every application manifest for **production** (namespace `demo`, branch `main`); the same
+path on the **`testing`** branch holds QA's manifests (namespace `demo-qa`) — see
+[QA / testing environment](#qa--testing-environment). ArgoCD itself is installed once into an `argocd`
+namespace
 (`kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml`),
-then `k8s-argocd/application.yaml` is applied to point it at this repo's `k8s/` path with auto-sync +
-self-heal enabled. From there ArgoCD watches `main` on its own. Loop once bootstrapped:
-
-1. Edit a manifest in `k8s/`, or push code that needs a new image
-2. If code changed: `docker build -f Dockerfile.service --build-arg SERVICE=<name> -t demo/<name>:local .`
-   then `k3d image import demo/<name>:local -c demo` (images aren't in a registry — this step doesn't
-   happen automatically)
-3. `git push` — ArgoCD picks up manifest changes on its own; a changed image still needs
-   `kubectl -n demo rollout restart deployment/<name>` to actually pick up the freshly-imported image
+then both `k8s-argocd/application.yaml` (tracks `main` → `demo`) and `k8s-argocd/application-qa.yaml`
+(tracks `testing` → `demo-qa`) are applied, each with auto-sync + self-heal enabled. From there it's
+push-to-deploy — CI/CD above handles the build/push/manifest-bump, ArgoCD picks up the commit on its
+own. `k8s-argocd/` holds the manifests applied once by hand, not GitOps-managed — the ArgoCD
+`Application` CRs themselves and the ArgoCD ingress (chicken-and-egg: nothing can sync them into
+existence before ArgoCD is watching anything).
 
 `Dockerfile.service` (repo root) is a single parameterized Dockerfile (`--build-arg SERVICE=<module>`) shared
 by every backend service — build context is the repo root so the multi-module Maven build can see
-sibling modules.
+sibling modules. Its build stage is pinned to `--platform=$BUILDPLATFORM` (the jar it produces is
+architecture-independent bytecode) so cross-compiling for the cluster's arm64 nodes on an amd64 CI
+runner needs no QEMU emulation — only the final runtime layer (`COPY`, no execution) is actually
+arm64.
+
+## QA / testing environment
+
+A second, fully independent deploy target — same cluster, same shared stateful infra, separate
+namespace and separate ArgoCD Application from production:
+
+- **Branch model**: `main` is production (bugfixes branch from here); `develop` is where feature
+  branches merge; `testing` is the QA environment itself — merging `develop` → `testing` and pushing
+  deploys to QA the same way pushing to `main` deploys to prod.
+- **k8s**: namespace `demo-qa`, ArgoCD Application `demo-qa` (tracks the `testing` branch's own
+  `k8s/` path), ingress at `qa.demo.localhost` — same port (`18090`) as prod, routed by hostname.
+- **Infra**: MySQL, MongoDB, and Elasticsearch are the **same instances** production uses — QA gets
+  its own database/index names (`demo_qa`, `<service>_qa`, `audit-log-qa`) instead of duplicate
+  containers. Keycloak is the same server too, with a separate realm (`demo-qa`,
+  `docker/keycloak/realm-demo-qa.json`). Kafka, Redis, and Mailpit are genuinely separate containers
+  (`docker-compose.qa.yml`) — Kafka specifically because shared topics would mean QA test traffic
+  triggering production's saga and vice versa.
+- **One-time setup on the shared MySQL** (see `docker-compose.qa.yml`'s header comment for the exact
+  command): create the `demo_qa` database and grant the `demo` user access to it. MongoDB and
+  Elasticsearch need no equivalent step — both auto-create on first write.
+- **Excluded from QA on purpose**: `promtail-daemonset.yaml` and `prometheus.yaml` are cluster-wide,
+  single-shared-instance resources (see [Observability](#observability)) — duplicating them per
+  environment would just make the `demo` and `demo-qa` Applications fight over the same
+  ClusterRole/ClusterRoleBinding names.
 
 ## Observability
 
-- **Metrics**: every service exposes `/actuator/prometheus`; Prometheus scrapes them; Grafana has a
-  pre-provisioned "Services Overview" dashboard (`docker/grafana/dashboards/`).
+- **Metrics**: every service exposes `/actuator/prometheus`. Two separate Prometheus instances cover
+  two separate deploy modes — `docker-compose.yml`'s (static targets, `host.docker.internal:<port>`)
+  covers the host-JVM/docker-compose dev flow; a second one runs *inside* the k3d cluster
+  (`k8s/prometheus.yaml`, namespace `monitoring`) covering the k8s-deployed services in **both**
+  `demo` and `demo-qa`, discovered via `kubernetes_sd_configs` (`role: pod`, opted in by the
+  `monitored: "true"` label most manifests already carry) and labeled by `namespace`. Pod IPs on the
+  k3d overlay network aren't reachable from outside the cluster at all, which is why this one has to
+  run in-cluster rather than as a third docker-compose static-target job. Grafana has both as
+  datasources, plus a pre-provisioned "Services Overview" dashboard (`docker/grafana/dashboards/`).
 - **Logs**: services log to stdout; in Docker Compose that's `docker logs <container>`. In k8s,
-  Promtail (`k8s/promtail-daemonset.yaml`) ships every pod's logs to the same Loki instance — query
-  either through Grafana's Explore tab.
+  Promtail (`k8s/promtail-daemonset.yaml`, one shared instance, not per-environment) ships every pod's
+  logs — from both namespaces — to the same Loki instance, labeled by `namespace`. Query either
+  through Grafana's Explore tab, e.g. `{namespace="demo-qa"}` to see QA only.
 - **Audit trail**: every REST call across every service is captured (who, what, when, request/response
   bodies with secrets redacted) and shipped to Elasticsearch. The admin UI's history icons (Users,
   Products, Media, Chat) show the full change timeline with before/after diffs per field, powered by
@@ -252,8 +327,11 @@ demo/
 │   notification-service/, audit-service/, chat-service/,
 │   product-comment-service/, product-media-service/, product-review-service/
 ├── frontend/                # Vue 3 SPA
-├── docker/                  # Keycloak realm, Grafana/Kibana/Prometheus provisioning
-├── k8s/                     # Kubernetes manifests (ArgoCD-synced)
-├── docker-compose.yml       # full local stack (infra + every service + frontend)
+├── docker/                  # Keycloak realms (demo + demo-qa), Grafana/Kibana/Prometheus provisioning
+├── k8s/                     # Kubernetes manifests — prod content on main, QA content on testing
+├── k8s-argocd/              # ArgoCD Application CRs + ingress, applied once by hand, not GitOps-synced
+├── docker-compose.yml       # full local stack (prod infra + every service + frontend)
+├── docker-compose.qa.yml    # QA-only infra (Kafka/Redis/Mailpit); MySQL/Mongo/ES/Keycloak are shared
+├── .github/workflows/       # CI/CD: test -> build & push to GHCR -> bump k8s manifests
 └── pom.xml                  # Maven reactor parent
 ```
