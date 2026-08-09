@@ -1,0 +1,131 @@
+# Scrapes k8s-deployed pods across BOTH the demo (prod) and demo-qa namespaces — a single shared
+# instance, same reasoning as promtail-daemonset.yaml (this file is excluded on the testing branch
+# for the same reason: one cluster-wide instance, not one per environment, to avoid the demo-qa
+# ArgoCD Application fighting the demo one over the same ClusterRole/ClusterRoleBinding names).
+#
+# Runs INSIDE the cluster rather than alongside docker-compose.yml's Prometheus (which stays,
+# unchanged, covering the host-JVM/docker-compose dev flow) — pod IPs on the k3d overlay network
+# turned out not to be reachable from a container outside the cluster at all, discovery-via-API-
+# server notwithstanding. Grafana (still in docker-compose) reaches this one through the k3d
+# ingress at prometheus.demo.localhost, same port (18090) as everything else, routed by hostname.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: prometheus
+  namespace: monitoring
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: prometheus
+rules:
+  - apiGroups: [""]
+    resources: ["nodes", "services", "endpoints", "pods"]
+    verbs: ["get", "list", "watch"]
+  - nonResourceURLs: ["/metrics"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: prometheus
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: prometheus
+subjects:
+  - kind: ServiceAccount
+    name: prometheus
+    namespace: monitoring
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: monitoring
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+
+    scrape_configs:
+      - job_name: kubernetes-pods
+        # No api_server/authorization block — running as a pod in-cluster, the client-go library
+        # auto-discovers the API server and this ServiceAccount's auto-mounted, auto-rotated token.
+        kubernetes_sd_configs:
+          - role: pod
+        metrics_path: /actuator/prometheus
+        relabel_configs:
+          # Opt-in via the same "monitored: true" label already on most Service/Deployment
+          # manifests (was meant for a kube-prometheus-stack ServiceMonitor that never
+          # materialized — reused here instead).
+          - source_labels: [__meta_kubernetes_pod_label_monitored]
+            regex: "true"
+            action: keep
+          - source_labels: [__meta_kubernetes_namespace]
+            target_label: namespace
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            target_label: app
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: pod
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  namespace: monitoring
+  labels: { app: prometheus }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: prometheus } }
+  template:
+    metadata: { labels: { app: prometheus } }
+    spec:
+      serviceAccountName: prometheus
+      containers:
+        - name: prometheus
+          image: prom/prometheus:latest
+          args:
+            - --config.file=/etc/prometheus/prometheus.yml
+            - --storage.tsdb.path=/prometheus
+          ports: [{ containerPort: 9090 }]
+          volumeMounts:
+            - { name: config, mountPath: /etc/prometheus }
+            - { name: data, mountPath: /prometheus }
+          resources:
+            requests: { cpu: "100m", memory: "256Mi" }
+            limits: { cpu: "500m", memory: "512Mi" }
+      volumes:
+        - name: config
+          configMap: { name: prometheus-config }
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+  namespace: monitoring
+spec:
+  selector: { app: prometheus }
+  ports: [{ port: 9090, targetPort: 9090 }]
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: prometheus-ingress
+  namespace: monitoring
+spec:
+  rules:
+    - host: prometheus.demo.localhost
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service: { name: prometheus, port: { number: 9090 } }
