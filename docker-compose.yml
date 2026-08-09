@@ -219,6 +219,11 @@ services:
       - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./docker/grafana/dashboards:/etc/grafana/dashboards:ro
       - grafana_data:/var/lib/grafana
+    # Reaches the in-cluster Prometheus (k8s/prometheus.yaml) through the k3d ingress by hostname —
+    # explicit rather than relying on .localhost auto-resolution working the same way inside a
+    # container's own network namespace as it does on the host.
+    extra_hosts:
+      - "prometheus.demo.localhost:host-gateway"
     ports:
       - "3000:3000"
     depends_on:

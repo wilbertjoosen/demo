@@ -1,11 +1,20 @@
 apiVersion: 1
 
 datasources:
+  # Host-JVM/docker-compose dev flow only — never actually reaches the k8s-deployed services (see
+  # the Prometheus (k8s) datasource below).
   - name: Prometheus
     type: prometheus
     access: proxy
     url: http://prometheus:9090
     isDefault: true
+
+  # The in-cluster Prometheus (k8s/prometheus.yaml) — covers both the demo and demo-qa namespaces,
+  # distinguished by its "namespace" label, reached through the k3d ingress by hostname.
+  - name: Prometheus (k8s)
+    type: prometheus
+    access: proxy
+    url: http://prometheus.demo.localhost:18090
 
   - name: Loki
     type: loki
