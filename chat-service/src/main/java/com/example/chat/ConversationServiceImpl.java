@@ -44,7 +44,8 @@ class ConversationServiceImpl implements ConversationService {
     @Override
     public List<DirectMessage> history(String conversationId, String requesterKeycloakId, int limit) {
         assertParticipant(conversationId, requesterKeycloakId);
-        List<DirectMessage> newestFirst = directMessageRepository.findByConversationIdOrderByCreatedAtDesc(conversationId, PageRequest.of(0, limit));
+        List<DirectMessage> newestFirst = directMessageRepository.findByConversationIdOrderByCreatedAtDesc(
+                conversationId, PageRequest.of(0, limit));
         Collections.reverse(newestFirst);
         return newestFirst;
     }
@@ -63,7 +64,8 @@ class ConversationServiceImpl implements ConversationService {
     @Override
     public List<DirectMessage> markDelivered(String conversationId, String recipientId) {
         assertParticipant(conversationId, recipientId);
-        List<DirectMessage> pending = directMessageRepository.findByConversationIdAndSenderIdNotAndDeliveredAtIsNull(conversationId, recipientId);
+        List<DirectMessage> pending = directMessageRepository.findByConversationIdAndSenderIdNotAndDeliveredAtIsNull(
+                conversationId, recipientId);
         pending.forEach(DirectMessage::markDelivered);
         return directMessageRepository.saveAll(pending);
     }
@@ -71,7 +73,8 @@ class ConversationServiceImpl implements ConversationService {
     @Override
     public List<DirectMessage> markRead(String conversationId, String recipientId) {
         assertParticipant(conversationId, recipientId);
-        List<DirectMessage> pending = directMessageRepository.findByConversationIdAndSenderIdNotAndReadAtIsNull(conversationId, recipientId);
+        List<DirectMessage> pending = directMessageRepository.findByConversationIdAndSenderIdNotAndReadAtIsNull(
+                conversationId, recipientId);
         pending.forEach(DirectMessage::markRead);
         return directMessageRepository.saveAll(pending);
     }

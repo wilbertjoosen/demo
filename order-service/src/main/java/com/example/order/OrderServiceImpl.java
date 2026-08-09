@@ -41,7 +41,8 @@ class OrderServiceImpl implements OrderService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, message("order.insufficientStock"));
         }
 
-        Order order = new Order(keycloakUserId, email, productId, quantity, shippingAddress, paymentMethod, shippingCarrier, OrderStatus.PENDING_PAYMENT);
+        Order order = new Order(
+                keycloakUserId, email, productId, quantity, shippingAddress, paymentMethod, shippingCarrier, OrderStatus.PENDING_PAYMENT);
         order = orderRepository.save(order);
         orderViewRepository.save(OrderView.from(order));
 

@@ -34,10 +34,12 @@ class ShippingServiceImpl implements ShippingService {
     private final ShippingRateCalculator rateCalculator;
 
     @Override
-    public void ship(String orderId, String keycloakUserId, String email, int quantity, ShippingCarrier carrier) {
+    public void ship(
+            String orderId, String keycloakUserId, String email, int quantity, ShippingCarrier carrier) {
         boolean success = quantity != SIMULATED_FAILURE_QUANTITY;
         BigDecimal cost = rateCalculator.quote(carrier, quantity);
-        shipmentRepository.save(new Shipment(orderId, keycloakUserId, success ? ShipmentStatus.DISPATCHED : ShipmentStatus.FAILED, carrier, cost));
+        shipmentRepository.save(new Shipment(
+                orderId, keycloakUserId, success ? ShipmentStatus.DISPATCHED : ShipmentStatus.FAILED, carrier, cost));
 
         kafkaTemplate.send(Topics.SHIPPING_EVENTS, DomainEvent.of(
                 success ? EventTypes.SHIPPED : EventTypes.SHIPPING_FAILED,

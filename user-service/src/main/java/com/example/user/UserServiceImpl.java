@@ -39,7 +39,8 @@ class UserServiceImpl implements UserService {
     }
 
     @Override
-    public UserProfileView createUser(String username, String email, String firstName, String lastName, String password, ProfileFields fields) {
+    public UserProfileView createUser(
+            String username, String email, String firstName, String lastName, String password, ProfileFields fields) {
         String keycloakId = keycloakAdminClient.createUser(username, email, firstName, lastName, password);
         User user = new User(keycloakId);
         applyProfileFields(user, fields);

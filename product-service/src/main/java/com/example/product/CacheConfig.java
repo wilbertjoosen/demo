@@ -38,17 +38,20 @@ public class CacheConfig implements CachingConfigurer {
         return new CacheErrorHandler() {
             @Override
             public void handleCacheGetError(RuntimeException exception, Cache cache, Object key) {
-                log.warn("Redis unavailable for cache '{}' get(key={}) — falling through to the source: {}", cache.getName(), key, exception.toString());
+                log.warn("Redis unavailable for cache '{}' get(key={}) — falling through to the source: {}",
+                        cache.getName(), key, exception.toString());
             }
 
             @Override
             public void handleCachePutError(RuntimeException exception, Cache cache, Object key, Object value) {
-                log.warn("Redis unavailable for cache '{}' put(key={}) — skipping cache write: {}", cache.getName(), key, exception.toString());
+                log.warn("Redis unavailable for cache '{}' put(key={}) — skipping cache write: {}",
+                        cache.getName(), key, exception.toString());
             }
 
             @Override
             public void handleCacheEvictError(RuntimeException exception, Cache cache, Object key) {
-                log.warn("Redis unavailable for cache '{}' evict(key={}) — skipping cache eviction: {}", cache.getName(), key, exception.toString());
+                log.warn("Redis unavailable for cache '{}' evict(key={}) — skipping cache eviction: {}",
+                        cache.getName(), key, exception.toString());
             }
 
             @Override

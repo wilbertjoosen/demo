@@ -14,8 +14,10 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Import;
 
 @SpringBootApplication
-@Import({ResourceServerSecurityConfig.class, OpenApiConfig.class, MessageSourceConfig.class, ApiExceptionHandler.class,
-        KafkaAuditEventRepository.class, AuditSchedulingConfig.class, RestCallAuditAspect.class, JwtAuditorAware.class, JpaAuditingEnabler.class})
+@Import({
+        ResourceServerSecurityConfig.class, OpenApiConfig.class, MessageSourceConfig.class, ApiExceptionHandler.class,
+        KafkaAuditEventRepository.class, AuditSchedulingConfig.class, RestCallAuditAspect.class,
+        JwtAuditorAware.class, JpaAuditingEnabler.class})
 public class OrderServiceApplication {
 
     public static void main(String[] args) {

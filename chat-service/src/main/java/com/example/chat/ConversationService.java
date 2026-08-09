@@ -14,7 +14,10 @@ public interface ConversationService {
 
     DirectMessage sendMessage(String conversationId, String senderId, String senderUsername, String body);
 
-    /** Marks every not-yet-delivered message sent by the OTHER participant as delivered to {@code recipientId}. Returns the messages that changed. */
+    /**
+     * Marks every not-yet-delivered message sent by the OTHER participant as delivered to
+     * {@code recipientId}. Returns the messages that changed.
+     */
     List<DirectMessage> markDelivered(String conversationId, String recipientId);
 
     /** Marks every not-yet-read message sent by the OTHER participant as read by {@code recipientId}. Returns the messages that changed. */

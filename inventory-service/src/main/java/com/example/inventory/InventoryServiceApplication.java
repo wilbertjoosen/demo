@@ -15,8 +15,10 @@ import org.springframework.context.annotation.Import;
 
 @SpringBootApplication
 @EnableCaching
-@Import({ResourceServerSecurityConfig.class, OpenApiConfig.class, ApiExceptionHandler.class, KafkaAuditEventRepository.class, AuditSchedulingConfig.class,
-        RestCallAuditAspect.class, JwtAuditorAware.class, MongoAuditingEnabler.class})
+@Import({
+        ResourceServerSecurityConfig.class, OpenApiConfig.class, ApiExceptionHandler.class,
+        KafkaAuditEventRepository.class, AuditSchedulingConfig.class, RestCallAuditAspect.class,
+        JwtAuditorAware.class, MongoAuditingEnabler.class})
 public class InventoryServiceApplication {
 
     public static void main(String[] args) {

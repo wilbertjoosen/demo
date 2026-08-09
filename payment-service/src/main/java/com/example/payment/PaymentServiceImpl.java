@@ -24,7 +24,8 @@ class PaymentServiceImpl implements PaymentService {
     private final PaymentGatewayAvailability gatewayAvailability;
 
     @Override
-    public void charge(String orderId, String keycloakUserId, String email, int quantity, PaymentMethod method, ShippingCarrier shippingCarrier) {
+    public void charge(
+            String orderId, String keycloakUserId, String email, int quantity, PaymentMethod method, ShippingCarrier shippingCarrier) {
         if (!gatewayAvailability.isAvailable(method)) {
             Payment payment = paymentRepository.save(new Payment(orderId, email, method, PaymentStatus.FAILED, "gateway_unavailable"));
             kafkaTemplate.send(Topics.PAYMENT_EVENTS, DomainEvent.of(EventTypes.PAYMENT_FAILED, orderId,

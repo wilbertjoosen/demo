@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+    <!--
+      EI_EXPOSE_REP/EI_EXPOSE_REP2 fire on every constructor-injected Spring bean (KafkaTemplate,
+      repositories, other services) — SpotBugs can't tell "singleton collaborator reference" apart
+      from "mutable data that needs defensive copying", so in a DI-heavy Spring app this pattern is
+      almost pure noise and would drown out real findings. Genuine mutable-state-exposure cases
+      (e.g. a record/DTO holding a Map) are fixed directly in source instead (defensive copy in the
+      constructor), not suppressed here.
+    -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+    </Match>
+
+    <!--
+      Spring HATEOAS's methodOn(Controller.class).someMethod(null) is an idiomatic dummy invocation
+      on a proxy — the args are never actually used, only recorded to build a URI template — so
+      passing null here is intentional, not a real null-deref risk.
+    -->
+    <Match>
+        <Class name="com.example.order.OrderViewModelAssembler"/>
+        <Bug pattern="NP_NULL_PARAM_DEREF_ALL_TARGETS_DANGEROUS"/>
+    </Match>
+</FindBugsFilter>
