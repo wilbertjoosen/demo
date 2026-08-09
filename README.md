@@ -363,9 +363,14 @@ flowchart LR
   bodies with secrets redacted) and shipped to Elasticsearch — index `audit-log` for prod, `audit-log-qa`
   for QA (same shared ES instance, see [QA / testing environment](#qa--testing-environment)). The admin
   UI's history icons (Users, Products, Media, Chat) show the full change timeline with before/after
-  diffs per field, powered by `audit-service`'s `RecordHistoryService` — a Kibana dashboard
-  (`docker/kibana/audit-trail-dashboard.ndjson`) covers the same data for ad-hoc querying; its index
-  pattern (`audit-log*`) already matches both indices, no per-environment duplicate needed.
+  diffs per field, powered by `audit-service`'s `RecordHistoryService`. Three Kibana dashboards cover
+  the same data for ad-hoc querying, all auto-imported on startup (`kibana-dashboard-init` in
+  `docker-compose.yml`): **"Audit Trail"** (`audit-trail-dashboard.ndjson`, the original — index
+  pattern `audit-log*`, both environments together, for cross-environment searching), and
+  **"Audit Trail — Production"** / **"Audit Trail — QA"** (`audit-trail-dashboard-{prod,qa}.ndjson`),
+  each pinned to its own exact index instead of relying on a filter — matches the Grafana dashboard's
+  approach of making the environment split a first-class view, not something the reader has to
+  remember to filter for.
 
 ## Repo layout
 
