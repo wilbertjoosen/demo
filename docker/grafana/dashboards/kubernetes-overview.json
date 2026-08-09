@@ -1,0 +1,146 @@
+{
+  "title": "Kubernetes Overview (prod vs QA)",
+  "uid": "demo-k8s-overview",
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "tags": ["demo", "kubernetes"],
+  "templating": {
+    "list": [
+      {
+        "name": "namespace",
+        "type": "query",
+        "datasource": "Prometheus (k8s)",
+        "query": "label_values(up, namespace)",
+        "multi": true,
+        "includeAll": true,
+        "current": { "text": "All", "value": "$__all" },
+        "refresh": 2
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Services Up — demo (prod)",
+      "type": "stat",
+      "datasource": "Prometheus (k8s)",
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 0 },
+      "fieldConfig": {
+        "defaults": { "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] } },
+        "overrides": []
+      },
+      "targets": [{ "expr": "sum(up{namespace=\"demo\"})", "legendFormat": "up", "refId": "A" }]
+    },
+    {
+      "id": 2,
+      "title": "Services Up — demo-qa (QA)",
+      "type": "stat",
+      "datasource": "Prometheus (k8s)",
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 0 },
+      "fieldConfig": {
+        "defaults": { "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] } },
+        "overrides": []
+      },
+      "targets": [{ "expr": "sum(up{namespace=\"demo-qa\"})", "legendFormat": "up", "refId": "A" }]
+    },
+    {
+      "id": 3,
+      "title": "Services Down — demo (prod)",
+      "type": "stat",
+      "datasource": "Prometheus (k8s)",
+      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 0 },
+      "fieldConfig": {
+        "defaults": { "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] } },
+        "overrides": []
+      },
+      "targets": [{ "expr": "count(up{namespace=\"demo\"} == 0) OR vector(0)", "legendFormat": "down", "refId": "A" }]
+    },
+    {
+      "id": 4,
+      "title": "Services Down — demo-qa (QA)",
+      "type": "stat",
+      "datasource": "Prometheus (k8s)",
+      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 0 },
+      "fieldConfig": {
+        "defaults": { "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] } },
+        "overrides": []
+      },
+      "targets": [{ "expr": "count(up{namespace=\"demo-qa\"} == 0) OR vector(0)", "legendFormat": "down", "refId": "A" }]
+    },
+    {
+      "id": 5,
+      "title": "JVM Heap Memory Used by Service",
+      "type": "timeseries",
+      "datasource": "Prometheus (k8s)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 5 },
+      "targets": [{
+        "expr": "sum(jvm_memory_used_bytes{area=\"heap\", namespace=~\"$namespace\"}) by (namespace, app)",
+        "legendFormat": "{{namespace}}/{{app}}",
+        "refId": "A"
+      }]
+    },
+    {
+      "id": 6,
+      "title": "CPU Usage by Service",
+      "type": "timeseries",
+      "datasource": "Prometheus (k8s)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 5 },
+      "targets": [{
+        "expr": "process_cpu_usage{namespace=~\"$namespace\"}",
+        "legendFormat": "{{namespace}}/{{app}}",
+        "refId": "A"
+      }]
+    },
+    {
+      "id": 7,
+      "title": "HTTP Request Rate by Service",
+      "type": "timeseries",
+      "datasource": "Prometheus (k8s)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 13 },
+      "targets": [{
+        "expr": "sum(rate(http_server_requests_seconds_count{namespace=~\"$namespace\"}[1m])) by (namespace, app)",
+        "legendFormat": "{{namespace}}/{{app}}",
+        "refId": "A"
+      }]
+    },
+    {
+      "id": 8,
+      "title": "HTTP 5xx Error Rate by Service",
+      "type": "timeseries",
+      "datasource": "Prometheus (k8s)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 13 },
+      "targets": [{
+        "expr": "sum(rate(http_server_requests_seconds_count{status=~\"5..\", namespace=~\"$namespace\"}[1m])) by (namespace, app)",
+        "legendFormat": "{{namespace}}/{{app}}",
+        "refId": "A"
+      }]
+    },
+    {
+      "id": 9,
+      "title": "Average HTTP Latency by Service",
+      "type": "timeseries",
+      "datasource": "Prometheus (k8s)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 21 },
+      "targets": [{
+        "expr": "sum(rate(http_server_requests_seconds_sum{namespace=~\"$namespace\"}[1m])) by (namespace, app) / sum(rate(http_server_requests_seconds_count{namespace=~\"$namespace\"}[1m])) by (namespace, app)",
+        "legendFormat": "{{namespace}}/{{app}}",
+        "refId": "A"
+      }]
+    },
+    {
+      "id": 10,
+      "title": "JVM Live Threads by Service",
+      "type": "timeseries",
+      "datasource": "Prometheus (k8s)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 21 },
+      "targets": [{
+        "expr": "jvm_threads_live_threads{namespace=~\"$namespace\"}",
+        "legendFormat": "{{namespace}}/{{app}}",
+        "refId": "A"
+      }]
+    }
+  ]
+}

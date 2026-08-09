@@ -276,6 +276,52 @@ arm64.
 A second, fully independent deploy target — same cluster, same shared stateful infra, separate
 namespace and separate ArgoCD Application from production:
 
+```mermaid
+flowchart LR
+    subgraph GIT["GitHub"]
+        MAIN["main branch"]
+        TEST["testing branch"]
+    end
+
+    subgraph K8S["k3d cluster"]
+        subgraph DEMO["namespace: demo (prod)"]
+            APPS_PROD["17 services\n+ frontend"]
+        end
+        subgraph DEMOQA["namespace: demo-qa (QA)"]
+            APPS_QA["17 services\n+ frontend"]
+        end
+        ARGO_PROD["ArgoCD app: demo"]
+        ARGO_QA["ArgoCD app: demo-qa"]
+    end
+
+    subgraph SHARED["Shared infra — one instance, environment-scoped by name"]
+        MYSQL[("MySQL\ndb: demo / demo_qa")]
+        MONGO[("MongoDB\ndb: <svc> / <svc>_qa")]
+        ES[("Elasticsearch\nindex: audit-log / audit-log-qa")]
+        KC["Keycloak\nrealm: demo / demo-qa"]
+    end
+
+    subgraph ISO_PROD["Prod-only infra"]
+        KAFKA_PROD["Kafka :9092/:9094"]
+        REDIS_PROD["Redis :6379"]
+    end
+
+    subgraph ISO_QA["QA-only infra"]
+        KAFKA_QA["Kafka :9192/:9194"]
+        REDIS_QA["Redis :6380"]
+    end
+
+    MAIN -- "CI/CD: build, push, bump k8s/" --> ARGO_PROD
+    TEST -- "CI/CD: build, push, bump k8s/" --> ARGO_QA
+    ARGO_PROD --> APPS_PROD
+    ARGO_QA --> APPS_QA
+
+    APPS_PROD --> MYSQL & MONGO & ES & KC
+    APPS_QA --> MYSQL & MONGO & ES & KC
+    APPS_PROD --> KAFKA_PROD & REDIS_PROD
+    APPS_QA --> KAFKA_QA & REDIS_QA
+```
+
 - **Branch model**: `main` is production (bugfixes branch from here); `develop` is where feature
   branches merge; `testing` is the QA environment itself — merging `develop` → `testing` and pushing
   deploys to QA the same way pushing to `main` deploys to prod.
@@ -305,16 +351,21 @@ namespace and separate ArgoCD Application from production:
   `monitored: "true"` label most manifests already carry) and labeled by `namespace`. Pod IPs on the
   k3d overlay network aren't reachable from outside the cluster at all, which is why this one has to
   run in-cluster rather than as a third docker-compose static-target job. Grafana has both as
-  datasources, plus a pre-provisioned "Services Overview" dashboard (`docker/grafana/dashboards/`).
+  datasources, plus two pre-provisioned dashboards (`docker/grafana/dashboards/`): "Services Overview"
+  (the docker-compose/host-JVM Prometheus) and **"Kubernetes Overview (prod vs QA)"** (the in-cluster
+  one) — the latter has a `namespace` filter variable and puts prod/QA side by side in the top row
+  (Services Up/Down for each), so environment health is a single glance, not two separate dashboards.
 - **Logs**: services log to stdout; in Docker Compose that's `docker logs <container>`. In k8s,
   Promtail (`k8s/promtail-daemonset.yaml`, one shared instance, not per-environment) ships every pod's
   logs — from both namespaces — to the same Loki instance, labeled by `namespace`. Query either
   through Grafana's Explore tab, e.g. `{namespace="demo-qa"}` to see QA only.
 - **Audit trail**: every REST call across every service is captured (who, what, when, request/response
-  bodies with secrets redacted) and shipped to Elasticsearch. The admin UI's history icons (Users,
-  Products, Media, Chat) show the full change timeline with before/after diffs per field, powered by
-  `audit-service`'s `RecordHistoryService` — a Kibana dashboard (`docker/kibana/audit-trail-dashboard.ndjson`)
-  covers the same data for ad-hoc querying.
+  bodies with secrets redacted) and shipped to Elasticsearch — index `audit-log` for prod, `audit-log-qa`
+  for QA (same shared ES instance, see [QA / testing environment](#qa--testing-environment)). The admin
+  UI's history icons (Users, Products, Media, Chat) show the full change timeline with before/after
+  diffs per field, powered by `audit-service`'s `RecordHistoryService` — a Kibana dashboard
+  (`docker/kibana/audit-trail-dashboard.ndjson`) covers the same data for ad-hoc querying; its index
+  pattern (`audit-log*`) already matches both indices, no per-environment duplicate needed.
 
 ## Repo layout
 
