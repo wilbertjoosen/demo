@@ -84,10 +84,32 @@ class DirectMessageWebSocketIntegrationTest extends AbstractWebSocketIntegration
         return session;
     }
 
+    // 10s, not 5s — this project's other WebSocket/Kafka integration tests hit the same CI-only
+    // flakiness (see OrderSagaIntegrationTest's history): a shared CI runner under load from the
+    // full reactor's other Testcontainers-backed suites needs more slack than a quiet local machine.
     private JsonNode nextFrame(QueueingHandler handler) throws Exception {
-        String raw = handler.received.poll(5, TimeUnit.SECONDS);
-        assertThat(raw).as("expected a frame within 5s").isNotNull();
+        String raw = handler.received.poll(10, TimeUnit.SECONDS);
+        assertThat(raw).as("expected a frame within 10s").isNotNull();
         return objectMapper.readTree(raw);
+    }
+
+    /**
+     * Like {@link #nextFrame}, but skips over frame types other than {@code type} instead of
+     * failing on the first mismatch — handleMessage() broadcasts MESSAGE then, if the recipient is
+     * already connected, an immediate MESSAGE_UPDATED (delivered) to the whole room including the
+     * sender; both are legitimate, but nothing guarantees a test polls them in a specific order.
+     */
+    private JsonNode nextFrameOfType(QueueingHandler handler, String type) throws Exception {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (System.nanoTime() < deadline) {
+            String raw = handler.received.poll(10, TimeUnit.SECONDS);
+            assertThat(raw).as("expected a '%s' frame within 10s", type).isNotNull();
+            JsonNode frame = objectMapper.readTree(raw);
+            if (type.equals(frame.get("type").asText())) {
+                return frame;
+            }
+        }
+        throw new AssertionError("expected a '" + type + "' frame within 10s, got other frame types only");
     }
 
     @Test
@@ -128,12 +150,11 @@ class DirectMessageWebSocketIntegrationTest extends AbstractWebSocketIntegration
 
         sender.sendMessage(new TextMessage(objectMapper.writeValueAsString(Map.of("type", "MESSAGE", "body", "hello there"))));
 
-        JsonNode senderFrame = nextFrame(senderHandler);
-        assertThat(senderFrame.get("type").asText()).isEqualTo("MESSAGE");
+        JsonNode senderFrame = nextFrameOfType(senderHandler, "MESSAGE");
         assertThat(senderFrame.get("payload").get("body").asText()).isEqualTo("hello there");
         assertThat(senderFrame.get("payload").get("senderId").asText()).isEqualTo("user-1");
 
-        JsonNode recipientFrame = nextFrame(recipientHandler);
+        JsonNode recipientFrame = nextFrameOfType(recipientHandler, "MESSAGE");
         assertThat(recipientFrame.get("payload").get("body").asText()).isEqualTo("hello there");
     }
 
