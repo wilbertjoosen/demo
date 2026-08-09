@@ -10,6 +10,8 @@ spec:
   template:
     metadata: { labels: { app: payment-service, monitored: "true" } }
     spec:
+      imagePullSecrets:
+        - name: ghcr-pull-secret
       containers:
         - name: payment-service
           image: demo/payment-service:local

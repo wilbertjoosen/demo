@@ -20,6 +20,8 @@ spec:
   template:
     metadata: { labels: { app: product-media-service, monitored: "true" } }
     spec:
+      imagePullSecrets:
+        - name: ghcr-pull-secret
       containers:
         - name: product-media-service
           image: demo/product-media-service:local

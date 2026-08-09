@@ -10,6 +10,8 @@ spec:
   template:
     metadata: { labels: { app: product-review-service, monitored: "true" } }
     spec:
+      imagePullSecrets:
+        - name: ghcr-pull-secret
       containers:
         - name: product-review-service
           image: demo/product-review-service:local
