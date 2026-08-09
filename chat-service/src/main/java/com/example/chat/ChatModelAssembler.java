@@ -13,7 +13,8 @@ class ChatModelAssembler implements RepresentationModelAssembler<ChatMessage, En
 
     @Override
     public EntityModel<ChatMessage> toModel(ChatMessage chatMessage) {
-        return EntityModel.of(chatMessage, linkTo(methodOn(ChatController.class).history(chatMessage.getProductId(), 50)).withRel("messages"));
+        return EntityModel.of(chatMessage,
+                linkTo(methodOn(ChatController.class).history(chatMessage.getProductId(), 50)).withRel("messages"));
     }
 
     @Override

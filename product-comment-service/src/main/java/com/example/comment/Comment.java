@@ -11,7 +11,10 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
 
-/** One-level-deep threading only ({@code parentId} points at a top-level comment, never another reply) — enough to demonstrate the pattern without a recursive tree API. */
+/**
+ * One-level-deep threading only ({@code parentId} points at a top-level comment, never another
+ * reply) — enough to demonstrate the pattern without a recursive tree API.
+ */
 @Document(collection = "comments")
 @Getter
 @NoArgsConstructor

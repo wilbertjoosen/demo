@@ -17,7 +17,7 @@ import java.util.UUID;
 
 /** Local-disk storage — no S3/MinIO in this demo (see application.yaml's media.upload-dir comment). */
 @Service
-class MediaFileStorageService {
+final class MediaFileStorageService {
 
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of(
             "jpg", "jpeg", "png", "gif", "webp", "mp4", "webm", "mov",

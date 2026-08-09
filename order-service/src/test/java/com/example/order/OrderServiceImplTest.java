@@ -15,7 +15,6 @@ import org.springframework.context.MessageSource;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -80,7 +79,8 @@ class OrderServiceImplTest {
         assertThat(result.getStatus()).isEqualTo(OrderStatus.PENDING_PAYMENT);
         verify(orderViewRepository).save(any(OrderView.class));
 
-        ArgumentCaptor<com.example.common.events.DomainEvent> eventCaptor = ArgumentCaptor.forClass(com.example.common.events.DomainEvent.class);
+        ArgumentCaptor<com.example.common.events.DomainEvent> eventCaptor =
+                ArgumentCaptor.forClass(com.example.common.events.DomainEvent.class);
         verify(kafkaTemplate).send(eq(Topics.ORDER_EVENTS), eventCaptor.capture());
         com.example.common.events.DomainEvent published = eventCaptor.getValue();
         assertThat(published.eventType()).isEqualTo(EventTypes.ORDER_CREATED);

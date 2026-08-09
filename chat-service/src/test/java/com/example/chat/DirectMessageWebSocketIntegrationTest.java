@@ -50,8 +50,11 @@ class DirectMessageWebSocketIntegrationTest extends AbstractWebSocketIntegration
     void closeSessions() {
         openSessions.forEach(s -> {
             try {
-                if (s.isOpen()) s.close();
-            } catch (Exception ignored) {
+                if (s.isOpen()) {
+                    s.close();
+                }
+            } catch (Exception e) {
+                // best-effort cleanup, nothing to act on if a socket was already gone
             }
         });
         openSessions.clear();
@@ -74,7 +77,8 @@ class DirectMessageWebSocketIntegrationTest extends AbstractWebSocketIntegration
     }
 
     private WebSocketSession connect(String conversationId, String token, QueueingHandler handler) throws Exception {
-        WebSocketSession session = client.execute(handler, "ws://localhost:" + port + "/ws/conversations/" + conversationId + "?token=" + token)
+        WebSocketSession session = client.execute(
+                        handler, "ws://localhost:" + port + "/ws/conversations/" + conversationId + "?token=" + token)
                 .get(5, TimeUnit.SECONDS);
         openSessions.add(session);
         return session;
@@ -91,7 +95,8 @@ class DirectMessageWebSocketIntegrationTest extends AbstractWebSocketIntegration
         String conversationId = seedConversation("user-1", "user-2");
         QueueingHandler handler = new QueueingHandler();
 
-        assertThatThrownBy(() -> client.execute(handler, "ws://localhost:" + port + "/ws/conversations/" + conversationId).get(5, TimeUnit.SECONDS))
+        assertThatThrownBy(() -> client.execute(handler, "ws://localhost:" + port + "/ws/conversations/" + conversationId)
+                .get(5, TimeUnit.SECONDS))
                 .isInstanceOfAny(ExecutionException.class, TimeoutException.class);
     }
 

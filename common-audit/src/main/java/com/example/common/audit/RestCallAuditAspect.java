@@ -1,5 +1,6 @@
 package com.example.common.audit;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -145,7 +146,7 @@ public class RestCallAuditAspect {
             redact(tree);
             String json = objectMapper.writeValueAsString(tree);
             return json.length() > MAX_BODY_LENGTH ? json.substring(0, MAX_BODY_LENGTH) + "...(truncated)" : json;
-        } catch (Exception e) {
+        } catch (IllegalArgumentException | JsonProcessingException e) {
             return null;
         }
     }

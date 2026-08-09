@@ -13,6 +13,10 @@ import java.util.Map;
  */
 public record AuditRecord(String service, String principal, String type, Map<String, Object> data, Instant timestamp) {
 
+    public AuditRecord {
+        data = data == null ? Map.of() : Map.copyOf(data);
+    }
+
     public static AuditRecord from(String service, AuditEvent event) {
         return new AuditRecord(service, event.getPrincipal(), event.getType(), event.getData(), event.getTimestamp());
     }

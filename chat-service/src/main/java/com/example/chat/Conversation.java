@@ -22,7 +22,10 @@ public class Conversation {
     /** Always exactly 2 keycloak IDs, sorted, so a pair maps to one conversation regardless of who started it. */
     private List<String> participantIds;
 
-    /** Display names snapshotted at creation time (self-reported via JWT / the directory lookup), not re-synced if the user renames later. */
+    /**
+     * Display names snapshotted at creation time (self-reported via JWT / the directory lookup),
+     * not re-synced if the user renames later.
+     */
     private Map<String, String> participantUsernames;
 
     @CreatedDate

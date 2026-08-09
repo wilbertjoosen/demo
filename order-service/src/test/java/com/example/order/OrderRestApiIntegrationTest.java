@@ -94,7 +94,8 @@ class OrderRestApiIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void placeOrder_reservesStockAndPersistsInBothModels() throws Exception {
-        inventoryService.stubFor(WireMock.post(urlPathMatching("/api/inventory/product-1/reserve")).willReturn(aResponse().withStatus(200)));
+        inventoryService.stubFor(WireMock.post(urlPathMatching("/api/inventory/product-1/reserve"))
+                .willReturn(aResponse().withStatus(200)));
 
         mockMvc.perform(post("/api/orders")
                         .with(userToken("user-1", jwt -> jwt.claim("email", "buyer@example.com")))
@@ -105,7 +106,8 @@ class OrderRestApiIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.productId").value("product-1"));
 
         inventoryService.verify(1, postRequestedFor(urlPathMatching("/api/inventory/product-1/reserve"))
-                .withHeader("Authorization", com.github.tomakehurst.wiremock.client.WireMock.equalTo("Bearer " + TestOAuth2ClientConfig.FAKE_TOKEN)));
+                .withHeader("Authorization",
+                        com.github.tomakehurst.wiremock.client.WireMock.equalTo("Bearer " + TestOAuth2ClientConfig.FAKE_TOKEN)));
 
         mockMvc.perform(get("/api/orders").with(userToken("user-1")))
                 .andExpect(status().isOk())
@@ -114,7 +116,8 @@ class OrderRestApiIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void placeOrder_insufficientStock_returns409AndPersistsNothing() throws Exception {
-        inventoryService.stubFor(WireMock.post(urlPathMatching("/api/inventory/product-1/reserve")).willReturn(aResponse().withStatus(409)));
+        inventoryService.stubFor(WireMock.post(urlPathMatching("/api/inventory/product-1/reserve"))
+                .willReturn(aResponse().withStatus(409)));
 
         mockMvc.perform(post("/api/orders")
                         .with(userToken("user-2", jwt -> jwt.claim("email", "buyer2@example.com")))
@@ -129,8 +132,10 @@ class OrderRestApiIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void cancelOrder_releasesStockViaInventoryService() throws Exception {
-        inventoryService.stubFor(WireMock.post(urlPathMatching("/api/inventory/product-1/reserve")).willReturn(aResponse().withStatus(200)));
-        inventoryService.stubFor(WireMock.post(urlPathMatching("/api/inventory/product-1/release")).willReturn(aResponse().withStatus(200)));
+        inventoryService.stubFor(WireMock.post(urlPathMatching("/api/inventory/product-1/reserve"))
+                .willReturn(aResponse().withStatus(200)));
+        inventoryService.stubFor(WireMock.post(urlPathMatching("/api/inventory/product-1/release"))
+                .willReturn(aResponse().withStatus(200)));
 
         String body = mockMvc.perform(post("/api/orders")
                         .with(userToken("user-3", jwt -> jwt.claim("email", "buyer3@example.com")))
@@ -152,7 +157,8 @@ class OrderRestApiIntegrationTest extends AbstractIntegrationTest {
         // Resilience4jConfig: slidingWindowSize=4, minimumNumberOfCalls=4, failureRateThreshold=50% —
         // 4 failing calls should be enough to trip the breaker open; a 5th call should fail WITHOUT
         // ever reaching WireMock (fails fast from the open breaker instead).
-        inventoryService.stubFor(WireMock.post(urlPathMatching("/api/inventory/product-1/reserve")).willReturn(aResponse().withStatus(500)));
+        inventoryService.stubFor(WireMock.post(urlPathMatching("/api/inventory/product-1/reserve"))
+                .willReturn(aResponse().withStatus(500)));
 
         for (int i = 0; i < 4; i++) {
             mockMvc.perform(post("/api/orders")

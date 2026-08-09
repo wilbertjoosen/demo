@@ -102,6 +102,10 @@ public class OrderView {
         return deleted;
     }
 
+    public Instant getDeletedAt() {
+        return deletedAt;
+    }
+
     public void markDeleted() {
         this.deleted = true;
         this.deletedAt = Instant.now();

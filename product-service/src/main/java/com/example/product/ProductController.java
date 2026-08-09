@@ -85,7 +85,8 @@ public class ProductController {
                     "status", execution.getStatus().toString()
             ));
         } catch (Exception e) {
-            String message = messageSource.getMessage("product.batchJobFailed", new Object[]{e.getMessage()}, LocaleContextHolder.getLocale());
+            String message = messageSource.getMessage(
+                    "product.batchJobFailed", new Object[]{e.getMessage()}, LocaleContextHolder.getLocale());
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, message, e);
         }
     }

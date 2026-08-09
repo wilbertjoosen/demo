@@ -39,7 +39,8 @@ public class CommentController {
     }
 
     @PutMapping("/{id}")
-    public EntityModel<Comment> update(@AuthenticationPrincipal Jwt jwt, @PathVariable String id, @Valid @RequestBody UpdateCommentRequest request) {
+    public EntityModel<Comment> update(
+            @AuthenticationPrincipal Jwt jwt, @PathVariable String id, @Valid @RequestBody UpdateCommentRequest request) {
         boolean isAdmin = hasAdminRole(jwt);
         Comment updated = commentService.update(id, jwt.getSubject(), isAdmin, request.body());
         return assembler.toModel(updated);

@@ -70,7 +70,8 @@ public class DirectMessageWebSocketHandler extends TextWebSocketHandler {
         }
     }
 
-    private void handleMessage(WebSocketSession session, String conversationId, String keycloakId, String username, String body) throws IOException {
+    private void handleMessage(
+            WebSocketSession session, String conversationId, String keycloakId, String username, String body) throws IOException {
         if (body == null || body.isBlank()) {
             return;
         }
