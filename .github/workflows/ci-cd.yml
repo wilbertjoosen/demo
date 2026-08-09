@@ -2,7 +2,9 @@ name: CI/CD
 
 on:
   push:
-    branches: [main]
+    # main deploys to production (namespace demo); testing deploys to QA (namespace demo-qa) — see
+    # each job's `if:` below. develop/feature branches aren't wired to any environment yet.
+    branches: [main, testing]
   pull_request:
     branches: [main]
 
@@ -53,7 +55,7 @@ jobs:
 
   changes:
     name: Detect changed services
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/testing')
     runs-on: ubuntu-latest
     outputs:
       services: ${{ steps.matrix.outputs.services }}
@@ -112,7 +114,7 @@ jobs:
   # images for a change that isn't merged yet.
   build-and-push:
     name: Build & push images
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.changes.outputs.services != '[]'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/testing') && needs.changes.outputs.services != '[]'
     needs: [backend-test, frontend-test, changes]
     runs-on: ubuntu-latest
     strategy:
@@ -160,7 +162,7 @@ jobs:
 
   build-and-push-frontend:
     name: Build & push frontend image
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.changes.outputs.frontend == 'true'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/testing') && needs.changes.outputs.frontend == 'true'
     needs: [backend-test, frontend-test, changes]
     runs-on: ubuntu-latest
     steps:
@@ -192,15 +194,17 @@ jobs:
     # also isn't 'failure', so this has to check for 'success' explicitly on at least one of them).
     if: |
       always() &&
-      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/testing') &&
       (needs.build-and-push.result == 'success' || needs.build-and-push-frontend.result == 'success')
     needs: [changes, build-and-push, build-and-push-frontend]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          # A later `git push` needs a real ref, not the detached HEAD checkout actions/checkout leaves by default.
-          ref: main
+          # Commit the manifest bump back to whichever branch triggered this run (main -> prod,
+          # testing -> QA) — a later `git push` needs a real ref, not the detached HEAD checkout
+          # actions/checkout leaves by default.
+          ref: ${{ github.ref_name }}
       - name: Point manifests at this commit's images
         run: |
           # Only touch manifests for services that were actually rebuilt this run — touching every
