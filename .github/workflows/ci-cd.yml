@@ -7,6 +7,10 @@ on:
     branches: [main, testing]
   pull_request:
     branches: [main]
+  # Manual "rebuild + redeploy everything" — e.g. after a change that doesn't touch any single
+  # service's own path (a Dockerfile fix, a versioning-scheme change) but every service still needs
+  # picking up. Run against whichever branch (main or testing) you want to rebuild.
+  workflow_dispatch: {}
 
 # Explicit rather than relying on repo-level defaults — GITHUB_TOKEN needs package-write to push
 # images to GHCR, and contents-write for the deploy job's auto-commit back to k8s/.
@@ -55,18 +59,23 @@ jobs:
 
   changes:
     name: Detect changed services
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/testing')
+    if: |
+      (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/testing')) ||
+      github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     outputs:
       services: ${{ steps.matrix.outputs.services }}
-      frontend: ${{ steps.filter.outputs.frontend }}
+      frontend: ${{ steps.matrix.outputs.frontend }}
     steps:
       - uses: actions/checkout@v4
         with:
           # dorny/paths-filter diffs against the previous commit on the branch — needs real
           # history, not the default shallow (fetch-depth: 1) checkout.
           fetch-depth: 0
+      # Manual dispatch has no "changed since" to diff against — every service is presumed
+      # changed, skipping the filter step entirely (its outputs would otherwise be empty/unset).
       - uses: dorny/paths-filter@v3
+        if: github.event_name != 'workflow_dispatch'
         id: filter
         with:
           filters: |
@@ -100,21 +109,28 @@ jobs:
       - name: Build service matrix
         id: matrix
         # A shared module (or the root pom/Dockerfile) changing can affect every service, since
-        # each image build runs `mvnw -pl <service> -am` — so it forces a full rebuild. Otherwise,
-        # only the services whose own directory changed go into the matrix.
+        # each image build runs `mvnw -pl <service> -am` — so it forces a full rebuild. Same result,
+        # deliberately, for a manual workflow_dispatch run — every service is presumed changed.
         run: |
-          if [ "${{ steps.filter.outputs.shared }}" = "true" ]; then
-            SERVICES='["eureka-server","config-server","gateway-service","inventory-service","audit-service","user-service","product-service","order-service","payment-service","shipping-service","delivery-service","notification-service","product-comment-service","product-media-service","product-review-service","chat-service"]'
+          ALL_SERVICES='["eureka-server","config-server","gateway-service","inventory-service","audit-service","user-service","product-service","order-service","payment-service","shipping-service","delivery-service","notification-service","product-comment-service","product-media-service","product-review-service","chat-service"]'
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "${{ steps.filter.outputs.shared }}" = "true" ]; then
+            SERVICES="$ALL_SERVICES"
+            FRONTEND=true
           else
             SERVICES=$(echo '${{ steps.filter.outputs.changes }}' | jq -c '[.[] | select(. != "frontend")]')
+            FRONTEND=${{ steps.filter.outputs.frontend }}
           fi
           echo "services=$SERVICES" >> "$GITHUB_OUTPUT"
+          echo "frontend=$FRONTEND" >> "$GITHUB_OUTPUT"
 
   # Everything below here only runs on a genuine push to main (not PRs) — no point building/pushing
   # images for a change that isn't merged yet.
   build-and-push:
     name: Build & push images
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/testing') && needs.changes.outputs.services != '[]'
+    if: |
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/testing') &&
+      needs.changes.outputs.services != '[]'
     needs: [backend-test, frontend-test, changes]
     runs-on: ubuntu-latest
     strategy:
@@ -162,7 +178,10 @@ jobs:
 
   build-and-push-frontend:
     name: Build & push frontend image
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/testing') && needs.changes.outputs.frontend == 'true'
+    if: |
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/testing') &&
+      needs.changes.outputs.frontend == 'true'
     needs: [backend-test, frontend-test, changes]
     runs-on: ubuntu-latest
     steps:
@@ -194,7 +213,8 @@ jobs:
     # also isn't 'failure', so this has to check for 'success' explicitly on at least one of them).
     if: |
       always() &&
-      github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/testing') &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/testing') &&
       (needs.build-and-push.result == 'success' || needs.build-and-push-frontend.result == 'success')
     needs: [changes, build-and-push, build-and-push-frontend]
     runs-on: ubuntu-latest
