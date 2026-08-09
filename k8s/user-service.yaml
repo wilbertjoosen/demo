@@ -14,7 +14,7 @@ spec:
         - name: ghcr-pull-secret
       containers:
         - name: user-service
-          image: ghcr.io/wilbertjoosen/demo-user-service:1c1f75de64d0e741f3a862e2231654dca292204d
+          image: ghcr.io/wilbertjoosen/demo-user-service:31a854c1d3857860b1085cf7a802be02cab0984f
           imagePullPolicy: IfNotPresent
           ports: [{ containerPort: 8082 }]
           envFrom:
