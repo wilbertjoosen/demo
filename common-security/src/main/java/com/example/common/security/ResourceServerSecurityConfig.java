@@ -85,6 +85,12 @@ public class ResourceServerSecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/actuator/health/**", "/actuator/prometheus").permitAll()
                         .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
+                        // Without this, an error thrown by a request on a DIFFERENT, permitAll-scoped
+                        // security chain (e.g. MediaFileSecurityConfig's /api/media/files/**) gets
+                        // re-secured on its internal forward to /error — which isn't covered by that
+                        // other chain's matcher — and an anonymous context there gets rejected with a
+                        // masking 401 instead of the real error status (404, etc).
+                        .requestMatchers("/error").permitAll()
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())));
         return http.build();
