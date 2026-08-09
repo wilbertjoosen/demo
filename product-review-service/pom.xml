@@ -9,6 +9,7 @@
         <relativePath>../pom.xml</relativePath>
     </parent>
     <artifactId>product-review-service</artifactId>
+    <version>1.0.0</version>
     <name>product-review-service</name>
     <description>Product ratings and reviews (MongoDB)</description>
 
@@ -56,12 +57,12 @@
         <dependency>
             <groupId>com.example</groupId>
             <artifactId>common-security</artifactId>
-            <version>${project.version}</version>
+            <version>${project.parent.version}</version>
         </dependency>
         <dependency>
             <groupId>com.example</groupId>
             <artifactId>common-audit</artifactId>
-            <version>${project.version}</version>
+            <version>${project.parent.version}</version>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>

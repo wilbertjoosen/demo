@@ -9,6 +9,7 @@
         <relativePath>../pom.xml</relativePath>
     </parent>
     <artifactId>product-media-service</artifactId>
+    <version>1.0.0</version>
     <name>product-media-service</name>
     <description>Product photos and videos (MongoDB)</description>
 
@@ -56,12 +57,12 @@
         <dependency>
             <groupId>com.example</groupId>
             <artifactId>common-security</artifactId>
-            <version>${project.version}</version>
+            <version>${project.parent.version}</version>
         </dependency>
         <dependency>
             <groupId>com.example</groupId>
             <artifactId>common-audit</artifactId>
-            <version>${project.version}</version>
+            <version>${project.parent.version}</version>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>

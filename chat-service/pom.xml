@@ -9,6 +9,7 @@
         <relativePath>../pom.xml</relativePath>
     </parent>
     <artifactId>chat-service</artifactId>
+    <version>1.0.0</version>
     <name>chat-service</name>
     <description>Per-product live chat: WebSocket fan-out + MongoDB-persisted history</description>
 
@@ -52,12 +53,12 @@
         <dependency>
             <groupId>com.example</groupId>
             <artifactId>common-security</artifactId>
-            <version>${project.version}</version>
+            <version>${project.parent.version}</version>
         </dependency>
         <dependency>
             <groupId>com.example</groupId>
             <artifactId>common-audit</artifactId>
-            <version>${project.version}</version>
+            <version>${project.parent.version}</version>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>

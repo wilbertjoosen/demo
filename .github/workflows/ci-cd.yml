@@ -120,6 +120,14 @@ jobs:
         service: ${{ fromJSON(needs.changes.outputs.services) }}
     steps:
       - uses: actions/checkout@v4
+      - name: Read service version
+        id: version
+        # Each service's own <version> (not the parent reactor's) — the top-level /project/version,
+        # not the one inside <parent>. xmllint (preinstalled) beats a grep here since the parent
+        # block has its own <version> line earlier in the same file.
+        run: |
+          VERSION=$(xmllint --xpath 'string(/*[local-name()="project"]/*[local-name()="version"])' ${{ matrix.service }}/pom.xml)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
         with:
@@ -135,9 +143,12 @@ jobs:
           # nothing here targets amd64 today, and it'd need QEMU emulation for no payoff.
           platforms: linux/arm64
           push: true
+          # SHA tag is what k8s manifests actually deploy by (immutable, guarantees every push
+          # rolls out even if the version wasn't bumped); the semver tag rides along on the same
+          # image purely for human-readable release tracking.
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/demo-${{ matrix.service }}:${{ github.sha }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/demo-${{ matrix.service }}:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/demo-${{ matrix.service }}:${{ steps.version.outputs.version }}
           cache-from: type=gha,scope=${{ matrix.service }}
           cache-to: type=gha,mode=max,scope=${{ matrix.service }}
 
@@ -148,6 +159,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Read frontend version
+        id: version
+        run: echo "version=$(jq -r .version frontend/package.json)" >> "$GITHUB_OUTPUT"
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
         with:
@@ -162,7 +176,7 @@ jobs:
           push: true
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/demo-frontend:${{ github.sha }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/demo-frontend:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/demo-frontend:${{ steps.version.outputs.version }}
           cache-from: type=gha,scope=frontend
           cache-to: type=gha,mode=max,scope=frontend
 
