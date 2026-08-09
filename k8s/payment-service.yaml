@@ -14,7 +14,7 @@ spec:
         - name: ghcr-pull-secret
       containers:
         - name: payment-service
-          image: ghcr.io/wilbertjoosen/demo-payment-service:bd8e5e27d95eb1b6499c6f7971d0a0c289eba3f1
+          image: ghcr.io/wilbertjoosen/demo-payment-service:1.0.0
           imagePullPolicy: Always
           ports: [{ containerPort: 8086 }]
           envFrom:
