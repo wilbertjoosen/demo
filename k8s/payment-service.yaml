@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: payment-service
-  namespace: demo
+  namespace: demo-qa
   labels: { app: payment-service, monitored: "true" }
 spec:
   replicas: 1
@@ -38,7 +38,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: payment-service
-  namespace: demo
+  namespace: demo-qa
   labels: { monitored: "true" }
 spec:
   selector: { app: payment-service }

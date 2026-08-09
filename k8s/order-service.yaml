@@ -5,7 +5,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: order-service-sidecar-nginx-conf
-  namespace: demo
+  namespace: demo-qa
 data:
   default.conf: |
     server {
@@ -20,7 +20,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: order-service
-  namespace: demo
+  namespace: demo-qa
   labels: { app: order-service, monitored: "true" }
 spec:
   replicas: 1
@@ -68,7 +68,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: order-service
-  namespace: demo
+  namespace: demo-qa
   labels: { monitored: "true" }
 spec:
   selector: { app: order-service }
