@@ -49,32 +49,73 @@ jobs:
       # npm run build already chains `vue-tsc -b && vite build` — one command covers both gates.
       - run: npm run build
 
+  changes:
+    name: Detect changed services
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    outputs:
+      services: ${{ steps.matrix.outputs.services }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # dorny/paths-filter diffs against the previous commit on the branch — needs real
+          # history, not the default shallow (fetch-depth: 1) checkout.
+          fetch-depth: 0
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            shared:
+              - 'pom.xml'
+              - 'mvnw'
+              - 'mvnw.cmd'
+              - '.mvn/**'
+              - 'Dockerfile.service'
+              - 'common-security/**'
+              - 'common-audit/**'
+              - 'common-model/**'
+            frontend:
+              - 'frontend/**'
+            eureka-server: [ 'eureka-server/**' ]
+            config-server: [ 'config-server/**' ]
+            gateway-service: [ 'gateway-service/**' ]
+            inventory-service: [ 'inventory-service/**' ]
+            audit-service: [ 'audit-service/**' ]
+            user-service: [ 'user-service/**' ]
+            product-service: [ 'product-service/**' ]
+            order-service: [ 'order-service/**' ]
+            payment-service: [ 'payment-service/**' ]
+            shipping-service: [ 'shipping-service/**' ]
+            delivery-service: [ 'delivery-service/**' ]
+            notification-service: [ 'notification-service/**' ]
+            product-comment-service: [ 'product-comment-service/**' ]
+            product-media-service: [ 'product-media-service/**' ]
+            product-review-service: [ 'product-review-service/**' ]
+            chat-service: [ 'chat-service/**' ]
+      - name: Build service matrix
+        id: matrix
+        # A shared module (or the root pom/Dockerfile) changing can affect every service, since
+        # each image build runs `mvnw -pl <service> -am` — so it forces a full rebuild. Otherwise,
+        # only the services whose own directory changed go into the matrix.
+        run: |
+          if [ "${{ steps.filter.outputs.shared }}" = "true" ]; then
+            SERVICES='["eureka-server","config-server","gateway-service","inventory-service","audit-service","user-service","product-service","order-service","payment-service","shipping-service","delivery-service","notification-service","product-comment-service","product-media-service","product-review-service","chat-service"]'
+          else
+            SERVICES=$(echo '${{ steps.filter.outputs.changes }}' | jq -c '[.[] | select(. != "frontend")]')
+          fi
+          echo "services=$SERVICES" >> "$GITHUB_OUTPUT"
+
   # Everything below here only runs on a genuine push to main (not PRs) — no point building/pushing
   # images for a change that isn't merged yet.
   build-and-push:
     name: Build & push images
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [backend-test, frontend-test]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.changes.outputs.services != '[]'
+    needs: [backend-test, frontend-test, changes]
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        service:
-          - eureka-server
-          - config-server
-          - gateway-service
-          - inventory-service
-          - audit-service
-          - user-service
-          - product-service
-          - order-service
-          - payment-service
-          - shipping-service
-          - delivery-service
-          - notification-service
-          - product-comment-service
-          - product-media-service
-          - product-review-service
-          - chat-service
+        service: ${{ fromJSON(needs.changes.outputs.services) }}
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
@@ -88,6 +129,9 @@ jobs:
           context: .
           file: Dockerfile.service
           build-args: SERVICE=${{ matrix.service }}
+          # This cluster's nodes are arm64 (local k3d on Apple Silicon) — not multi-arch, since
+          # nothing here targets amd64 today, and it'd need QEMU emulation for no payoff.
+          platforms: linux/arm64
           push: true
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/demo-${{ matrix.service }}:${{ github.sha }}
@@ -97,8 +141,8 @@ jobs:
 
   build-and-push-frontend:
     name: Build & push frontend image
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [backend-test, frontend-test]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.changes.outputs.frontend == 'true'
+    needs: [backend-test, frontend-test, changes]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -112,6 +156,7 @@ jobs:
         with:
           context: frontend
           file: frontend/Dockerfile
+          platforms: linux/arm64
           push: true
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/demo-frontend:${{ github.sha }}
@@ -121,8 +166,13 @@ jobs:
 
   update-manifests:
     name: Update k8s manifests -> ArgoCD sync
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [build-and-push, build-and-push-frontend]
+    # Runs if either build job actually built something (not just "didn't fail" — a *skipped* job
+    # also isn't 'failure', so this has to check for 'success' explicitly on at least one of them).
+    if: |
+      always() &&
+      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      (needs.build-and-push.result == 'success' || needs.build-and-push-frontend.result == 'success')
+    needs: [changes, build-and-push, build-and-push-frontend]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -131,11 +181,20 @@ jobs:
           ref: main
       - name: Point manifests at this commit's images
         run: |
+          # Only touch manifests for services that were actually rebuilt this run — touching every
+          # k8s/*.yaml unconditionally would bump untouched services to a SHA tag that was never
+          # pushed to GHCR, breaking their next ArgoCD sync.
+          FILES=$(echo '${{ needs.changes.outputs.services }}' | jq -r '.[] | "k8s/" + . + ".yaml"')
+          if [ "${{ needs.changes.outputs.frontend }}" = "true" ]; then
+            FILES="$FILES
+          k8s/frontend.yaml"
+          fi
           # Handles both the steady state (already ghcr.io/.../demo-<service>:<old-sha>, bump the tag)
           # and the one-time first run (still demo/<service>:local from before CI/CD existed) — either
           # way, by the time this step runs the SHA-tagged image already exists in GHCR (build-and-push
           # ran first), so ArgoCD never syncs a manifest pointing at an image that isn't pullable yet.
-          for f in k8s/*.yaml; do
+          echo "$FILES" | while IFS= read -r f; do
+            [ -f "$f" ] || continue
             sed -i -E "s#image: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/demo-([a-z-]+):[a-zA-Z0-9._-]+#image: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/demo-\1:${{ github.sha }}#g" "$f"
             sed -i -E "s#image: demo/([a-z-]+):local#image: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/demo-\1:${{ github.sha }}#g" "$f"
           done

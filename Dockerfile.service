@@ -1,7 +1,10 @@
 # Shared build for every Spring Boot module in the reactor — build context must be the repo root
 # so the multi-module build can see sibling common-* modules. Select the module via --build-arg
 # SERVICE=order-service (etc.), set as the `build.args.SERVICE` per-service in docker-compose.yml.
-FROM maven:3.9-eclipse-temurin-26 AS build
+# Pinned to the build host's own platform, not the target — the jar it produces is architecture-
+# independent bytecode, so cross-compiling it under QEMU emulation for a foreign target (e.g.
+# building linux/arm64 images on an amd64 CI runner) would just be wasted emulation overhead.
+FROM --platform=$BUILDPLATFORM maven:3.9-eclipse-temurin-26 AS build
 ARG SERVICE
 WORKDIR /build
 COPY . .
