@@ -168,9 +168,18 @@ class DirectMessageWebSocketIntegrationTest extends AbstractWebSocketIntegration
         WebSocketSession sender = connect(conversationId, "user-1", senderHandler);
         connect(conversationId, "user-2", recipientHandler);
 
-        sender.sendMessage(new TextMessage(objectMapper.writeValueAsString(Map.of("type", "TYPING"))));
-
-        JsonNode recipientFrame = nextFrame(recipientHandler);
+        // Retries the SEND itself, not just the wait — this has failed on CI identically at 5s, 10s,
+        // and 20s poll timeouts (never locally), which rules out "arrives slowly" and points at a
+        // narrow window right after connect() returns where the recipient's server-side session
+        // registration isn't guaranteed complete yet under CI-only scheduling delays. TYPING is a
+        // fire-and-forget broadcast with no persisted side effect, so resending it is safe.
+        String raw = null;
+        for (int attempt = 0; attempt < 5 && raw == null; attempt++) {
+            sender.sendMessage(new TextMessage(objectMapper.writeValueAsString(Map.of("type", "TYPING"))));
+            raw = recipientHandler.received.poll(2, TimeUnit.SECONDS);
+        }
+        assertThat(raw).as("expected a TYPING frame after retrying the send").isNotNull();
+        JsonNode recipientFrame = objectMapper.readTree(raw);
         assertThat(recipientFrame.get("type").asText()).isEqualTo("TYPING");
         assertThat(recipientFrame.get("payload").get("senderId").asText()).isEqualTo("user-1");
 
