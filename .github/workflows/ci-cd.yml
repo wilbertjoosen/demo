@@ -208,21 +208,34 @@ jobs:
       - name: Point manifests at this commit's images
         run: |
           # Only touch manifests for services that were actually rebuilt this run — touching every
-          # k8s/*.yaml unconditionally would bump untouched services to a SHA tag that was never
-          # pushed to GHCR, breaking their next ArgoCD sync.
+          # k8s/*.yaml unconditionally would bump untouched services to a tag that was never pushed
+          # to GHCR, breaking their next ArgoCD sync.
           FILES=$(echo '${{ needs.changes.outputs.services }}' | jq -r '.[] | "k8s/" + . + ".yaml"')
           if [ "${{ needs.changes.outputs.frontend }}" = "true" ]; then
             FILES="$FILES
           k8s/frontend.yaml"
           fi
-          # Handles both the steady state (already ghcr.io/.../demo-<service>:<old-sha>, bump the tag)
-          # and the one-time first run (still demo/<service>:local from before CI/CD existed) — either
-          # way, by the time this step runs the SHA-tagged image already exists in GHCR (build-and-push
-          # ran first), so ArgoCD never syncs a manifest pointing at an image that isn't pullable yet.
+          # Deploys by each service's own semver (not the SHA build-and-push also tagged) — note
+          # this means a push that doesn't bump a service's version produces the exact same image
+          # tag as last time, so this manifest won't change and ArgoCD won't see anything to sync;
+          # imagePullPolicy: Always (see k8s/*.yaml) at least guarantees a rollout that DOES happen
+          # for another reason re-pulls the latest content pushed under that tag rather than serving
+          # a node's stale local cache — bump the version whenever you want a push to actually deploy.
           echo "$FILES" | while IFS= read -r f; do
             [ -f "$f" ] || continue
-            sed -i -E "s#image: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/demo-([a-z-]+):[a-zA-Z0-9._-]+#image: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/demo-\1:${{ github.sha }}#g" "$f"
-            sed -i -E "s#image: demo/([a-z-]+):local#image: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/demo-\1:${{ github.sha }}#g" "$f"
+            SERVICE=$(basename "$f" .yaml)
+            if [ "$SERVICE" = "frontend" ]; then
+              VERSION=$(jq -r .version frontend/package.json)
+            else
+              VERSION=$(python3 -c "
+          import xml.etree.ElementTree as ET
+          ns = {'m': 'http://maven.apache.org/POM/4.0.0'}
+          root = ET.parse('$SERVICE/pom.xml').getroot()
+          print(root.find('m:version', ns).text)
+          ")
+            fi
+            sed -i -E "s#image: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/demo-([a-z-]+):[a-zA-Z0-9._-]+#image: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/demo-\1:$VERSION#g" "$f"
+            sed -i -E "s#image: demo/([a-z-]+):local#image: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/demo-\1:$VERSION#g" "$f"
           done
       - name: Commit and push
         run: |
