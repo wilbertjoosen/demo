@@ -87,3 +87,9 @@ scrape_configs:
     metrics_path: /actuator/prometheus
     static_configs:
       - targets: ["host.docker.internal:8094"]
+
+# k8s-deployed services (both demo and demo-qa namespaces) are scraped by a SEPARATE Prometheus
+# running inside the cluster instead — see k8s/prometheus.yaml. Pod IPs on the k3d overlay network
+# aren't reachable from a container out here in docker-compose at all (tried it: discovery via the
+# API server worked, but every scrape timed out), so this Prometheus can only ever cover the
+# host-JVM/docker-compose dev flow above it, not what's actually running in the cluster.
