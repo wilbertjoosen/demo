@@ -31,7 +31,7 @@ spec:
             - configMapRef: { name: demo-common-config }
           env:
             - { name: EUREKA_INSTANCE_HOSTNAME, value: product-media-service }
-            - { name: MONGO_DB, value: media }
+            - { name: MONGO_DB, value: media_qa }
             - { name: MEDIA_UPLOAD_DIR, value: /data/media-uploads }
           volumeMounts:
             - { name: media-uploads, mountPath: /data/media-uploads }
