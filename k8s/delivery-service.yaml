@@ -15,7 +15,7 @@ spec:
       containers:
         - name: delivery-service
           image: ghcr.io/wilbertjoosen/demo-delivery-service:bd8e5e27d95eb1b6499c6f7971d0a0c289eba3f1
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           ports: [{ containerPort: 8087 }]
           envFrom:
             - configMapRef: { name: demo-common-config }
