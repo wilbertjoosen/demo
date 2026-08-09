@@ -84,12 +84,14 @@ class DirectMessageWebSocketIntegrationTest extends AbstractWebSocketIntegration
         return session;
     }
 
-    // 10s, not 5s — this project's other WebSocket/Kafka integration tests hit the same CI-only
-    // flakiness (see OrderSagaIntegrationTest's history): a shared CI runner under load from the
-    // full reactor's other Testcontainers-backed suites needs more slack than a quiet local machine.
+    // 20s — bumped twice now (originally 5s, then 10s) chasing the same CI-only flakiness (see
+    // OrderSagaIntegrationTest's history for the same pattern elsewhere in this project): this
+    // specific test class has failed on a plain timeout three separate times on GitHub's shared
+    // runners despite passing reliably (3+ consecutive runs) on a quiet local machine every time —
+    // genuine CPU-starvation noisy-neighbor scheduling on the runner, not a local reproduction gap.
     private JsonNode nextFrame(QueueingHandler handler) throws Exception {
-        String raw = handler.received.poll(10, TimeUnit.SECONDS);
-        assertThat(raw).as("expected a frame within 10s").isNotNull();
+        String raw = handler.received.poll(20, TimeUnit.SECONDS);
+        assertThat(raw).as("expected a frame within 20s").isNotNull();
         return objectMapper.readTree(raw);
     }
 
@@ -100,16 +102,16 @@ class DirectMessageWebSocketIntegrationTest extends AbstractWebSocketIntegration
      * sender; both are legitimate, but nothing guarantees a test polls them in a specific order.
      */
     private JsonNode nextFrameOfType(QueueingHandler handler, String type) throws Exception {
-        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
         while (System.nanoTime() < deadline) {
-            String raw = handler.received.poll(10, TimeUnit.SECONDS);
-            assertThat(raw).as("expected a '%s' frame within 10s", type).isNotNull();
+            String raw = handler.received.poll(20, TimeUnit.SECONDS);
+            assertThat(raw).as("expected a '%s' frame within 20s", type).isNotNull();
             JsonNode frame = objectMapper.readTree(raw);
             if (type.equals(frame.get("type").asText())) {
                 return frame;
             }
         }
-        throw new AssertionError("expected a '" + type + "' frame within 10s, got other frame types only");
+        throw new AssertionError("expected a '" + type + "' frame within 20s, got other frame types only");
     }
 
     @Test
