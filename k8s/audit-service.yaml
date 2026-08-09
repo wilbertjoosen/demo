@@ -14,7 +14,7 @@ spec:
         - name: ghcr-pull-secret
       containers:
         - name: audit-service
-          image: ghcr.io/wilbertjoosen/demo-audit-service:31a854c1d3857860b1085cf7a802be02cab0984f
+          image: ghcr.io/wilbertjoosen/demo-audit-service:bd8e5e27d95eb1b6499c6f7971d0a0c289eba3f1
           imagePullPolicy: IfNotPresent
           ports: [{ containerPort: 8090 }]
           envFrom:
