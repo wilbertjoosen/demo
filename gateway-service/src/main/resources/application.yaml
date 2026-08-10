@@ -63,6 +63,10 @@ spring:
               uri: lb://chat-service
               predicates:
                 - Path=/api/conversations/**
+            - id: reporting-service
+              uri: lb://reporting-service
+              predicates:
+                - Path=/api/reports/**
             # Proxies each service's own /v3/api-docs under /docs/<service>/v3/api-docs so one
             # Swagger UI (this gateway's own) can aggregate all of them — see springdoc.swagger-ui.urls
             # below. notification-service is excluded: it has no REST controllers (WebSocket-only).
@@ -138,6 +142,12 @@ spring:
                 - Path=/docs/chat-service/v3/api-docs
               filters:
                 - SetPath=/v3/api-docs
+            - id: reporting-service-docs
+              uri: lb://reporting-service
+              predicates:
+                - Path=/docs/reporting-service/v3/api-docs
+              filters:
+                - SetPath=/v3/api-docs
     # Failover: if a route resolves to a service with 2+ instances registered in Eureka and one is
     # down/erroring, the LoadBalancer retries against a *different* instance automatically (enabled
     # by default; retry-on-all-operations is off by default since retrying a POST/PUT across
@@ -173,12 +183,21 @@ springdoc:
       - { name: product-media-service, url: /docs/product-media-service/v3/api-docs }
       - { name: product-review-service, url: /docs/product-review-service/v3/api-docs }
       - { name: chat-service, url: /docs/chat-service/v3/api-docs }
+      - { name: reporting-service, url: /docs/reporting-service/v3/api-docs }
 
 cors:
   # localhost:5173 is the Vite dev server; demo.localhost:18090 is the k3d ingress the built SPA is
   # served from — the SPA's own API calls always target localhost:8080 (see frontend/.env.production)
   # regardless of which origin served the page itself, so both need to be allowed here.
   allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://demo.localhost:18090}
+
+# Per-client-IP token bucket (see RateLimitFilter) — sustained 20 req/s with a burst of 20 comfortably
+# covers a normal page load (several concurrent panel/table fetches) while still meaningfully
+# throttling a single client hammering the gateway.
+rate-limit:
+  capacity: ${RATE_LIMIT_CAPACITY:20}
+  refill-tokens: ${RATE_LIMIT_REFILL_TOKENS:20}
+  refill-period-seconds: ${RATE_LIMIT_REFILL_PERIOD_SECONDS:1}
 
 eureka:
   client:
