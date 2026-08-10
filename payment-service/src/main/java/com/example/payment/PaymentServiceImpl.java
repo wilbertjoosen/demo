@@ -69,9 +69,10 @@ class PaymentServiceImpl implements PaymentService {
     }
 
     /**
-     * Resolves BANK_TRANSFER/CASH payments once they've sat PENDING for {@link #MOCK_PROCESSING_DELAY} —
-     * always to COMPLETED for now (no decline path for a manual method). A future manual-review step
-     * replaces this auto-resolution with an actual finance-role approval action.
+     * Moves BANK_TRANSFER/CASH payments from PENDING to AWAITING_REVIEW once they've sat for
+     * {@link #MOCK_PROCESSING_DELAY} — simulates the proof (bank confirmation, cash drop-off)
+     * actually arriving. No event published yet; the order stays PENDING_PAYMENT until a
+     * FINANCE-role user calls {@link #approve} or {@link #reject}.
      */
     @Scheduled(fixedDelay = 10_000)
     void resolvePendingManualPayments() {
@@ -80,16 +81,45 @@ class PaymentServiceImpl implements PaymentService {
             if (payment.getCreatedAt() == null || payment.getCreatedAt().isAfter(cutoff)) {
                 continue;
             }
-            payment.setStatus(PaymentStatus.COMPLETED);
+            payment.setStatus(PaymentStatus.AWAITING_REVIEW);
             paymentRepository.save(payment);
-            log.info("Payment {} for order {} ({}) resolved to COMPLETED after mock processing delay",
-                    payment.getId(), payment.getOrderId(), payment.getMethod());
-            kafkaTemplate.send(Topics.PAYMENT_EVENTS, DomainEvent.of(EventTypes.PAYMENT_COMPLETED, payment.getOrderId(),
-                    Map.of("paymentId", payment.getId(), "email", payment.getEmail() == null ? "" : payment.getEmail(),
-                            "quantity", payment.getQuantity(),
-                            "userId", payment.getKeycloakUserId() == null ? "" : payment.getKeycloakUserId(),
-                            "shippingCarrier", payment.getShippingCarrier().name())));
+            log.info("Payment {} for order {} ({}) is now AWAITING_REVIEW", payment.getId(), payment.getOrderId(), payment.getMethod());
         }
+    }
+
+    private Payment findAwaitingReview(String id) {
+        Payment payment = paymentRepository.findByIdAndDeletedFalse(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (payment.getStatus() != PaymentStatus.AWAITING_REVIEW) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Payment " + id + " is not awaiting review (status: " + payment.getStatus() + ")");
+        }
+        return payment;
+    }
+
+    @Override
+    public void approve(String id) {
+        Payment payment = findAwaitingReview(id);
+        payment.setStatus(PaymentStatus.COMPLETED);
+        paymentRepository.save(payment);
+        log.info("Payment {} for order {} approved", payment.getId(), payment.getOrderId());
+        kafkaTemplate.send(Topics.PAYMENT_EVENTS, DomainEvent.of(EventTypes.PAYMENT_COMPLETED, payment.getOrderId(),
+                Map.of("paymentId", payment.getId(), "email", payment.getEmail() == null ? "" : payment.getEmail(),
+                        "quantity", payment.getQuantity(),
+                        "userId", payment.getKeycloakUserId() == null ? "" : payment.getKeycloakUserId(),
+                        "shippingCarrier", payment.getShippingCarrier().name())));
+    }
+
+    @Override
+    public void reject(String id, String reason) {
+        Payment payment = findAwaitingReview(id);
+        payment.setStatus(PaymentStatus.FAILED);
+        payment.setFailureReason(reason == null || reason.isBlank() ? "rejected_by_finance" : reason);
+        paymentRepository.save(payment);
+        log.info("Payment {} for order {} rejected: {}", payment.getId(), payment.getOrderId(), payment.getFailureReason());
+        kafkaTemplate.send(Topics.PAYMENT_EVENTS, DomainEvent.of(EventTypes.PAYMENT_FAILED, payment.getOrderId(),
+                Map.of("paymentId", payment.getId(), "email", payment.getEmail() == null ? "" : payment.getEmail(),
+                        "quantity", payment.getQuantity(), "reason", payment.getFailureReason())));
     }
 
     @Override

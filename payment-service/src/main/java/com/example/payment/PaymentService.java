@@ -27,6 +27,20 @@ public interface PaymentService {
     /** Admin-only soft delete — record-keeping action, does not touch the underlying payment/refund status. */
     void delete(String id);
 
+    /**
+     * FINANCE-role approval for a BANK_TRANSFER/CASH payment sitting in AWAITING_REVIEW — marks it
+     * COMPLETED and publishes PAYMENT_COMPLETED, same as an instant-gateway charge would.
+     * Throws if the payment isn't currently AWAITING_REVIEW.
+     */
+    void approve(String id);
+
+    /**
+     * FINANCE-role rejection for a BANK_TRANSFER/CASH payment sitting in AWAITING_REVIEW — marks it
+     * FAILED with {@code reason} and publishes PAYMENT_FAILED, triggering the same compensation path
+     * a declined instant charge would. Throws if the payment isn't currently AWAITING_REVIEW.
+     */
+    void reject(String id, String reason);
+
     /** Current mock availability per payment method, used to enable/disable methods in checkout UI. */
     Map<PaymentMethod, Boolean> availableMethods();
 
