@@ -36,7 +36,7 @@ onMounted(async () => {
     </div>
     <div v-if="report">
       <p class="mb-1 text-sm text-gray-500">{{ t('reports.userGrowth.dailyRegistrations') }}</p>
-      <v-chart class="h-64" autoresize :option="dailyRegistrationsOption" />
+      <v-chart style="height: 256px" autoresize :option="dailyRegistrationsOption" />
     </div>
   </div>
 </template>
