@@ -10,6 +10,9 @@ spring:
   mongodb:
     uri: mongodb://${MONGO_HOST:localhost:27017}/${MONGO_DB:chat}${MONGO_REPLICA_SET_PARAM:}
 
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+
 eureka:
   client:
     service-url:
