@@ -37,3 +37,21 @@ export interface UserGrowthReport {
   totalNewUsers: number
   dailyRegistrations: DailyCount[]
 }
+
+export interface OrderDrillDownItem {
+  orderId: string
+  email: string | null
+  productId: string
+  quantity: number
+  status: string
+  paymentMethod: string | null
+  shippingCarrier: string | null
+  orderCreatedAt: string
+}
+
+export interface UserDrillDownItem {
+  userId: string
+  username: string
+  email: string
+  registeredAt: string
+}
