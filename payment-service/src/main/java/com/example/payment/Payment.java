@@ -1,6 +1,7 @@
 package com.example.payment;
 
 import com.example.common.model.PaymentMethod;
+import com.example.common.model.ShippingCarrier;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedBy;
@@ -27,6 +28,16 @@ public class Payment {
     /** Set when status is FAILED because the method's mock gateway was unavailable, rather than a declined charge. */
     private String failureReason;
 
+    /**
+     * Only populated for PENDING payments (BANK_TRANSFER/CASH) — the saga's ORDER_CREATED fields
+     * that PAYMENT_COMPLETED/PAYMENT_FAILED need, kept around because the scheduled job that
+     * eventually resolves this payment runs long after the original Kafka listener call (and its
+     * method-local variables) has returned.
+     */
+    private int quantity;
+    private String keycloakUserId;
+    private ShippingCarrier shippingCarrier;
+
     @CreatedDate
     private Instant createdAt;
 
@@ -48,6 +59,17 @@ public class Payment {
         this.method = method;
         this.status = status;
         this.failureReason = failureReason;
+    }
+
+    public Payment(String orderId, String email, PaymentMethod method, PaymentStatus status,
+            int quantity, String keycloakUserId, ShippingCarrier shippingCarrier) {
+        this.orderId = orderId;
+        this.email = email;
+        this.method = method;
+        this.status = status;
+        this.quantity = quantity;
+        this.keycloakUserId = keycloakUserId;
+        this.shippingCarrier = shippingCarrier;
     }
 
     void setStatus(PaymentStatus status) {
