@@ -229,11 +229,14 @@ via your kubeconfig context, not something you visit directly).
 
 1. **Test** — full Maven reactor `verify` (unit + Testcontainers-backed integration tests, Checkstyle,
    SpotBugs) and the frontend's `lint` + typecheck + build. Nothing downstream runs if this fails.
-2. **Detect changed services** — path-filters the diff so only services that actually changed get
-   rebuilt (a shared module or `Dockerfile.service` changing forces a full rebuild, since every image
-   build is `mvnw -pl <service> -am`). A manual `workflow_dispatch` run (Actions tab → "Run workflow")
-   skips the filter and rebuilds everything — useful after a change that doesn't touch any single
-   service's own path but every service still needs picking up.
+2. **Detect changed services** — path-filters the diff between this push and the branch's own previous
+   commit (`base: github.event.before`, not the default branch — `main` and `testing` differ
+   permanently in QA-only files and namespace-specific manifests, so diffing against `main` would make
+   almost every `testing` push look like "everything changed") so only services that actually changed
+   get rebuilt (a shared module or `Dockerfile.service` changing forces a full rebuild, since every
+   image build is `mvnw -pl <service> -am`). A manual `workflow_dispatch` run (Actions tab → "Run
+   workflow") skips the filter and rebuilds everything — useful after a change that doesn't touch any
+   single service's own path but every service still needs picking up.
 3. **Build & push** — each changed service's image goes to GHCR (`ghcr.io/<owner>/demo-<service>`),
    tagged with both the commit SHA and that service's own `pom.xml`/`package.json` version (each
    service versions independently, starting at `1.0.0` — bump it by hand when you want to mark a
@@ -333,6 +336,11 @@ flowchart LR
   `docker/keycloak/realm-demo-qa.json`). Kafka, Redis, and Mailpit are genuinely separate containers
   (`docker-compose.qa.yml`) — Kafka specifically because shared topics would mean QA test traffic
   triggering production's saga and vice versa.
+- **One frontend image, two Keycloak realms**: Vite bakes `VITE_KEYCLOAK_REALM` in at build time, but
+  the same built image is deployed to both `demo` and `demo-qa` — a build-time value can't vary per
+  environment. `frontend/src/auth/keycloak.ts` instead resolves the realm at runtime from the
+  hostname (`qa.` prefix → `demo-qa`, anything else → the build-time default), matching the
+  `demo.localhost` / `qa.demo.localhost` ingress split above.
 - **One-time setup on the shared MySQL** (see `docker-compose.qa.yml`'s header comment for the exact
   command): create the `demo_qa` database and grant the `demo` user access to it. MongoDB and
   Elasticsearch need no equivalent step — both auto-create on first write.
