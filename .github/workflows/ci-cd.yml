@@ -76,8 +76,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # dorny/paths-filter diffs against the previous commit on the branch — needs real
-          # history, not the default shallow (fetch-depth: 1) checkout.
+          # dorny/paths-filter diffs against `base` below — needs real history, not the default
+          # shallow (fetch-depth: 1) checkout.
           fetch-depth: 0
       # Manual dispatch has no "changed since" to diff against — every service is presumed
       # changed, skipping the filter step entirely (its outputs would otherwise be empty/unset).
@@ -85,6 +85,14 @@ jobs:
         if: github.event_name != 'workflow_dispatch'
         id: filter
         with:
+          # Without an explicit base, dorny/paths-filter falls back to diffing against the
+          # repository's default branch (main) rather than this push's own previous commit — since
+          # main and testing have substantial permanent divergence (QA-only files, namespace-
+          # specific k8s manifests, unpromoted testing-only work), that made nearly every push to
+          # testing register as "everything changed," rebuilding all 17 services + frontend
+          # regardless of what the commit actually touched. github.event.before is the SHA the
+          # branch pointed at immediately before this push, so this now diffs against exactly that.
+          base: ${{ github.event.before }}
           filters: |
             shared:
               - 'pom.xml'
