@@ -10,4 +10,6 @@ public interface DeliveryRepository extends MongoRepository<Delivery, String> {
     List<Delivery> findByDeletedFalse();
 
     Optional<Delivery> findByIdAndDeletedFalse(String id);
+
+    List<Delivery> findByStatus(DeliveryStatus status);
 }
