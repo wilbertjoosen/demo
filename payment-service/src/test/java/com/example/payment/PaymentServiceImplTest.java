@@ -13,6 +13,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -21,6 +22,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -155,7 +157,7 @@ class PaymentServiceImplTest {
     }
 
     @Test
-    void resolvePendingManualPayments_pastMockDelay_completesAndPublishesPaymentCompleted() {
+    void resolvePendingManualPayments_pastMockDelay_movesToAwaitingReviewWithoutPublishing() {
         Payment pending = withCreatedAt(
                 withId(new Payment("order-1", "a@b.com", PaymentMethod.BANK_TRANSFER, PaymentStatus.PENDING,
                         3, "user-1", ShippingCarrier.UPS), "pay-6"),
@@ -164,17 +166,9 @@ class PaymentServiceImplTest {
 
         paymentService.resolvePendingManualPayments();
 
-        assertThat(pending.getStatus()).isEqualTo(PaymentStatus.COMPLETED);
+        assertThat(pending.getStatus()).isEqualTo(PaymentStatus.AWAITING_REVIEW);
         verify(paymentRepository).save(pending);
-        ArgumentCaptor<DomainEvent> eventCaptor = ArgumentCaptor.forClass(DomainEvent.class);
-        verify(kafkaTemplate).send(eq(Topics.PAYMENT_EVENTS), eventCaptor.capture());
-        DomainEvent published = eventCaptor.getValue();
-        assertThat(published.eventType()).isEqualTo(EventTypes.PAYMENT_COMPLETED);
-        @SuppressWarnings("unchecked")
-        Map<String, Object> payload = (Map<String, Object>) published.payload();
-        assertThat(payload).containsEntry("paymentId", "pay-6").containsEntry("userId", "user-1")
-                .containsEntry("shippingCarrier", "UPS").containsEntry("quantity", 3);
-        assertThat(EventContracts.missingFields(EventTypes.PAYMENT_COMPLETED, payload)).isEmpty();
+        verifyNoInteractions(kafkaTemplate);
     }
 
     @Test
@@ -190,6 +184,70 @@ class PaymentServiceImplTest {
         assertThat(recent.getStatus()).isEqualTo(PaymentStatus.PENDING);
         verify(paymentRepository, never()).save(any());
         verifyNoInteractions(kafkaTemplate);
+    }
+
+    @Test
+    void approve_awaitingReview_completesAndPublishesPaymentCompleted() {
+        Payment awaiting = withId(new Payment("order-1", "a@b.com", PaymentMethod.BANK_TRANSFER,
+                PaymentStatus.AWAITING_REVIEW, 4, "user-1", ShippingCarrier.DHL), "pay-8");
+        when(paymentRepository.findByIdAndDeletedFalse("pay-8")).thenReturn(Optional.of(awaiting));
+
+        paymentService.approve("pay-8");
+
+        assertThat(awaiting.getStatus()).isEqualTo(PaymentStatus.COMPLETED);
+        verify(paymentRepository).save(awaiting);
+        ArgumentCaptor<DomainEvent> eventCaptor = ArgumentCaptor.forClass(DomainEvent.class);
+        verify(kafkaTemplate).send(eq(Topics.PAYMENT_EVENTS), eventCaptor.capture());
+        DomainEvent published = eventCaptor.getValue();
+        assertThat(published.eventType()).isEqualTo(EventTypes.PAYMENT_COMPLETED);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> payload = (Map<String, Object>) published.payload();
+        assertThat(payload).containsEntry("paymentId", "pay-8").containsEntry("userId", "user-1")
+                .containsEntry("shippingCarrier", "DHL").containsEntry("quantity", 4);
+        assertThat(EventContracts.missingFields(EventTypes.PAYMENT_COMPLETED, payload)).isEmpty();
+    }
+
+    @Test
+    void approve_notAwaitingReview_throwsConflict() {
+        Payment pending = withId(new Payment("order-1", "a@b.com", PaymentMethod.CASH,
+                PaymentStatus.PENDING, 1, "user-1", ShippingCarrier.UPS), "pay-9");
+        when(paymentRepository.findByIdAndDeletedFalse("pay-9")).thenReturn(Optional.of(pending));
+
+        assertThatThrownBy(() -> paymentService.approve("pay-9")).isInstanceOf(ResponseStatusException.class);
+        verify(paymentRepository, never()).save(any());
+        verifyNoInteractions(kafkaTemplate);
+    }
+
+    @Test
+    void reject_awaitingReview_failsAndPublishesPaymentFailedWithReason() {
+        Payment awaiting = withId(new Payment("order-1", "a@b.com", PaymentMethod.CASH,
+                PaymentStatus.AWAITING_REVIEW, 2, "user-1", ShippingCarrier.UPS), "pay-10");
+        when(paymentRepository.findByIdAndDeletedFalse("pay-10")).thenReturn(Optional.of(awaiting));
+
+        paymentService.reject("pay-10", "proof does not match order total");
+
+        assertThat(awaiting.getStatus()).isEqualTo(PaymentStatus.FAILED);
+        assertThat(awaiting.getFailureReason()).isEqualTo("proof does not match order total");
+        verify(paymentRepository).save(awaiting);
+        ArgumentCaptor<DomainEvent> eventCaptor = ArgumentCaptor.forClass(DomainEvent.class);
+        verify(kafkaTemplate).send(eq(Topics.PAYMENT_EVENTS), eventCaptor.capture());
+        DomainEvent published = eventCaptor.getValue();
+        assertThat(published.eventType()).isEqualTo(EventTypes.PAYMENT_FAILED);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> payload = (Map<String, Object>) published.payload();
+        assertThat(payload).containsEntry("paymentId", "pay-10");
+        assertThat(EventContracts.missingFields(EventTypes.PAYMENT_FAILED, payload)).isEmpty();
+    }
+
+    @Test
+    void reject_noReasonGiven_defaultsToRejectedByFinance() {
+        Payment awaiting = withId(new Payment("order-1", "a@b.com", PaymentMethod.CASH,
+                PaymentStatus.AWAITING_REVIEW, 2, "user-1", ShippingCarrier.UPS), "pay-11");
+        when(paymentRepository.findByIdAndDeletedFalse("pay-11")).thenReturn(Optional.of(awaiting));
+
+        paymentService.reject("pay-11", null);
+
+        assertThat(awaiting.getFailureReason()).isEqualTo("rejected_by_finance");
     }
 
     @Test
