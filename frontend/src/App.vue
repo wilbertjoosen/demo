@@ -48,6 +48,12 @@ onUnmounted(() => {
           {{ t('nav.messages') }}
           <el-badge v-if="messages.totalUnread > 0" :value="messages.totalUnread" class="ml-1" />
         </el-menu-item>
+        <el-menu-item
+          v-if="auth.isAdmin || auth.isFinance || auth.isWarehouse || auth.isDeliveryAgent"
+          index="/queues"
+        >
+          {{ t('nav.queues') }}
+        </el-menu-item>
         <el-menu-item v-if="auth.isAdmin" index="/admin">{{ t('nav.admin') }}</el-menu-item>
       </el-menu>
       <div class="flex items-center gap-4">
