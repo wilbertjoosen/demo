@@ -202,7 +202,6 @@ async function addStock(payload: { warehouseId: string; quantity: number }) {
 
 onMounted(() => {
   users.load()
-  products.load()
 })
 </script>
 
@@ -226,8 +225,8 @@ onMounted(() => {
         />
       </el-tab-pane>
 
-      <el-tab-pane :label="t('admin.products')">
-        <div class="mb-3">
+      <el-tab-pane :label="t('admin.products')" lazy>
+        <div class="mb-3" @vue:mounted="products.load()">
           <el-button type="primary" @click="openProductCreate">{{ t('admin.newProduct') }}</el-button>
         </div>
         <AdminProductTable
@@ -243,7 +242,7 @@ onMounted(() => {
         />
       </el-tab-pane>
 
-      <el-tab-pane :label="t('admin.reports')">
+      <el-tab-pane :label="t('admin.reports')" lazy>
         <div class="flex flex-col gap-8">
           <OrdersRevenueReportPanel />
           <el-divider />

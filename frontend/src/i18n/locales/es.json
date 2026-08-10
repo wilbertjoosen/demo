@@ -47,6 +47,7 @@
     "profile": "Perfil",
     "messages": "Mensajes",
     "admin": "Administración",
+    "queues": "Colas",
     "logout": "Cerrar sesión",
     "login": "Iniciar sesión"
   },
@@ -173,6 +174,48 @@
     "userCreated": "Usuario creado",
     "userCreateError": "No se pudo crear el usuario",
     "reports": "Informes"
+  },
+  "queues": {
+    "title": "Colas de tareas",
+    "paymentReview": "Revisión de pagos",
+    "shipments": "Envíos",
+    "deliveries": "Entregas",
+    "filter": {
+      "pending": "Pendiente",
+      "done": "Hecho",
+      "all": "Todo"
+    },
+    "dateRange": "Rango de fechas",
+    "orderId": "Pedido",
+    "method": "Método",
+    "quantity": "Cant.",
+    "email": "Correo",
+    "status": "Estado",
+    "created": "Creado",
+    "reason": "Motivo",
+    "approve": "Aprobar",
+    "reject": "Rechazar",
+    "confirmPicked": "Confirmar recogido",
+    "reportIssue": "Reportar problema",
+    "confirmDelivered": "Confirmar entregado",
+    "reasonPromptTitle": "Motivo (opcional)",
+    "reasonPromptPlaceholder": "¿Por qué se rechaza/marca?",
+    "confirmApprove": "¿Aprobar este pago? Esto avanza el pedido a PAID.",
+    "confirmConfirmPicked": "¿Confirmar que este envío fue recogido y entregado al transportista?",
+    "confirmConfirmDelivered": "¿Confirmar que esta entrega fue completada?",
+    "actionSuccess": "Listo",
+    "actionError": "No se pudo completar la acción",
+    "empty": "Nada por aquí",
+    "shipmentStatus": {
+      "PENDING_WAREHOUSE": "Pendiente de recogida",
+      "DISPATCHED": "Despachado",
+      "FAILED": "Fallido"
+    },
+    "deliveryStatus": {
+      "PENDING_DELIVERY_AGENT": "Pendiente de entrega",
+      "DELIVERED": "Entregado",
+      "FAILED": "Fallido"
+    }
   },
   "address": {
     "street": "Calle",

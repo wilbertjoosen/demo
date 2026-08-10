@@ -47,6 +47,7 @@
     "profile": "Profile",
     "messages": "Messages",
     "admin": "Admin",
+    "queues": "Queues",
     "logout": "Logout",
     "login": "Log in"
   },
@@ -173,6 +174,48 @@
     "userCreated": "User created",
     "userCreateError": "Could not create user",
     "reports": "Reports"
+  },
+  "queues": {
+    "title": "Action Queues",
+    "paymentReview": "Payment Review",
+    "shipments": "Shipments",
+    "deliveries": "Deliveries",
+    "filter": {
+      "pending": "Pending",
+      "done": "Done",
+      "all": "All"
+    },
+    "dateRange": "Date range",
+    "orderId": "Order",
+    "method": "Method",
+    "quantity": "Qty",
+    "email": "Email",
+    "status": "Status",
+    "created": "Created",
+    "reason": "Reason",
+    "approve": "Approve",
+    "reject": "Reject",
+    "confirmPicked": "Confirm picked",
+    "reportIssue": "Report issue",
+    "confirmDelivered": "Confirm delivered",
+    "reasonPromptTitle": "Reason (optional)",
+    "reasonPromptPlaceholder": "Why is this being rejected/flagged?",
+    "confirmApprove": "Approve this payment? This advances the order to PAID.",
+    "confirmConfirmPicked": "Confirm this shipment was picked and handed to the carrier?",
+    "confirmConfirmDelivered": "Confirm this delivery was completed?",
+    "actionSuccess": "Done",
+    "actionError": "Could not complete the action",
+    "empty": "Nothing here",
+    "shipmentStatus": {
+      "PENDING_WAREHOUSE": "Awaiting pick",
+      "DISPATCHED": "Dispatched",
+      "FAILED": "Failed"
+    },
+    "deliveryStatus": {
+      "PENDING_DELIVERY_AGENT": "Awaiting delivery",
+      "DELIVERED": "Delivered",
+      "FAILED": "Failed"
+    }
   },
   "address": {
     "street": "Street",
