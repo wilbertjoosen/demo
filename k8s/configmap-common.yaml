@@ -37,3 +37,9 @@ data:
   # Tempo's OTLP/HTTP receiver, running alongside Grafana/Loki/Prometheus in docker-compose —
   # see config-server's config-repo/application.yml for how every service picks this up.
   OTLP_ENDPOINT: http://host.k3d.internal:4318/v1/traces
+  # Task #75, real secrets management — Vault dev-mode instance, single node (no topology
+  # discovery needed, unlike Mongo's replica set), reached the same way as every other host-side
+  # infra process in this file. The token itself is sensitive and lives in the vault-token k8s
+  # Secret (created imperatively per-namespace, not committed — same pattern as ghcr-pull-secret).
+  VAULT_HOST: host.k3d.internal
+  VAULT_PORT: "8200"
