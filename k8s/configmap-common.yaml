@@ -29,3 +29,6 @@ data:
   MAIL_PORT: "1025"
   INVENTORY_SERVICE_URI: http://inventory-service:8089
   CORS_ALLOWED_ORIGINS: http://localhost:5173,http://demo.localhost:18090
+  # Tempo's OTLP/HTTP receiver, running alongside Grafana/Loki/Prometheus in docker-compose —
+  # see config-server's config-repo/application.yml for how every service picks this up.
+  OTLP_ENDPOINT: http://host.k3d.internal:4318/v1/traces

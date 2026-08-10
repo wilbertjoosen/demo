@@ -232,6 +232,20 @@ services:
     depends_on:
       - prometheus
       - loki
+      - tempo
+
+  tempo:
+    image: grafana/tempo:latest
+    container_name: demo-tempo
+    restart: unless-stopped
+    command: ["-config.file=/etc/tempo/tempo.yml"]
+    volumes:
+      - ./docker/tempo/tempo.yml:/etc/tempo/tempo.yml:ro
+      - tempo_data:/var/tempo
+    ports:
+      - "3200:3200" # Tempo's own query API, used by Grafana's datasource
+      - "4317:4317" # OTLP gRPC receiver
+      - "4318:4318" # OTLP HTTP receiver — what every service's OTLP exporter actually sends to
 
   # --- App services -----------------------------------------------------------------------
   # Not meant to run alongside the local `mvn spring-boot:run` processes used throughout dev —
@@ -584,5 +598,6 @@ volumes:
   prometheus_data:
   loki_data:
   grafana_data:
+  tempo_data:
   rancher_data:
   media_uploads:
