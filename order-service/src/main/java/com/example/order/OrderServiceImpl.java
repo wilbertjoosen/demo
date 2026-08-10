@@ -81,6 +81,10 @@ class OrderServiceImpl implements OrderService {
             view.setStatus(newStatus);
             orderViewRepository.save(view);
         });
+        kafkaTemplate.send(Topics.ORDER_EVENTS, DomainEvent.of(EventTypes.ORDER_STATUS_CHANGED, orderId.toString(), Map.of(
+                "status", newStatus.name(),
+                "email", order.getEmail() == null ? "" : order.getEmail()
+        )));
     }
 
     @Override
@@ -106,8 +110,6 @@ class OrderServiceImpl implements OrderService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, message("order.tooLateToCancel", order.getStatus()));
         }
         cancelAndReleaseStock(orderId);
-        kafkaTemplate.send(Topics.ORDER_EVENTS, DomainEvent.of(EventTypes.ORDER_CANCELLED, orderId.toString(),
-                Map.of("email", order.getEmail() == null ? "" : order.getEmail())));
         return getOrderView(orderId.toString());
     }
 

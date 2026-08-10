@@ -170,7 +170,8 @@
     "temporaryPassword": "Temporary password",
     "identityStoredInKeycloak": "Saving these updates the account directly in Keycloak.",
     "userCreated": "User created",
-    "userCreateError": "Could not create user"
+    "userCreateError": "Could not create user",
+    "reports": "Reports"
   },
   "address": {
     "street": "Street",
@@ -232,5 +233,42 @@
     "deleteError": "Could not delete comment",
     "editError": "Could not edit comment",
     "edited": "edited"
+  },
+  "reports": {
+    "loadError": "Could not load report data",
+    "ordersRevenue": {
+      "title": "Orders & Revenue",
+      "totalOrders": "Total orders",
+      "totalRevenue": "Total revenue",
+      "byStatus": "Orders by status",
+      "dailyOrders": "Orders per day"
+    },
+    "sagaHealth": {
+      "title": "Saga Health",
+      "inProgress": "In progress",
+      "completed": "Completed",
+      "cancelled": "Cancelled",
+      "cancellationRate": "Cancellation rate",
+      "avgTimeToConfirmation": "Avg. time to confirmation",
+      "minutes": "{count} min",
+      "noCompletedOrders": "No completed orders yet",
+      "failuresByStage": "Cancellations by stage",
+      "userCancelledBeforePayment": "Cancelled before payment"
+    },
+    "topProducts": {
+      "title": "Top Products & Inventory",
+      "product": "Product",
+      "sku": "SKU",
+      "quantityOrdered": "Qty ordered",
+      "orderCount": "Orders",
+      "revenue": "Revenue",
+      "inactive": "Deleted",
+      "empty": "No orders in this period yet"
+    },
+    "userGrowth": {
+      "title": "User Growth",
+      "totalNewUsers": "New users",
+      "dailyRegistrations": "Registrations per day"
+    }
   }
 }

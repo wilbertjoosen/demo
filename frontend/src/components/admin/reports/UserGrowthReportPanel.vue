@@ -1,0 +1,42 @@
+<script setup lang="ts">
+import { computed, onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { reportsApi } from '../../../api/reports'
+import { showApiError } from '../../../composables/useApiError'
+import type { UserGrowthReport } from '../../../models'
+
+const { t } = useI18n()
+const loading = ref(true)
+const report = ref<UserGrowthReport | null>(null)
+
+const dailyRegistrationsOption = computed(() => ({
+  tooltip: { trigger: 'axis' },
+  grid: { left: 40, right: 16, top: 24, bottom: 24 },
+  xAxis: { type: 'category', data: report.value?.dailyRegistrations.map((d) => d.date) ?? [] },
+  yAxis: { type: 'value', minInterval: 1 },
+  series: [{ type: 'line', data: report.value?.dailyRegistrations.map((d) => d.count) ?? [], smooth: true, color: '#67c23a' }],
+}))
+
+onMounted(async () => {
+  try {
+    report.value = await reportsApi.userGrowth()
+  } catch (error) {
+    showApiError(error, t('reports.loadError'))
+  } finally {
+    loading.value = false
+  }
+})
+</script>
+
+<template>
+  <div v-loading="loading">
+    <h2 class="mb-3 text-lg font-semibold">{{ t('reports.userGrowth.title') }}</h2>
+    <div v-if="report" class="mb-4">
+      <el-statistic :title="t('reports.userGrowth.totalNewUsers')" :value="report.totalNewUsers" />
+    </div>
+    <div v-if="report">
+      <p class="mb-1 text-sm text-gray-500">{{ t('reports.userGrowth.dailyRegistrations') }}</p>
+      <v-chart class="h-64" autoresize :option="dailyRegistrationsOption" />
+    </div>
+  </div>
+</template>

@@ -170,7 +170,8 @@
     "temporaryPassword": "Contraseña temporal",
     "identityStoredInKeycloak": "Al guardar, estos datos se actualizan directamente en Keycloak.",
     "userCreated": "Usuario creado",
-    "userCreateError": "No se pudo crear el usuario"
+    "userCreateError": "No se pudo crear el usuario",
+    "reports": "Informes"
   },
   "address": {
     "street": "Calle",
@@ -232,5 +233,42 @@
     "deleteError": "No se pudo eliminar el comentario",
     "editError": "No se pudo editar el comentario",
     "edited": "editado"
+  },
+  "reports": {
+    "loadError": "No se pudieron cargar los datos del informe",
+    "ordersRevenue": {
+      "title": "Pedidos e ingresos",
+      "totalOrders": "Pedidos totales",
+      "totalRevenue": "Ingresos totales",
+      "byStatus": "Pedidos por estado",
+      "dailyOrders": "Pedidos por día"
+    },
+    "sagaHealth": {
+      "title": "Salud de la saga",
+      "inProgress": "En curso",
+      "completed": "Completados",
+      "cancelled": "Cancelados",
+      "cancellationRate": "Tasa de cancelación",
+      "avgTimeToConfirmation": "Tiempo medio hasta confirmación",
+      "minutes": "{count} min",
+      "noCompletedOrders": "Aún no hay pedidos completados",
+      "failuresByStage": "Cancelaciones por etapa",
+      "userCancelledBeforePayment": "Cancelado antes del pago"
+    },
+    "topProducts": {
+      "title": "Productos más vendidos e inventario",
+      "product": "Producto",
+      "sku": "SKU",
+      "quantityOrdered": "Cant. pedida",
+      "orderCount": "Pedidos",
+      "revenue": "Ingresos",
+      "inactive": "Eliminado",
+      "empty": "Aún no hay pedidos en este período"
+    },
+    "userGrowth": {
+      "title": "Crecimiento de usuarios",
+      "totalNewUsers": "Usuarios nuevos",
+      "dailyRegistrations": "Registros por día"
+    }
   }
 }
