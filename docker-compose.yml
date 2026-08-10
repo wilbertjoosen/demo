@@ -252,6 +252,44 @@ services:
     volumes:
       - redis_data:/data
 
+  # Task #75, real secrets management — dev mode: auto-initialized, auto-unsealed, in-memory
+  # storage (nothing persists across a restart, and nothing needs to for a demo). A fixed root
+  # token is the accepted simplification here — see order-service's own env block above for why
+  # that's fine for a throwaway local instance holding only this demo's own low-stakes credentials.
+  vault:
+    image: hashicorp/vault:latest
+    container_name: demo-vault
+    restart: unless-stopped
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: demo-root-token
+      VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
+    ports:
+      - "8200:8200"
+
+  # One-shot: writes order-service's DB credentials + Keycloak client secret into Vault's KV store
+  # at secret/order-service — the path Spring Cloud Vault looks up automatically from
+  # spring.application.name. Safe to re-run (`vault kv put` is idempotent).
+  vault-init:
+    image: hashicorp/vault:latest
+    container_name: demo-vault-init
+    restart: "no"
+    depends_on:
+      - vault
+    environment:
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: demo-root-token
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        until vault status >/dev/null 2>&1; do
+          echo "waiting for vault..."; sleep 2
+        done
+        vault kv put secret/order-service \
+          DB_USERNAME=demo \
+          DB_PASSWORD=demo \
+          ORDER_SERVICE_CLIENT_SECRET=order-service-secret
+        echo "order-service secrets written to Vault"
+
   prometheus:
     image: prom/prometheus:latest
     container_name: demo-prometheus
@@ -446,8 +484,16 @@ services:
       DB_HOST: mysql
       DB_PORT: 3306
       DB_NAME: demo
-      DB_USERNAME: demo
-      DB_PASSWORD: demo
+      # No DB_USERNAME/DB_PASSWORD/ORDER_SERVICE_CLIENT_SECRET here (task #75, real secrets
+      # management) — order-service now pulls those from Vault at startup (spring.config.import:
+      # optional:vault://, see its application.yaml) instead of a plaintext env var or a committed
+      # k8s Secret. VAULT_TOKEN is dev-mode's own fixed root token — acceptable for a throwaway
+      # local Vault holding nothing but this demo's own low-stakes credentials; a real deployment
+      # would use Vault's Kubernetes auth method instead (pods authenticate via their own
+      # ServiceAccount token, no static bootstrap secret needed at all).
+      VAULT_HOST: vault
+      VAULT_PORT: 8200
+      VAULT_TOKEN: demo-root-token
       KEYCLOAK_TOKEN_URI: http://keycloak:8080/realms/demo/protocol/openid-connect/token
       INVENTORY_SERVICE_URI: http://inventory-service:8089
     ports:
@@ -459,6 +505,7 @@ services:
       - mongo-rs-init
       - kafka
       - keycloak
+      - vault-init
 
   payment-service:
     build:

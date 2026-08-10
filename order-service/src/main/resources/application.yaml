@@ -5,7 +5,19 @@ spring:
   application:
     name: order-service
   config:
-    import: optional:configserver:${CONFIG_SERVER_URI:http://localhost:8888}
+    # optional:vault:// — DB_USERNAME/DB_PASSWORD/ORDER_SERVICE_CLIENT_SECRET below are looked up
+    # from Vault's secret/order-service path (task #75, real secrets management) if Vault is
+    # reachable; "optional" means local dev without Vault running still starts fine, falling back
+    # to the placeholder defaults right below, same resilience pattern already used for config-server.
+    import: "optional:configserver:${CONFIG_SERVER_URI:http://localhost:8888},optional:vault://"
+
+  cloud:
+    vault:
+      host: ${VAULT_HOST:localhost}
+      port: ${VAULT_PORT:8200}
+      scheme: http
+      authentication: TOKEN
+      token: ${VAULT_TOKEN:demo-root-token}
 
   datasource:
     url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:demo}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
