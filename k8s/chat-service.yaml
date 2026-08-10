@@ -14,7 +14,7 @@ spec:
         - name: ghcr-pull-secret
       containers:
         - name: chat-service
-          image: ghcr.io/wilbertjoosen/demo-chat-service:12d4474669dcfcfe91f819879bbf25fb7f8f9292
+          image: ghcr.io/wilbertjoosen/demo-chat-service:ea2c7b9b962c690fbd57ff049939a9e0fbe23e71
           imagePullPolicy: Always
           ports: [{ containerPort: 8094 }]
           envFrom:
