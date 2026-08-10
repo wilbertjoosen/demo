@@ -9,7 +9,7 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: reporting-service
-  namespace: demo
+  namespace: demo-qa
   labels: { app: reporting-service, monitored: "true" }
 spec:
   serviceName: reporting-service-headless
@@ -67,7 +67,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: reporting-service-headless
-  namespace: demo
+  namespace: demo-qa
   labels: { monitored: "true" }
 spec:
   clusterIP: None
@@ -81,7 +81,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: reporting-service
-  namespace: demo
+  namespace: demo-qa
   labels: { monitored: "true" }
 spec:
   selector: { app: reporting-service }
