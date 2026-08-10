@@ -56,7 +56,8 @@ public class ProductImportJobConfig {
                 kafkaTemplate.send(Topics.PRODUCT_EVENTS, DomainEvent.of(EventTypes.PRODUCT_CREATED, null, Map.of(
                         "productId", saved.getId(),
                         "name", saved.getName(),
-                        "sku", saved.getSku()
+                        "sku", saved.getSku(),
+                        "price", saved.getPrice()
                 )));
             }
         };

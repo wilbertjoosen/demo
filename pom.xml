@@ -41,6 +41,7 @@
         <module>product-media-service</module>
         <module>product-review-service</module>
         <module>chat-service</module>
+        <module>reporting-service</module>
     </modules>
 
     <dependencyManagement>
