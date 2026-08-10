@@ -330,6 +330,16 @@
       "title": "User Growth",
       "totalNewUsers": "New users",
       "dailyRegistrations": "Registrations per day"
+    },
+    "drillDown": {
+      "ordersTitle": "Orders — {label}",
+      "usersTitle": "New users — {label}",
+      "orderId": "Order",
+      "quantity": "Qty",
+      "user": "User",
+      "created": "Created",
+      "empty": "No records",
+      "loadError": "Could not load details"
     }
   }
 }

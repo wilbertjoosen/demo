@@ -19,4 +19,6 @@ export type {
   ProductStat,
   TopProductsReport,
   UserGrowthReport,
+  OrderDrillDownItem,
+  UserDrillDownItem,
 } from './report'

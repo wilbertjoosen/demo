@@ -330,6 +330,16 @@
       "title": "Crecimiento de usuarios",
       "totalNewUsers": "Usuarios nuevos",
       "dailyRegistrations": "Registros por día"
+    },
+    "drillDown": {
+      "ordersTitle": "Pedidos — {label}",
+      "usersTitle": "Usuarios nuevos — {label}",
+      "orderId": "Pedido",
+      "quantity": "Cant.",
+      "user": "Usuario",
+      "created": "Creado",
+      "empty": "Sin registros",
+      "loadError": "No se pudieron cargar los detalles"
     }
   }
 }
