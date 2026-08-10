@@ -7,6 +7,7 @@ import { useMessagesStore } from '../stores/messages'
 import { conversationsApi } from '../api/conversations'
 import { usersApi } from '../api/users'
 import { showApiError } from '../composables/useApiError'
+import { resolveWsUrl } from '../lib/ws'
 import type { DirectMessage, DirectoryEntry } from '../models'
 
 const { t } = useI18n()
@@ -84,7 +85,8 @@ async function selectConversation(id: string) {
 }
 
 function connectSocket(conversationId: string) {
-  const url = `${import.meta.env.VITE_CHAT_WS_BASE_URL}/ws/conversations/${conversationId}?token=${encodeURIComponent(keycloak.token ?? '')}`
+  const base = resolveWsUrl(import.meta.env.VITE_CHAT_WS_BASE_URL, '')
+  const url = `${base}/ws/conversations/${conversationId}?token=${encodeURIComponent(keycloak.token ?? '')}`
   const ws = new WebSocket(url)
 
   ws.onopen = () => sendReadReceipt(ws)
