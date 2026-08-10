@@ -37,6 +37,8 @@ public class Payment {
     private int quantity;
     private String keycloakUserId;
     private ShippingCarrier shippingCarrier;
+    /** Customer-uploaded bank transfer/cash receipt — a path served by this service's own /api/payments/files/**. */
+    private String proofOfPaymentUrl;
 
     @CreatedDate
     private Instant createdAt;
@@ -78,6 +80,10 @@ public class Payment {
 
     void setFailureReason(String failureReason) {
         this.failureReason = failureReason;
+    }
+
+    void setProofOfPaymentUrl(String proofOfPaymentUrl) {
+        this.proofOfPaymentUrl = proofOfPaymentUrl;
     }
 
     void markDeleted() {

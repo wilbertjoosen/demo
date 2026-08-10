@@ -114,7 +114,8 @@
       "IN_TRANSIT": "In transit",
       "OUT_FOR_DELIVERY": "Out for delivery",
       "DELIVERED": "Delivered"
-    }
+    },
+    "uploadProof": "Upload proof"
   },
   "profile": {
     "title": "My Profile",
@@ -192,7 +193,22 @@
       "BANK_TRANSFER": "Bank transfer",
       "CASH": "Cash"
     },
-    "unavailable": "Currently unavailable"
+    "unavailable": "Currently unavailable",
+    "status": {
+      "PENDING": "Pending",
+      "AWAITING_REVIEW": "Awaiting review",
+      "COMPLETED": "Completed",
+      "FAILED": "Failed",
+      "REFUNDED": "Refunded"
+    },
+    "proofDialogTitle": "Payment proof — order {id}",
+    "noPaymentYet": "No payment record yet",
+    "noProofYet": "No proof uploaded yet",
+    "uploadProof": "Upload proof",
+    "replaceProof": "Replace proof",
+    "viewProofFile": "View uploaded file",
+    "proofUploaded": "Proof uploaded",
+    "proofUploadError": "Could not upload proof"
   },
   "shipping": {
     "carriers": {
