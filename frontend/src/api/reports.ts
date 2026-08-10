@@ -1,5 +1,12 @@
 import { http } from './http'
-import type { OrdersRevenueReport, SagaHealthReport, TopProductsReport, UserGrowthReport } from '../models'
+import type {
+  OrdersRevenueReport,
+  SagaHealthReport,
+  TopProductsReport,
+  UserGrowthReport,
+  OrderDrillDownItem,
+  UserDrillDownItem,
+} from '../models'
 
 export const reportsApi = {
   async ordersRevenue(): Promise<OrdersRevenueReport> {
@@ -16,6 +23,14 @@ export const reportsApi = {
   },
   async userGrowth(): Promise<UserGrowthReport> {
     const { data } = await http.get('/api/reports/user-growth')
+    return data
+  },
+  async ordersDrillDown(params: { status?: string; date?: string; stage?: string }): Promise<OrderDrillDownItem[]> {
+    const { data } = await http.get('/api/reports/orders/drill-down', { params })
+    return data
+  },
+  async usersDrillDown(params: { date?: string }): Promise<UserDrillDownItem[]> {
+    const { data } = await http.get('/api/reports/users/drill-down', { params })
     return data
   },
 }
