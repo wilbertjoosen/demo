@@ -129,13 +129,13 @@ class PaymentServiceImplTest {
     }
 
     @Test
-    void charge_bankTransfer_savesPendingPaymentWithoutPublishing() {
+    void charge_bankTransfer_savesPendingPaymentAndPublishesInstructionsRequired() {
         when(gatewayAvailability.isAvailable(PaymentMethod.BANK_TRANSFER)).thenReturn(true);
         when(paymentRepository.save(any(Payment.class))).thenAnswer(inv -> withId(inv.getArgument(0), "pay-4"));
 
         paymentService.charge("order-1", "user-1", "a@b.com", 2, PaymentMethod.BANK_TRANSFER, ShippingCarrier.UPS);
 
-        verifyNoInteractions(paymentGatewayClient, kafkaTemplate);
+        verifyNoInteractions(paymentGatewayClient);
         ArgumentCaptor<Payment> paymentCaptor = ArgumentCaptor.forClass(Payment.class);
         verify(paymentRepository).save(paymentCaptor.capture());
         Payment saved = paymentCaptor.getValue();
@@ -143,17 +143,29 @@ class PaymentServiceImplTest {
         assertThat(saved.getQuantity()).isEqualTo(2);
         assertThat(saved.getKeycloakUserId()).isEqualTo("user-1");
         assertThat(saved.getShippingCarrier()).isEqualTo(ShippingCarrier.UPS);
+
+        ArgumentCaptor<DomainEvent> eventCaptor = ArgumentCaptor.forClass(DomainEvent.class);
+        verify(kafkaTemplate).send(eq(Topics.PAYMENT_EVENTS), eventCaptor.capture());
+        DomainEvent published = eventCaptor.getValue();
+        assertThat(published.eventType()).isEqualTo(EventTypes.PAYMENT_INSTRUCTIONS_REQUIRED);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> payload = (Map<String, Object>) published.payload();
+        assertThat(payload).containsEntry("paymentId", "pay-4").containsEntry("method", "BANK_TRANSFER");
+        assertThat(EventContracts.missingFields(EventTypes.PAYMENT_INSTRUCTIONS_REQUIRED, payload)).isEmpty();
     }
 
     @Test
-    void charge_cash_savesPendingPaymentWithoutPublishing() {
+    void charge_cash_savesPendingPaymentAndPublishesInstructionsRequired() {
         when(gatewayAvailability.isAvailable(PaymentMethod.CASH)).thenReturn(true);
         when(paymentRepository.save(any(Payment.class))).thenAnswer(inv -> withId(inv.getArgument(0), "pay-5"));
 
         paymentService.charge("order-1", "user-1", "a@b.com", 1, PaymentMethod.CASH, ShippingCarrier.DHL);
 
-        verifyNoInteractions(paymentGatewayClient, kafkaTemplate);
+        verifyNoInteractions(paymentGatewayClient);
         verify(paymentRepository).save(any(Payment.class));
+        ArgumentCaptor<DomainEvent> eventCaptor = ArgumentCaptor.forClass(DomainEvent.class);
+        verify(kafkaTemplate).send(eq(Topics.PAYMENT_EVENTS), eventCaptor.capture());
+        assertThat(eventCaptor.getValue().eventType()).isEqualTo(EventTypes.PAYMENT_INSTRUCTIONS_REQUIRED);
     }
 
     @Test

@@ -51,6 +51,8 @@ class PaymentServiceImpl implements PaymentService {
                     quantity, keycloakUserId, shippingCarrier));
             log.info("Payment {} for order {} ({}) is PENDING — resolves after the mock processing delay",
                     payment.getId(), orderId, method);
+            kafkaTemplate.send(Topics.PAYMENT_EVENTS, DomainEvent.of(EventTypes.PAYMENT_INSTRUCTIONS_REQUIRED, orderId,
+                    Map.of("paymentId", payment.getId(), "email", email == null ? "" : email, "method", method.name())));
             return;
         }
 

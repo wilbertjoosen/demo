@@ -34,6 +34,7 @@ public final class EventContracts {
             // not the union of what either happens to include.
             Map.entry(EventTypes.PAYMENT_FAILED, Set.of("paymentId", "email", "quantity")),
             Map.entry(EventTypes.PAYMENT_REFUNDED, Set.of("paymentId", "email")),
+            Map.entry(EventTypes.PAYMENT_INSTRUCTIONS_REQUIRED, Set.of("paymentId", "email", "method")),
             Map.entry(EventTypes.SHIPPED, Set.of("email", "quantity")),
             Map.entry(EventTypes.SHIPPING_FAILED, Set.of("email", "quantity")),
             Map.entry(EventTypes.DELIVERED, Set.of("email", "quantity")),
