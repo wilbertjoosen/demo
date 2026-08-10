@@ -1,13 +1,34 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import type { ECElementEvent } from 'echarts'
 import { reportsApi } from '../../../api/reports'
 import { showApiError } from '../../../composables/useApiError'
-import type { UserGrowthReport } from '../../../models'
+import type { UserDrillDownItem, UserGrowthReport } from '../../../models'
+import ReportDrillDownModal from './ReportDrillDownModal.vue'
 
 const { t } = useI18n()
 const loading = ref(true)
 const report = ref<UserGrowthReport | null>(null)
+
+const drillDownOpen = ref(false)
+const drillDownLoading = ref(false)
+const drillDownTitle = ref('')
+const drillDownRows = ref<UserDrillDownItem[]>([])
+
+async function onDailyRegistrationsClick(event: ECElementEvent) {
+  const date = String(event.name)
+  drillDownTitle.value = t('reports.drillDown.usersTitle', { label: date })
+  drillDownOpen.value = true
+  drillDownLoading.value = true
+  try {
+    drillDownRows.value = await reportsApi.usersDrillDown({ date })
+  } catch (error) {
+    showApiError(error, t('reports.drillDown.loadError'))
+  } finally {
+    drillDownLoading.value = false
+  }
+}
 
 const dailyRegistrationsOption = computed(() => ({
   tooltip: { trigger: 'axis' },
@@ -36,7 +57,15 @@ onMounted(async () => {
     </div>
     <div v-if="report">
       <p class="mb-1 text-sm text-gray-500">{{ t('reports.userGrowth.dailyRegistrations') }}</p>
-      <v-chart style="height: 256px" autoresize :option="dailyRegistrationsOption" />
+      <v-chart style="height: 256px" autoresize :option="dailyRegistrationsOption" @click="onDailyRegistrationsClick" />
     </div>
+    <ReportDrillDownModal
+      v-model="drillDownOpen"
+      kind="users"
+      :loading="drillDownLoading"
+      :title="drillDownTitle"
+      :order-rows="[]"
+      :user-rows="drillDownRows"
+    />
   </div>
 </template>

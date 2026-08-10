@@ -122,6 +122,30 @@ class ReportsServiceImpl implements ReportsService {
         return new UserGrowthReport(registrations.size(), daily);
     }
 
+    @Override
+    public List<OrderDrillDownItem> ordersDrillDown(Instant from, Instant to, String status, LocalDate date, String failureStage) {
+        return orderMetricsBetween(from, to).stream()
+                .filter(m -> status == null || status.equals(m.getStatus()))
+                .filter(m -> date == null || date.equals(m.getOrderCreatedAt().atZone(ZoneOffset.UTC).toLocalDate()))
+                .filter(m -> failureStage == null
+                        || failureStage.equals(m.getFailureStage() == null ? USER_CANCELLED_BEFORE_PAYMENT : m.getFailureStage()))
+                .sorted(Comparator.comparing(OrderMetric::getOrderCreatedAt).reversed())
+                .map(m -> new OrderDrillDownItem(
+                        m.getOrderId(), m.getEmail(), m.getProductId(), m.getQuantity(), m.getStatus(),
+                        m.getPaymentMethod(), m.getShippingCarrier(), m.getOrderCreatedAt()))
+                .toList();
+    }
+
+    @Override
+    public List<UserDrillDownItem> usersDrillDown(Instant from, Instant to, LocalDate date) {
+        return this.<UserRegistration>allValues(ReportingTopology.USER_REGISTRATIONS_STORE).stream()
+                .filter(u -> !u.getRegisteredAt().isBefore(from) && !u.getRegisteredAt().isAfter(to))
+                .filter(u -> date == null || date.equals(u.getRegisteredAt().atZone(ZoneOffset.UTC).toLocalDate()))
+                .sorted(Comparator.comparing(UserRegistration::getRegisteredAt).reversed())
+                .map(u -> new UserDrillDownItem(u.getUserId(), u.getUsername(), u.getEmail(), u.getRegisteredAt()))
+                .toList();
+    }
+
     private List<OrderMetric> orderMetricsBetween(Instant from, Instant to) {
         return this.<OrderMetric>allValues(ReportingTopology.ORDER_METRICS_STORE).stream()
                 .filter(m -> m.getOrderCreatedAt() != null && !m.getOrderCreatedAt().isBefore(from) && !m.getOrderCreatedAt().isAfter(to))

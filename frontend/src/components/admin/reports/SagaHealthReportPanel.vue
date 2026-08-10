@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import type { ECElementEvent } from 'echarts'
 import { reportsApi } from '../../../api/reports'
 import { showApiError } from '../../../composables/useApiError'
-import type { SagaHealthReport } from '../../../models'
+import type { OrderDrillDownItem, SagaHealthReport } from '../../../models'
+import ReportDrillDownModal from './ReportDrillDownModal.vue'
 
 const { t } = useI18n()
 const loading = ref(true)
@@ -13,6 +15,25 @@ function stageLabel(stage: string): string {
   return stage === 'USER_CANCELLED_BEFORE_PAYMENT' ? t('reports.sagaHealth.userCancelledBeforePayment') : stage
 }
 
+const drillDownOpen = ref(false)
+const drillDownLoading = ref(false)
+const drillDownTitle = ref('')
+const drillDownRows = ref<OrderDrillDownItem[]>([])
+
+async function onFailuresByStageClick(event: ECElementEvent) {
+  const stage = String((event.data as { stage: string }).stage)
+  drillDownTitle.value = t('reports.drillDown.ordersTitle', { label: stageLabel(stage) })
+  drillDownOpen.value = true
+  drillDownLoading.value = true
+  try {
+    drillDownRows.value = await reportsApi.ordersDrillDown({ stage })
+  } catch (error) {
+    showApiError(error, t('reports.drillDown.loadError'))
+  } finally {
+    drillDownLoading.value = false
+  }
+}
+
 const failuresByStageOption = computed(() => ({
   tooltip: { trigger: 'item' },
   legend: { bottom: 0 },
@@ -20,7 +41,7 @@ const failuresByStageOption = computed(() => ({
     {
       type: 'pie',
       radius: ['40%', '70%'],
-      data: Object.entries(report.value?.failuresByStage ?? {}).map(([name, value]) => ({ name: stageLabel(name), value })),
+      data: Object.entries(report.value?.failuresByStage ?? {}).map(([name, value]) => ({ name: stageLabel(name), value, stage: name })),
     },
   ],
 }))
@@ -57,7 +78,15 @@ onMounted(async () => {
     </p>
     <div v-if="report && report.cancelledCount > 0">
       <p class="mb-1 text-sm text-gray-500">{{ t('reports.sagaHealth.failuresByStage') }}</p>
-      <v-chart style="height: 256px" autoresize :option="failuresByStageOption" />
+      <v-chart style="height: 256px" autoresize :option="failuresByStageOption" @click="onFailuresByStageClick" />
     </div>
+    <ReportDrillDownModal
+      v-model="drillDownOpen"
+      kind="orders"
+      :loading="drillDownLoading"
+      :title="drillDownTitle"
+      :order-rows="drillDownRows"
+      :user-rows="[]"
+    />
   </div>
 </template>
