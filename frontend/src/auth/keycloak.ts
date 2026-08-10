@@ -1,8 +1,18 @@
 import Keycloak from 'keycloak-js'
 
+/**
+ * One frontend image is deployed to both demo (host demo.localhost, realm "demo") and demo-qa
+ * (host qa.demo.localhost, realm "demo-qa") — see k8s/ingress.yaml on the main/testing branches.
+ * Vite bakes VITE_KEYCLOAK_REALM at build time, so it can't vary per environment; the hostname's
+ * "qa." prefix is the one signal available at runtime that already distinguishes the two.
+ */
+export function resolveKeycloakRealm(): string {
+  return window.location.hostname.startsWith('qa.') ? 'demo-qa' : import.meta.env.VITE_KEYCLOAK_REALM
+}
+
 export const keycloak = new Keycloak({
   url: import.meta.env.VITE_KEYCLOAK_URL,
-  realm: import.meta.env.VITE_KEYCLOAK_REALM,
+  realm: resolveKeycloakRealm(),
   clientId: import.meta.env.VITE_KEYCLOAK_CLIENT_ID,
 })
 

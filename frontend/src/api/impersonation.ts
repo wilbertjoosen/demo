@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { keycloak } from '../auth/keycloak'
+import { keycloak, resolveKeycloakRealm } from '../auth/keycloak'
 
 /**
  * Keycloak's admin impersonation endpoint sets a session cookie on Keycloak's own domain for the
@@ -9,7 +9,7 @@ import { keycloak } from '../auth/keycloak'
  */
 export async function impersonateUser(targetKeycloakId: string): Promise<void> {
   const base = import.meta.env.VITE_KEYCLOAK_URL
-  const realm = import.meta.env.VITE_KEYCLOAK_REALM
+  const realm = resolveKeycloakRealm()
   await axios.post(
     `${base}/admin/realms/${realm}/users/${targetKeycloakId}/impersonation`,
     {},
