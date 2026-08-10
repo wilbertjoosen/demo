@@ -114,7 +114,8 @@
       "IN_TRANSIT": "En tránsito",
       "OUT_FOR_DELIVERY": "En reparto",
       "DELIVERED": "Entregado"
-    }
+    },
+    "uploadProof": "Subir comprobante"
   },
   "profile": {
     "title": "Mi Perfil",
@@ -192,7 +193,22 @@
       "BANK_TRANSFER": "Transferencia bancaria",
       "CASH": "Efectivo"
     },
-    "unavailable": "No disponible actualmente"
+    "unavailable": "No disponible actualmente",
+    "status": {
+      "PENDING": "Pendiente",
+      "AWAITING_REVIEW": "En revisión",
+      "COMPLETED": "Completado",
+      "FAILED": "Fallido",
+      "REFUNDED": "Reembolsado"
+    },
+    "proofDialogTitle": "Comprobante de pago — pedido {id}",
+    "noPaymentYet": "Aún no hay registro de pago",
+    "noProofYet": "Aún no se subió comprobante",
+    "uploadProof": "Subir comprobante",
+    "replaceProof": "Reemplazar comprobante",
+    "viewProofFile": "Ver archivo subido",
+    "proofUploaded": "Comprobante subido",
+    "proofUploadError": "No se pudo subir el comprobante"
   },
   "shipping": {
     "carriers": {

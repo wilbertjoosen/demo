@@ -519,6 +519,9 @@ services:
       <<: *app-env
       EUREKA_INSTANCE_HOSTNAME: payment-service
       MONGO_DB: payments
+      PAYMENT_PROOF_UPLOAD_DIR: /data/payment-proofs
+    volumes:
+      - payment_proofs:/data/payment-proofs
     ports:
       - "8086:8086"
     depends_on:
@@ -724,3 +727,4 @@ volumes:
   tempo_data:
   rancher_data:
   media_uploads:
+  payment_proofs:

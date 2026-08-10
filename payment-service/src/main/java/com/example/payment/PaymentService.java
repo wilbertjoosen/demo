@@ -24,6 +24,15 @@ public interface PaymentService {
 
     List<Payment> list();
 
+    Payment getByOrderId(String orderId);
+
+    /**
+     * Records the URL of an already-stored proof-of-payment file on the customer's own payment —
+     * bank transfer receipt or cash confirmation, uploaded via PaymentController/PaymentProofStorageService.
+     * Throws if the payment isn't {@code keycloakUserId}'s own.
+     */
+    Payment attachProof(String keycloakUserId, String id, String url);
+
     /** Admin-only soft delete — record-keeping action, does not touch the underlying payment/refund status. */
     void delete(String id);
 
