@@ -7,6 +7,7 @@ import { showApiError } from '../composables/useApiError'
 import OrderTable from '../components/orders/OrderTable.vue'
 import OrderAddressDialog from '../components/orders/OrderAddressDialog.vue'
 import ShipmentTrackingDialog from '../components/orders/ShipmentTrackingDialog.vue'
+import PaymentProofDialog from '../components/orders/PaymentProofDialog.vue'
 import type { Address, OrderView } from '../models'
 
 const { t } = useI18n()
@@ -17,10 +18,17 @@ const saving = ref(false)
 const editing = ref<OrderView | null>(null)
 const trackingVisible = ref(false)
 const tracking = ref<OrderView | null>(null)
+const proofVisible = ref(false)
+const proofOrder = ref<OrderView | null>(null)
 
 function openTracking(order: OrderView) {
   tracking.value = order
   trackingVisible.value = true
+}
+
+function openUploadProof(order: OrderView) {
+  proofOrder.value = order
+  proofVisible.value = true
 }
 
 async function cancelOrder(order: OrderView) {
@@ -62,7 +70,14 @@ onMounted(() => orders.load())
 <template>
   <div>
     <h1 class="mb-4 text-xl font-semibold">{{ t('orders.title') }}</h1>
-    <OrderTable :orders="orders.items" :loading="orders.loading" @edit-address="openEdit" @cancel="cancelOrder" @track="openTracking" />
+    <OrderTable
+      :orders="orders.items"
+      :loading="orders.loading"
+      @edit-address="openEdit"
+      @cancel="cancelOrder"
+      @track="openTracking"
+      @upload-proof="openUploadProof"
+    />
     <OrderAddressDialog
       v-model="dialogVisible"
       :initial-address="editing?.shippingAddress ?? null"
@@ -70,5 +85,6 @@ onMounted(() => orders.load())
       @submit="saveAddress"
     />
     <ShipmentTrackingDialog v-model="trackingVisible" :order-id="tracking?.id ?? null" />
+    <PaymentProofDialog v-model="proofVisible" :order-id="proofOrder?.id ?? null" />
   </div>
 </template>

@@ -289,4 +289,44 @@ class PaymentServiceImplTest {
         verify(paymentRepository, never()).save(any());
         verifyNoInteractions(kafkaTemplate);
     }
+
+    @Test
+    void getByOrderId_found_returnsPayment() {
+        Payment payment = withId(new Payment("order-1", "a@b.com", PaymentMethod.BANK_TRANSFER,
+                PaymentStatus.PENDING, 1, "user-1", ShippingCarrier.UPS), "pay-12");
+        when(paymentRepository.findByOrderId("order-1")).thenReturn(Optional.of(payment));
+
+        assertThat(paymentService.getByOrderId("order-1")).isEqualTo(payment);
+    }
+
+    @Test
+    void getByOrderId_notFound_throwsNotFound() {
+        when(paymentRepository.findByOrderId("missing")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> paymentService.getByOrderId("missing")).isInstanceOf(ResponseStatusException.class);
+    }
+
+    @Test
+    void attachProof_ownPayment_setsUrl() {
+        Payment payment = withId(new Payment("order-1", "a@b.com", PaymentMethod.BANK_TRANSFER,
+                PaymentStatus.PENDING, 1, "user-1", ShippingCarrier.UPS), "pay-13");
+        when(paymentRepository.findByIdAndDeletedFalse("pay-13")).thenReturn(Optional.of(payment));
+        when(paymentRepository.save(payment)).thenReturn(payment);
+
+        Payment result = paymentService.attachProof("user-1", "pay-13", "/api/payments/files/abc.jpg");
+
+        assertThat(result.getProofOfPaymentUrl()).isEqualTo("/api/payments/files/abc.jpg");
+        verify(paymentRepository).save(payment);
+    }
+
+    @Test
+    void attachProof_notOwnPayment_throwsForbidden() {
+        Payment payment = withId(new Payment("order-1", "a@b.com", PaymentMethod.BANK_TRANSFER,
+                PaymentStatus.PENDING, 1, "user-1", ShippingCarrier.UPS), "pay-14");
+        when(paymentRepository.findByIdAndDeletedFalse("pay-14")).thenReturn(Optional.of(payment));
+
+        assertThatThrownBy(() -> paymentService.attachProof("someone-else", "pay-14", "/api/payments/files/abc.jpg"))
+                .isInstanceOf(ResponseStatusException.class);
+        verify(paymentRepository, never()).save(any());
+    }
 }

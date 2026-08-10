@@ -141,6 +141,23 @@ class PaymentServiceImpl implements PaymentService {
     }
 
     @Override
+    public Payment getByOrderId(String orderId) {
+        return paymentRepository.findByOrderId(orderId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+    }
+
+    @Override
+    public Payment attachProof(String keycloakUserId, String id, String url) {
+        Payment payment = paymentRepository.findByIdAndDeletedFalse(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (!keycloakUserId.equals(payment.getKeycloakUserId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not your payment");
+        }
+        payment.setProofOfPaymentUrl(url);
+        return paymentRepository.save(payment);
+    }
+
+    @Override
     public void delete(String id) {
         Payment payment = paymentRepository.findByIdAndDeletedFalse(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
