@@ -14,7 +14,7 @@ spec:
         - name: ghcr-pull-secret
       containers:
         - name: config-server
-          image: ghcr.io/wilbertjoosen/demo-config-server:1.0.0
+          image: ghcr.io/wilbertjoosen/demo-config-server:12d4474669dcfcfe91f819879bbf25fb7f8f9292
           imagePullPolicy: Always
           ports: [{ containerPort: 8888 }]
           resources:
