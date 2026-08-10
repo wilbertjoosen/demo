@@ -11,3 +11,11 @@ export type { ChatMessage } from './chatMessage'
 export { detectMediaType } from './media'
 export type { FieldChange, RecordHistoryAction, RecordHistoryEntry } from './auditHistory'
 export type { ConversationSummary, DirectMessage, DirectoryEntry } from './conversation'
+export type {
+  DailyCount,
+  OrdersRevenueReport,
+  SagaHealthReport,
+  ProductStat,
+  TopProductsReport,
+  UserGrowthReport,
+} from './report'

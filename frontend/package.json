@@ -12,10 +12,12 @@
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.2",
     "axios": "^1.19.0",
+    "echarts": "^6.1.0",
     "element-plus": "^2.14.3",
     "keycloak-js": "^26.2.4",
     "pinia": "^4.0.2",
     "vue": "^3.5.40",
+    "vue-echarts": "^8.1.0",
     "vue-i18n": "^11.4.8",
     "vue-router": "^4.6.4"
   },

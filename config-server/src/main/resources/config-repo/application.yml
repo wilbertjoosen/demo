@@ -26,6 +26,14 @@ spring:
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
         spring.json.trusted.packages: "*"
+    # Micrometer Observation instrumentation for producer sends / listener invocations — this is
+    # what propagates trace context through Kafka message headers, so a single trace can span the
+    # async saga boundary (order-service publishing ORDER_CREATED -> payment-service's listener
+    # picking it up) instead of tracing stopping dead at the synchronous order->inventory call.
+    template:
+      observation-enabled: true
+    listener:
+      observation-enabled: true
 
 eureka:
   client:
@@ -50,3 +58,19 @@ management:
   metrics:
     tags:
       application: ${spring.application.name}
+  tracing:
+    # 100% sampling — this is a demo/dev environment where seeing every trace matters more than
+    # the overhead; a real production deployment would sample a small fraction (e.g. 0.1) instead.
+    sampling:
+      probability: 1.0
+  opentelemetry:
+    tracing:
+      export:
+        otlp:
+          # Tempo's OTLP/HTTP receiver — verified against the actual Spring Boot 4.1
+          # OtlpTracingProperties class (this project's Boot version splits tracing autoconfiguration
+          # into spring-boot-micrometer-tracing-opentelemetry, a different module than the
+          # micrometer-tracing-bridge-otel + opentelemetry-exporter-otlp pairing docs for older Boot
+          # versions describe) — the property prefix here is
+          # management.opentelemetry.tracing.export.otlp, not management.otlp.tracing.
+          endpoint: ${OTLP_ENDPOINT:http://localhost:4318/v1/traces}
