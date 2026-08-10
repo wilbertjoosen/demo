@@ -13,6 +13,12 @@ spec:
             pathType: Prefix
             backend:
               service: { name: gateway-service, port: { number: 8080 } }
+          # Same-origin health probe for the frontend's useBackendHealth composable — actuator
+          # isn't under /api (Spring Boot serves it at the app root), so it needs its own rule.
+          - path: /actuator
+            pathType: Prefix
+            backend:
+              service: { name: gateway-service, port: { number: 8080 } }
           - path: /
             pathType: Prefix
             backend:
