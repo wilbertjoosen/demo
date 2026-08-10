@@ -16,14 +16,30 @@ data:
       }
     }
 ---
-apiVersion: apps/v1
-kind: Deployment
+# Argo Rollouts canary (task #73) — order-service is the saga initiator and most user-facing
+# service, chosen as the one flagship example rather than converting all 19 services. No
+# trafficRouting block: that needs a mesh/ingress plugin (Istio, SMI, an NGINX/ALB controller),
+# none of which this cluster runs. Basic canary instead approximates each step's weight by the
+# ratio of canary-to-stable REPLICA COUNTS, which still works correctly here because the gateway
+# resolves order-service via Eureka client-side load balancing (lb://order-service) — every pod
+# replica registers as its own Eureka instance, so Spring Cloud LoadBalancer's round-robin across
+# them approximates the requested traffic split the same way a Service-based router would.
+# replicas: 2 (not 1) so a step actually has something to split between — bumped no further than
+# that to keep the resource footprint close to this project's existing single-replica norm.
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
 metadata:
   name: order-service
   namespace: demo
   labels: { app: order-service, monitored: "true" }
 spec:
-  replicas: 1
+  replicas: 2
+  strategy:
+    canary:
+      steps:
+        - setWeight: 50
+        - pause: { duration: 30s }
+        - setWeight: 100
   selector: { matchLabels: { app: order-service } }
   template:
     metadata: { labels: { app: order-service, monitored: "true" } }
