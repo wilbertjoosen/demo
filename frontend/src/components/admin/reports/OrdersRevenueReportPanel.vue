@@ -50,11 +50,11 @@ onMounted(async () => {
     <div v-if="report" class="grid grid-cols-1 gap-4 lg:grid-cols-2">
       <div>
         <p class="mb-1 text-sm text-gray-500">{{ t('reports.ordersRevenue.dailyOrders') }}</p>
-        <v-chart class="h-64" autoresize :option="dailyOrdersOption" />
+        <v-chart style="height: 256px" autoresize :option="dailyOrdersOption" />
       </div>
       <div>
         <p class="mb-1 text-sm text-gray-500">{{ t('reports.ordersRevenue.byStatus') }}</p>
-        <v-chart class="h-64" autoresize :option="byStatusOption" />
+        <v-chart style="height: 256px" autoresize :option="byStatusOption" />
       </div>
     </div>
   </div>

@@ -57,7 +57,7 @@ onMounted(async () => {
     </p>
     <div v-if="report && report.cancelledCount > 0">
       <p class="mb-1 text-sm text-gray-500">{{ t('reports.sagaHealth.failuresByStage') }}</p>
-      <v-chart class="h-64" autoresize :option="failuresByStageOption" />
+      <v-chart style="height: 256px" autoresize :option="failuresByStageOption" />
     </div>
   </div>
 </template>
