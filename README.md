@@ -238,13 +238,13 @@ via your kubeconfig context, not something you visit directly).
    tagged with both the commit SHA and that service's own `pom.xml`/`package.json` version (each
    service versions independently, starting at `1.0.0` — bump it by hand when you want to mark a
    release). Images are `linux/arm64` only, matching this k3d cluster's nodes.
-4. **Update manifests** — bumps the changed services' `image:` lines in `k8s/*.yaml` to their new
-   version tag and commits straight back to whichever branch triggered the run, gated behind the
-   images already existing in GHCR — ArgoCD's `selfHeal` never sees a manifest pointing at an
-   unpullable image. **Note:** deploying by version tag (not the SHA) means a push that doesn't bump a
-   service's version produces the same tag as last time, so that service's manifest won't change and
-   won't redeploy — `imagePullPolicy: Always` at least guarantees any rollout that *does* happen for
-   another reason re-pulls the latest content pushed under that tag.
+4. **Update manifests** — bumps the changed services' `image:` lines in `k8s/*.yaml` to the new commit
+   SHA tag and commits straight back to whichever branch triggered the run, gated behind the images
+   already existing in GHCR — ArgoCD's `selfHeal` never sees a manifest pointing at an unpullable
+   image. Deploying by the immutable SHA (not the semver tag) means every commit that touches a
+   service produces a genuinely new tag and a real manifest diff, so a rollout always happens —
+   nothing depends on remembering to bump that service's version. The semver tag still rides along on
+   the same image purely for human-readable release tracking.
 
 GHCR packages are private, so every Deployment references `imagePullSecrets: ghcr-pull-secret` — a
 `kubernetes.io/dockerconfigjson` Secret created directly in each namespace (`demo`, `demo-qa`) via
