@@ -13,4 +13,6 @@ public interface PaymentRepository extends MongoRepository<Payment, String> {
     List<Payment> findByDeletedFalse();
 
     Optional<Payment> findByIdAndDeletedFalse(String id);
+
+    List<Payment> findByStatus(PaymentStatus status);
 }

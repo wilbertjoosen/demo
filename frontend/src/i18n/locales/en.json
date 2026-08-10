@@ -188,7 +188,9 @@
       "DEBIT_CARD": "Debit card",
       "PAYPAL": "PayPal",
       "PIX": "Pix",
-      "BOLETO": "Boleto"
+      "BOLETO": "Boleto",
+      "BANK_TRANSFER": "Bank transfer",
+      "CASH": "Cash"
     },
     "unavailable": "Currently unavailable"
   },
