@@ -53,10 +53,16 @@ spec:
           ports: [{ containerPort: 8084 }]
           envFrom:
             - configMapRef: { name: demo-common-config }
-            - secretRef: { name: order-service-db }
           env:
             - { name: EUREKA_INSTANCE_HOSTNAME, value: order-service }
             - { name: MONGO_DB, value: orders_qa }
+            # Task #75: DB_USERNAME/DB_PASSWORD/ORDER_SERVICE_CLIENT_SECRET no longer come from a
+            # committed k8s Secret — order-service fetches them itself from Vault at startup
+            # (spring.cloud.vault.*, see application.yaml). Only the Vault connection info itself
+            # is needed here, and only the token is sensitive.
+            - name: VAULT_TOKEN
+              valueFrom:
+                secretKeyRef: { name: vault-token, key: token }
           resources:
             requests: { cpu: "250m", memory: "448Mi" }
             limits: { cpu: "1", memory: "768Mi" }

@@ -42,3 +42,9 @@ data:
   # shared across prod and QA (same Tempo instance) — see config-server's config-repo/application.yml
   # for how every service picks this up.
   OTLP_ENDPOINT: http://host.k3d.internal:4318/v1/traces
+  # Task #75, real secrets management — Vault dev-mode instance, single node, shared across prod
+  # and QA the same way Tempo is above (one throwaway local Vault, not per-environment). The token
+  # itself is sensitive and lives in the vault-token k8s Secret (created imperatively per-namespace,
+  # not committed — same pattern as ghcr-pull-secret).
+  VAULT_HOST: host.k3d.internal
+  VAULT_PORT: "8200"
