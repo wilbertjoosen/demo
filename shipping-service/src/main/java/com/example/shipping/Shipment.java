@@ -25,7 +25,11 @@ public class Shipment {
 
     private String orderId;
     private String keycloakUserId;
+    private String email;
+    private int quantity;
     private ShipmentStatus status;
+    /** Set when a WAREHOUSE-role user reports an issue instead of confirming the pick. */
+    private String issueReason;
     private ShippingCarrier carrier;
     private BigDecimal cost;
     private TrackingStatus trackingStatus;
@@ -57,10 +61,30 @@ public class Shipment {
         }
     }
 
+    /**
+     * PENDING_WAREHOUSE creation path — also keeps email/quantity around since the WAREHOUSE-role
+     * confirm/report-issue action that eventually resolves this shipment runs long after the
+     * original Kafka listener call (and its method-local variables) has returned.
+     */
+    public Shipment(String orderId, String keycloakUserId, String email, int quantity,
+            ShipmentStatus status, ShippingCarrier carrier, BigDecimal cost) {
+        this(orderId, keycloakUserId, status, carrier, cost);
+        this.email = email;
+        this.quantity = quantity;
+    }
+
     /** Appends the next tracking stage; called on creation and by the periodic tracking-progression job. */
     void advanceTracking(TrackingStatus next) {
         this.trackingStatus = next;
         this.trackingHistory.add(new TrackingEvent(next, Instant.now()));
+    }
+
+    void setStatus(ShipmentStatus status) {
+        this.status = status;
+    }
+
+    void setIssueReason(String issueReason) {
+        this.issueReason = issueReason;
     }
 
     void markDeleted() {
