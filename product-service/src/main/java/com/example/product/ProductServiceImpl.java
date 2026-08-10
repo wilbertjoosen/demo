@@ -53,7 +53,8 @@ class ProductServiceImpl implements ProductService {
         kafkaTemplate.send(Topics.PRODUCT_EVENTS, DomainEvent.of(EventTypes.PRODUCT_CREATED, null, Map.of(
                 "productId", saved.getId(),
                 "name", saved.getName(),
-                "sku", saved.getSku()
+                "sku", saved.getSku(),
+                "price", saved.getPrice()
         )));
         return saved;
     }
@@ -84,6 +85,12 @@ class ProductServiceImpl implements ProductService {
         if (updated == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
+        kafkaTemplate.send(Topics.PRODUCT_EVENTS, DomainEvent.of(EventTypes.PRODUCT_UPDATED, null, Map.of(
+                "productId", updated.getId(),
+                "name", updated.getName(),
+                "sku", updated.getSku(),
+                "price", updated.getPrice()
+        )));
         return updated;
     }
 
@@ -97,5 +104,8 @@ class ProductServiceImpl implements ProductService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         product.markDeleted();
         productRepository.save(product);
+        kafkaTemplate.send(Topics.PRODUCT_EVENTS, DomainEvent.of(EventTypes.PRODUCT_DELETED, null, Map.of(
+                "productId", id
+        )));
     }
 }

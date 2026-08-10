@@ -17,6 +17,21 @@ datasources:
     url: http://prometheus.demo.localhost:18090
 
   - name: Loki
+    uid: loki
     type: loki
     access: proxy
     url: http://loki:3100
+
+  - name: Tempo
+    type: tempo
+    access: proxy
+    url: http://tempo:3200
+    jsonData:
+      # Spring Boot auto-adds [traceId,spanId] to every log line once micrometer-tracing is on the
+      # classpath (see common-security/gateway-service poms), and promtail already ships container
+      # stdout to Loki — so a trace can jump straight to its own log lines with no extra wiring.
+      # Explicit uid above so this reference is stable rather than relying on Grafana's
+      # auto-generated default.
+      tracesToLogsV2:
+        datasourceUid: loki
+        filterByTraceID: true

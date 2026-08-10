@@ -1,5 +1,6 @@
 package com.example.order;
 
+import com.example.common.events.EventContracts;
 import com.example.common.events.EventTypes;
 import com.example.common.events.Topics;
 import com.example.common.model.Address;
@@ -88,6 +89,9 @@ class OrderServiceImplTest {
         @SuppressWarnings("unchecked")
         Map<String, Object> payload = (Map<String, Object>) published.payload();
         assertThat(payload).containsEntry("userId", "user-1").containsEntry("productId", "product-1").containsEntry("quantity", 2);
+        // Contract test: payment-service, reporting-service and others consume ORDER_CREATED
+        // relying on exactly these fields being present — see EventContracts.
+        assertThat(EventContracts.missingFields(EventTypes.ORDER_CREATED, payload)).isEmpty();
     }
 
     @Test
@@ -106,7 +110,7 @@ class OrderServiceImplTest {
     }
 
     @Test
-    void advanceStatus_updatesBothWriteAndReadModel() {
+    void advanceStatus_updatesBothWriteAndReadModel_andPublishesOrderStatusChanged() {
         Order order = savedOrder(1L, "user-1", OrderStatus.PENDING_PAYMENT);
         OrderView view = OrderView.from(order);
         when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
@@ -117,6 +121,18 @@ class OrderServiceImplTest {
         assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
         assertThat(view.getStatus()).isEqualTo(OrderStatus.PAID);
         verify(orderViewRepository).save(view);
+
+        ArgumentCaptor<com.example.common.events.DomainEvent> eventCaptor =
+                ArgumentCaptor.forClass(com.example.common.events.DomainEvent.class);
+        verify(kafkaTemplate).send(eq(Topics.ORDER_EVENTS), eventCaptor.capture());
+        com.example.common.events.DomainEvent published = eventCaptor.getValue();
+        assertThat(published.eventType()).isEqualTo(EventTypes.ORDER_STATUS_CHANGED);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> payload = (Map<String, Object>) published.payload();
+        assertThat(payload).containsEntry("status", "PAID");
+        // Contract test: reporting-service's order-metrics KTable relies on exactly these fields —
+        // see EventContracts and ReportingTopology.
+        assertThat(EventContracts.missingFields(EventTypes.ORDER_STATUS_CHANGED, payload)).isEmpty();
     }
 
     @Test
