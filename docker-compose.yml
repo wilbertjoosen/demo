@@ -347,7 +347,11 @@ services:
       - tempo
 
   tempo:
-    image: grafana/tempo:latest
+    # Pinned (not :latest) — v3 restructured storage config around a new backend-scheduler/
+    # backend-worker split and dropped the top-level `compactor` block this single-binary,
+    # local-storage config (docker/tempo/tempo.yml) is written against; 2.7.1 is the last 2.x
+    # release and matches that config's schema.
+    image: grafana/tempo:2.7.1
     container_name: demo-tempo
     restart: unless-stopped
     command: ["-config.file=/etc/tempo/tempo.yml"]
