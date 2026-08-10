@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Check, Close } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
@@ -44,6 +44,20 @@ const filtered = computed(() => {
 function rowStyle({ row }: { row: Delivery }) {
   return agingRowStyle(row.createdAt, row.status === 'PENDING_DELIVERY_AGENT')
 }
+
+const pageSize = 10
+const currentPage = ref(1)
+const paged = computed(() => {
+  const start = (currentPage.value - 1) * pageSize
+  return filtered.value.slice(start, start + pageSize)
+})
+watch(
+  () => filtered.value.length,
+  () => {
+    const maxPage = Math.max(1, Math.ceil(filtered.value.length / pageSize))
+    if (currentPage.value > maxPage) currentPage.value = maxPage
+  },
+)
 
 async function confirmDelivered(delivery: Delivery) {
   try {
@@ -99,7 +113,7 @@ async function reportIssue(delivery: Delivery) {
         :end-placeholder="t('queues.dateRange')"
       />
     </div>
-    <el-table v-loading="loading" :data="filtered" stripe :row-style="rowStyle" :empty-text="t('queues.empty')">
+    <el-table v-loading="loading" :data="paged" stripe :row-style="rowStyle" :empty-text="t('queues.empty')">
       <el-table-column prop="orderId" :label="t('queues.orderId')" width="90" />
       <el-table-column prop="email" :label="t('queues.email')" />
       <el-table-column prop="quantity" :label="t('queues.quantity')" width="80" />
@@ -122,5 +136,13 @@ async function reportIssue(delivery: Delivery) {
         </template>
       </el-table-column>
     </el-table>
+    <el-pagination
+      v-if="filtered.length > pageSize"
+      class="mt-3 justify-end"
+      layout="prev, pager, next"
+      :page-size="pageSize"
+      :total="filtered.length"
+      v-model:current-page="currentPage"
+    />
   </div>
 </template>
