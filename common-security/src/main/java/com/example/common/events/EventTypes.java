@@ -14,6 +14,8 @@ public final class EventTypes {
     public static final String PAYMENT_COMPLETED = "PAYMENT_COMPLETED";
     public static final String PAYMENT_FAILED = "PAYMENT_FAILED";
     public static final String PAYMENT_REFUNDED = "PAYMENT_REFUNDED";
+    /** BANK_TRANSFER/CASH only — fired the moment charge() saves the payment as PENDING, so the customer knows how to actually pay. */
+    public static final String PAYMENT_INSTRUCTIONS_REQUIRED = "PAYMENT_INSTRUCTIONS_REQUIRED";
 
     public static final String SHIPPED = "SHIPPED";
     public static final String SHIPPING_FAILED = "SHIPPING_FAILED";
