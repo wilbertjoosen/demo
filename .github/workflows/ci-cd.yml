@@ -252,27 +252,20 @@ jobs:
             FILES="$FILES
           k8s/frontend.yaml"
           fi
-          # Deploys by each service's own semver (not the SHA build-and-push also tagged) — note
-          # this means a push that doesn't bump a service's version produces the exact same image
-          # tag as last time, so this manifest won't change and ArgoCD won't see anything to sync;
-          # imagePullPolicy: Always (see k8s/*.yaml) at least guarantees a rollout that DOES happen
-          # for another reason re-pulls the latest content pushed under that tag rather than serving
-          # a node's stale local cache — bump the version whenever you want a push to actually deploy.
+          # Deploys by the immutable git SHA (also tagged on every image in build-and-push above),
+          # not each service's own semver — every commit that touches a service therefore produces a
+          # genuinely new tag and a real manifest diff, so ArgoCD always has something to sync even
+          # if nobody remembered to bump that service's version. This was briefly semver-only
+          # (46984c2) on the theory that "each service's own version" should drive its own deploys;
+          # in practice that meant any commit which forgot the version bump left the running pod
+          # silently stale (hit user-service, payment-service, reporting-service, and the frontend
+          # more than once) — SHA-based deploy removes that whole failure mode structurally instead
+          # of relying on remembering every time. The semver tag still rides along on the same image
+          # purely for human-readable release tracking, not for deploys.
           echo "$FILES" | while IFS= read -r f; do
             [ -f "$f" ] || continue
-            SERVICE=$(basename "$f" .yaml)
-            if [ "$SERVICE" = "frontend" ]; then
-              VERSION=$(jq -r .version frontend/package.json)
-            else
-              VERSION=$(python3 -c "
-          import xml.etree.ElementTree as ET
-          ns = {'m': 'http://maven.apache.org/POM/4.0.0'}
-          root = ET.parse('$SERVICE/pom.xml').getroot()
-          print(root.find('m:version', ns).text)
-          ")
-            fi
-            sed -i -E "s#image: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/demo-([a-z-]+):[a-zA-Z0-9._-]+#image: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/demo-\1:$VERSION#g" "$f"
-            sed -i -E "s#image: demo/([a-z-]+):local#image: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/demo-\1:$VERSION#g" "$f"
+            sed -i -E "s#image: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/demo-([a-z-]+):[a-zA-Z0-9._-]+#image: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/demo-\1:${{ github.sha }}#g" "$f"
+            sed -i -E "s#image: demo/([a-z-]+):local#image: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/demo-\1:${{ github.sha }}#g" "$f"
           done
       - name: Commit and push
         run: |
