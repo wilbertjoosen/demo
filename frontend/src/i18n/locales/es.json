@@ -188,7 +188,9 @@
       "DEBIT_CARD": "Tarjeta de débito",
       "PAYPAL": "PayPal",
       "PIX": "Pix",
-      "BOLETO": "Boleto"
+      "BOLETO": "Boleto",
+      "BANK_TRANSFER": "Transferencia bancaria",
+      "CASH": "Efectivo"
     },
     "unavailable": "No disponible actualmente"
   },

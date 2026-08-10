@@ -14,6 +14,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.kafka.core.KafkaTemplate;
 
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -51,6 +54,17 @@ class PaymentServiceImplTest {
             var field = Payment.class.getDeclaredField("id");
             field.setAccessible(true);
             field.set(payment, id);
+        } catch (ReflectiveOperationException e) {
+            throw new RuntimeException(e);
+        }
+        return payment;
+    }
+
+    private Payment withCreatedAt(Payment payment, Instant createdAt) {
+        try {
+            var field = Payment.class.getDeclaredField("createdAt");
+            field.setAccessible(true);
+            field.set(payment, createdAt);
         } catch (ReflectiveOperationException e) {
             throw new RuntimeException(e);
         }
@@ -110,6 +124,72 @@ class PaymentServiceImplTest {
         @SuppressWarnings("unchecked")
         Map<String, Object> payload = (Map<String, Object>) published.payload();
         assertThat(EventContracts.missingFields(EventTypes.PAYMENT_FAILED, payload)).isEmpty();
+    }
+
+    @Test
+    void charge_bankTransfer_savesPendingPaymentWithoutPublishing() {
+        when(gatewayAvailability.isAvailable(PaymentMethod.BANK_TRANSFER)).thenReturn(true);
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(inv -> withId(inv.getArgument(0), "pay-4"));
+
+        paymentService.charge("order-1", "user-1", "a@b.com", 2, PaymentMethod.BANK_TRANSFER, ShippingCarrier.UPS);
+
+        verifyNoInteractions(paymentGatewayClient, kafkaTemplate);
+        ArgumentCaptor<Payment> paymentCaptor = ArgumentCaptor.forClass(Payment.class);
+        verify(paymentRepository).save(paymentCaptor.capture());
+        Payment saved = paymentCaptor.getValue();
+        assertThat(saved.getStatus()).isEqualTo(PaymentStatus.PENDING);
+        assertThat(saved.getQuantity()).isEqualTo(2);
+        assertThat(saved.getKeycloakUserId()).isEqualTo("user-1");
+        assertThat(saved.getShippingCarrier()).isEqualTo(ShippingCarrier.UPS);
+    }
+
+    @Test
+    void charge_cash_savesPendingPaymentWithoutPublishing() {
+        when(gatewayAvailability.isAvailable(PaymentMethod.CASH)).thenReturn(true);
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(inv -> withId(inv.getArgument(0), "pay-5"));
+
+        paymentService.charge("order-1", "user-1", "a@b.com", 1, PaymentMethod.CASH, ShippingCarrier.DHL);
+
+        verifyNoInteractions(paymentGatewayClient, kafkaTemplate);
+        verify(paymentRepository).save(any(Payment.class));
+    }
+
+    @Test
+    void resolvePendingManualPayments_pastMockDelay_completesAndPublishesPaymentCompleted() {
+        Payment pending = withCreatedAt(
+                withId(new Payment("order-1", "a@b.com", PaymentMethod.BANK_TRANSFER, PaymentStatus.PENDING,
+                        3, "user-1", ShippingCarrier.UPS), "pay-6"),
+                Instant.now().minus(31, ChronoUnit.SECONDS));
+        when(paymentRepository.findByStatus(PaymentStatus.PENDING)).thenReturn(List.of(pending));
+
+        paymentService.resolvePendingManualPayments();
+
+        assertThat(pending.getStatus()).isEqualTo(PaymentStatus.COMPLETED);
+        verify(paymentRepository).save(pending);
+        ArgumentCaptor<DomainEvent> eventCaptor = ArgumentCaptor.forClass(DomainEvent.class);
+        verify(kafkaTemplate).send(eq(Topics.PAYMENT_EVENTS), eventCaptor.capture());
+        DomainEvent published = eventCaptor.getValue();
+        assertThat(published.eventType()).isEqualTo(EventTypes.PAYMENT_COMPLETED);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> payload = (Map<String, Object>) published.payload();
+        assertThat(payload).containsEntry("paymentId", "pay-6").containsEntry("userId", "user-1")
+                .containsEntry("shippingCarrier", "UPS").containsEntry("quantity", 3);
+        assertThat(EventContracts.missingFields(EventTypes.PAYMENT_COMPLETED, payload)).isEmpty();
+    }
+
+    @Test
+    void resolvePendingManualPayments_withinMockDelay_leavesPending() {
+        Payment recent = withCreatedAt(
+                withId(new Payment("order-1", "a@b.com", PaymentMethod.CASH, PaymentStatus.PENDING,
+                        1, "user-1", ShippingCarrier.UPS), "pay-7"),
+                Instant.now().minus(5, ChronoUnit.SECONDS));
+        when(paymentRepository.findByStatus(PaymentStatus.PENDING)).thenReturn(List.of(recent));
+
+        paymentService.resolvePendingManualPayments();
+
+        assertThat(recent.getStatus()).isEqualTo(PaymentStatus.PENDING);
+        verify(paymentRepository, never()).save(any());
+        verifyNoInteractions(kafkaTemplate);
     }
 
     @Test

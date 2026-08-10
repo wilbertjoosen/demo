@@ -19,7 +19,7 @@ const emit = defineEmits<{
 }>()
 const { t } = useI18n()
 
-const paymentMethods: PaymentMethod[] = ['CREDIT_CARD', 'DEBIT_CARD', 'PAYPAL', 'PIX', 'BOLETO']
+const paymentMethods: PaymentMethod[] = ['CREDIT_CARD', 'DEBIT_CARD', 'PAYPAL', 'PIX', 'BOLETO', 'BANK_TRANSFER', 'CASH']
 const shippingCarriers: ShippingCarrier[] = ['UPS', 'DHL']
 
 const formRef = ref<FormInstance>()
