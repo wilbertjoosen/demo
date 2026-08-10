@@ -76,6 +76,10 @@ public class Payment {
         this.status = status;
     }
 
+    void setFailureReason(String failureReason) {
+        this.failureReason = failureReason;
+    }
+
     void markDeleted() {
         this.deleted = true;
         this.deletedAt = Instant.now();
