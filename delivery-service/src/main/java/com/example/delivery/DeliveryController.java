@@ -26,4 +26,23 @@ public class DeliveryController {
         deliveryService.delete(id);
         return ResponseEntity.noContent().build();
     }
+
+    /** Confirms a PENDING_DELIVERY_AGENT delivery was handed to the customer. */
+    @PostMapping("/{id}/confirm-delivered")
+    @PreAuthorize("hasAnyRole('ADMIN', 'DELIVERY_AGENT')")
+    public ResponseEntity<Void> confirmDelivered(@PathVariable String id) {
+        deliveryService.confirmDelivered(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    public record ReportIssueRequest(String reason) {
+    }
+
+    /** Reports that a PENDING_DELIVERY_AGENT delivery couldn't be completed — triggers the same compensation a system failure would. */
+    @PostMapping("/{id}/report-issue")
+    @PreAuthorize("hasAnyRole('ADMIN', 'DELIVERY_AGENT')")
+    public ResponseEntity<Void> reportIssue(@PathVariable String id, @RequestBody(required = false) ReportIssueRequest request) {
+        deliveryService.reportIssue(id, request == null ? null : request.reason());
+        return ResponseEntity.noContent().build();
+    }
 }
