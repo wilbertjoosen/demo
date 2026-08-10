@@ -42,4 +42,23 @@ public class ShipmentController {
         shippingService.delete(id);
         return ResponseEntity.noContent().build();
     }
+
+    /** Confirms a PENDING_WAREHOUSE shipment has been picked and handed to the carrier. */
+    @PostMapping("/{id}/confirm-picked")
+    @PreAuthorize("hasAnyRole('ADMIN', 'WAREHOUSE')")
+    public ResponseEntity<Void> confirmPicked(@PathVariable String id) {
+        shippingService.confirmPicked(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    public record ReportIssueRequest(String reason) {
+    }
+
+    /** Reports that a PENDING_WAREHOUSE shipment can't be fulfilled — triggers the same compensation path a system failure would. */
+    @PostMapping("/{id}/report-issue")
+    @PreAuthorize("hasAnyRole('ADMIN', 'WAREHOUSE')")
+    public ResponseEntity<Void> reportIssue(@PathVariable String id, @RequestBody(required = false) ReportIssueRequest request) {
+        shippingService.reportIssue(id, request == null ? null : request.reason());
+        return ResponseEntity.noContent().build();
+    }
 }

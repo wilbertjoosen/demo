@@ -24,6 +24,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -43,26 +44,35 @@ class ShippingServiceImplTest {
         shippingService = new ShippingServiceImpl(shipmentRepository, kafkaTemplate, rateCalculator);
     }
 
-    @Test
-    void ship_normalQuantity_dispatchesAndPublishesShipped() {
-        when(rateCalculator.quote(ShippingCarrier.UPS, 2)).thenReturn(new BigDecimal("9.99"));
-
-        shippingService.ship("order-1", "user-1", "a@b.com", 2, ShippingCarrier.UPS);
-
-        verify(shipmentRepository).save(any(Shipment.class));
-        ArgumentCaptor<DomainEvent> eventCaptor = ArgumentCaptor.forClass(DomainEvent.class);
-        verify(kafkaTemplate).send(eq(Topics.SHIPPING_EVENTS), eventCaptor.capture());
-        DomainEvent published = eventCaptor.getValue();
-        assertThat(published.eventType()).isEqualTo(EventTypes.SHIPPED);
-        assertThat(published.orderId()).isEqualTo("order-1");
-        @SuppressWarnings("unchecked")
-        Map<String, Object> payload = (Map<String, Object>) published.payload();
-        assertThat(payload).containsEntry("quantity", 2);
-        assertThat(EventContracts.missingFields(EventTypes.SHIPPED, payload)).isEmpty();
+    private Shipment withId(Shipment shipment, String id) {
+        try {
+            var field = Shipment.class.getDeclaredField("id");
+            field.setAccessible(true);
+            field.set(shipment, id);
+        } catch (ReflectiveOperationException e) {
+            throw new RuntimeException(e);
+        }
+        return shipment;
     }
 
     @Test
-    void ship_simulatedFailureQuantity_publishesShippingFailed() {
+    void ship_normalQuantity_savesPendingWarehouseWithoutPublishing() {
+        when(rateCalculator.quote(ShippingCarrier.UPS, 2)).thenReturn(new BigDecimal("9.99"));
+        when(shipmentRepository.save(any(Shipment.class))).thenAnswer(inv -> withId(inv.getArgument(0), "ship-0"));
+
+        shippingService.ship("order-1", "user-1", "a@b.com", 2, ShippingCarrier.UPS);
+
+        ArgumentCaptor<Shipment> shipmentCaptor = ArgumentCaptor.forClass(Shipment.class);
+        verify(shipmentRepository).save(shipmentCaptor.capture());
+        Shipment saved = shipmentCaptor.getValue();
+        assertThat(saved.getStatus()).isEqualTo(ShipmentStatus.PENDING_WAREHOUSE);
+        assertThat(saved.getQuantity()).isEqualTo(2);
+        assertThat(saved.getEmail()).isEqualTo("a@b.com");
+        verifyNoInteractions(kafkaTemplate);
+    }
+
+    @Test
+    void ship_simulatedFailureQuantity_publishesShippingFailedImmediately() {
         when(rateCalculator.quote(ShippingCarrier.UPS, 7)).thenReturn(new BigDecimal("9.99"));
 
         shippingService.ship("order-1", "user-1", "a@b.com", 7, ShippingCarrier.UPS);
@@ -74,6 +84,54 @@ class ShippingServiceImplTest {
         @SuppressWarnings("unchecked")
         Map<String, Object> payload = (Map<String, Object>) published.payload();
         assertThat(EventContracts.missingFields(EventTypes.SHIPPING_FAILED, payload)).isEmpty();
+    }
+
+    @Test
+    void confirmPicked_pendingWarehouse_dispatchesAndPublishesShipped() {
+        Shipment pending = withId(new Shipment("order-1", "user-1", "a@b.com", 4,
+                ShipmentStatus.PENDING_WAREHOUSE, ShippingCarrier.UPS, new BigDecimal("9.99")), "ship-1");
+        when(shipmentRepository.findByIdAndDeletedFalse("ship-1")).thenReturn(Optional.of(pending));
+
+        shippingService.confirmPicked("ship-1");
+
+        assertThat(pending.getStatus()).isEqualTo(ShipmentStatus.DISPATCHED);
+        assertThat(pending.getTrackingStatus()).isEqualTo(TrackingStatus.LABEL_CREATED);
+        verify(shipmentRepository).save(pending);
+        ArgumentCaptor<DomainEvent> eventCaptor = ArgumentCaptor.forClass(DomainEvent.class);
+        verify(kafkaTemplate).send(eq(Topics.SHIPPING_EVENTS), eventCaptor.capture());
+        DomainEvent published = eventCaptor.getValue();
+        assertThat(published.eventType()).isEqualTo(EventTypes.SHIPPED);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> payload = (Map<String, Object>) published.payload();
+        assertThat(payload).containsEntry("quantity", 4).containsEntry("email", "a@b.com");
+        assertThat(EventContracts.missingFields(EventTypes.SHIPPED, payload)).isEmpty();
+    }
+
+    @Test
+    void confirmPicked_notPendingWarehouse_throwsConflict() {
+        Shipment dispatched = withId(
+                new Shipment("order-1", "user-1", ShipmentStatus.DISPATCHED, ShippingCarrier.UPS, BigDecimal.TEN), "ship-2");
+        when(shipmentRepository.findByIdAndDeletedFalse("ship-2")).thenReturn(Optional.of(dispatched));
+
+        assertThatThrownBy(() -> shippingService.confirmPicked("ship-2")).isInstanceOf(ResponseStatusException.class);
+        verify(shipmentRepository, never()).save(any());
+        verifyNoInteractions(kafkaTemplate);
+    }
+
+    @Test
+    void reportIssue_pendingWarehouse_failsAndPublishesShippingFailed() {
+        Shipment pending = withId(new Shipment("order-1", "user-1", "a@b.com", 3,
+                ShipmentStatus.PENDING_WAREHOUSE, ShippingCarrier.DHL, new BigDecimal("5.00")), "ship-3");
+        when(shipmentRepository.findByIdAndDeletedFalse("ship-3")).thenReturn(Optional.of(pending));
+
+        shippingService.reportIssue("ship-3", "damaged in warehouse");
+
+        assertThat(pending.getStatus()).isEqualTo(ShipmentStatus.FAILED);
+        assertThat(pending.getIssueReason()).isEqualTo("damaged in warehouse");
+        verify(shipmentRepository).save(pending);
+        ArgumentCaptor<DomainEvent> eventCaptor = ArgumentCaptor.forClass(DomainEvent.class);
+        verify(kafkaTemplate).send(eq(Topics.SHIPPING_EVENTS), eventCaptor.capture());
+        assertThat(eventCaptor.getValue().eventType()).isEqualTo(EventTypes.SHIPPING_FAILED);
     }
 
     @Test
