@@ -29,50 +29,20 @@ env:
   IMAGE_OWNER: ${{ github.repository_owner }}
 
 jobs:
-  backend-test:
-    name: Backend (Maven reactor)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '26'
-          cache: maven
-      # `verify` (not just `test`) so Checkstyle + SpotBugs run too — both are bound to the verify
-      # phase in the root pom, alongside the Testcontainers-backed integration tests (order-service,
-      # chat-service), which need real Docker; GitHub-hosted ubuntu-latest runners have it preinstalled.
-      - name: Run tests + static analysis
-        run: ./mvnw -B verify
-
-  frontend-test:
-    name: Frontend (typecheck + build)
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: frontend
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: frontend/.nvmrc
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-      - run: npm ci
-      - run: npm run lint
-      # npm run build already chains `vue-tsc -b && vite build` — one command covers both gates.
-      - run: npm run build
-
+  # Runs first, for every event (push to either branch, PR, workflow_dispatch) — backend-test and
+  # frontend-test both gate on its output so a docs/infra-only change (or a change scoped to one
+  # service) doesn't pay for a full reactor build. Previously this only ran for testing pushes,
+  # since it originally existed purely to drive the image-build matrix; now that it also drives
+  # test scoping, every event needs it.
   changes:
     name: Detect changed services
-    # testing only — main never builds on a plain push, see the promote-to-production job.
-    if: |
-      (github.event_name == 'push' && github.ref == 'refs/heads/testing') ||
-      github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     outputs:
       services: ${{ steps.matrix.outputs.services }}
       frontend: ${{ steps.matrix.outputs.frontend }}
+      run-backend-tests: ${{ steps.matrix.outputs.run-backend-tests }}
+      run-frontend-tests: ${{ steps.matrix.outputs.run-frontend-tests }}
+      backend-test-modules: ${{ steps.matrix.outputs.backend-test-modules }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -92,7 +62,9 @@ jobs:
           # testing register as "everything changed," rebuilding all 17 services + frontend
           # regardless of what the commit actually touched. github.event.before is the SHA the
           # branch pointed at immediately before this push, so this now diffs against exactly that.
-          base: ${{ github.event.before }}
+          # pull_request has no "before" (it's a push-only field) — leave base empty there so the
+          # action falls back to its own default PR-base-branch diff, which is already correct.
+          base: ${{ github.event_name == 'push' && github.event.before || '' }}
           filters: |
             shared:
               - 'pom.xml'
@@ -127,17 +99,83 @@ jobs:
         # A shared module (or the root pom/Dockerfile) changing can affect every service, since
         # each image build runs `mvnw -pl <service> -am` — so it forces a full rebuild. Same result,
         # deliberately, for a manual workflow_dispatch run — every service is presumed changed.
+        #
+        # backend-test-modules drives how much of the reactor Backend (Maven reactor) actually
+        # builds: empty means "run the full `mvnw verify`" (shared code changed, or nothing to scope
+        # to yet — always true for workflow_dispatch), a comma list means `mvnw -pl <list> -am
+        # verify` — just the touched service(s) plus whatever they depend on. run-backend-tests is
+        # false only when the diff touched no backend module at all (frontend-only, or docs/infra
+        # paths like k8s/**, docker/**, *.md, .github/** that no filter above matches) — that's the
+        # actual "don't run tests when we're not changing code" case.
         run: |
           ALL_SERVICES='["eureka-server","config-server","gateway-service","inventory-service","audit-service","user-service","product-service","order-service","payment-service","shipping-service","delivery-service","notification-service","product-comment-service","product-media-service","product-review-service","chat-service","reporting-service"]'
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "${{ steps.filter.outputs.shared }}" = "true" ]; then
             SERVICES="$ALL_SERVICES"
             FRONTEND=true
+            RUN_BACKEND_TESTS=true
+            BACKEND_TEST_MODULES=""
           else
             SERVICES=$(echo '${{ steps.filter.outputs.changes }}' | jq -c '[.[] | select(. != "frontend")]')
             FRONTEND=${{ steps.filter.outputs.frontend }}
+            if [ "$SERVICES" = "[]" ]; then
+              RUN_BACKEND_TESTS=false
+              BACKEND_TEST_MODULES=""
+            else
+              RUN_BACKEND_TESTS=true
+              BACKEND_TEST_MODULES=$(echo "$SERVICES" | jq -r 'join(",")')
+            fi
           fi
           echo "services=$SERVICES" >> "$GITHUB_OUTPUT"
           echo "frontend=$FRONTEND" >> "$GITHUB_OUTPUT"
+          echo "run-backend-tests=$RUN_BACKEND_TESTS" >> "$GITHUB_OUTPUT"
+          echo "run-frontend-tests=$FRONTEND" >> "$GITHUB_OUTPUT"
+          echo "backend-test-modules=$BACKEND_TEST_MODULES" >> "$GITHUB_OUTPUT"
+
+  backend-test:
+    name: Backend (Maven reactor)
+    needs: [changes]
+    if: needs.changes.outputs.run-backend-tests == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '26'
+          cache: maven
+      # `verify` (not just `test`) so Checkstyle + SpotBugs run too — both are bound to the verify
+      # phase in the root pom, alongside the Testcontainers-backed integration tests (order-service,
+      # chat-service), which need real Docker; GitHub-hosted ubuntu-latest runners have it preinstalled.
+      # Scoped to just the changed service(s) (+ whatever they depend on, via -am) when
+      # backend-test-modules is set — shared-module changes and workflow_dispatch leave it empty,
+      # which runs the full reactor instead, since a shared change can affect every service.
+      - name: Run tests + static analysis
+        run: |
+          if [ -z "${{ needs.changes.outputs.backend-test-modules }}" ]; then
+            ./mvnw -B verify
+          else
+            ./mvnw -B -pl "${{ needs.changes.outputs.backend-test-modules }}" -am verify
+          fi
+
+  frontend-test:
+    name: Frontend (typecheck + build)
+    needs: [changes]
+    if: needs.changes.outputs.run-frontend-tests == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      # npm run build already chains `vue-tsc -b && vite build` — one command covers both gates.
+      - run: npm run build
 
   # Only testing pushes (or a manual workflow_dispatch) build images from source — see the
   # build-once-promote-many note at the top of this file.
@@ -149,7 +187,9 @@ jobs:
         github.event_name == 'workflow_dispatch'
       ) &&
       needs.changes.outputs.services != '[]'
-    needs: [backend-test, frontend-test, changes]
+    # Deliberately not frontend-test — a backend-only change leaves frontend-test skipped (see
+    # run-frontend-tests above), and this shouldn't wait on or be gated by an unrelated job.
+    needs: [backend-test, changes]
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -202,7 +242,9 @@ jobs:
         github.event_name == 'workflow_dispatch'
       ) &&
       needs.changes.outputs.frontend == 'true'
-    needs: [backend-test, frontend-test, changes]
+    # Deliberately not backend-test — a frontend-only change leaves backend-test skipped (see
+    # run-backend-tests above), and this shouldn't wait on or be gated by an unrelated job.
+    needs: [frontend-test, changes]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -293,10 +335,13 @@ jobs:
   # identical, already-validated-in-QA artifact rather than a fresh rebuild of the same source.
   # A genuine hotfix committed directly to main (with no corresponding tested build on testing)
   # has nothing to promote from — use workflow_dispatch against main for that case instead.
+  #
+  # No `needs:` on the test jobs — this job doesn't compile or run anything from source, it only
+  # copies image references that were already validated by testing's own CI run before they were
+  # ever pushed to GHCR, so re-running tests here again would just be redundant delay.
   promote-to-production:
     name: Promote testing's images to production
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [backend-test, frontend-test]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
