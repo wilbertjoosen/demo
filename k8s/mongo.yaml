@@ -26,14 +26,22 @@ spec:
           resources:
             requests: { cpu: "200m", memory: "384Mi" }
             limits: { cpu: "750m", memory: "768Mi" }
+          # timeoutSeconds explicit (not the 1s default): mongosh is a Node.js CLI with real
+          # process-startup overhead of its own, which regularly exceeds 1s under any scheduling
+          # jitter at all — the 1s default was causing genuine false-positive probe failures on
+          # main/testing (confirmed live: kubelet killing/restarting the pod on "command timed
+          # out" even though the node's actual CPU/memory usage was low single digits, not real
+          # contention).
           readinessProbe:
             exec: { command: ["mongosh", "--quiet", "--eval", "db.runCommand({ping:1})"] }
             initialDelaySeconds: 10
             periodSeconds: 10
+            timeoutSeconds: 5
           livenessProbe:
             exec: { command: ["mongosh", "--quiet", "--eval", "db.runCommand({ping:1})"] }
             initialDelaySeconds: 20
             periodSeconds: 20
+            timeoutSeconds: 5
       volumes:
         - name: data
           persistentVolumeClaim: { claimName: mongodb-data }
