@@ -177,6 +177,12 @@ Day-to-day cluster start/stop (the cluster plus the host infra it depends on) is
 `./k8s-local.sh {start|stop|restart|status}` — e.g. `./k8s-local.sh stop` runs `k3d cluster stop demo`
 then `docker compose stop`; `./k8s-local.sh start` runs `docker compose up -d` then
 `k3d cluster start demo` and tails `kubectl get pods -A -w` (pass `--no-watch` to skip the tail).
+`start`/`stop` only touch the infra pods actually need (MySQL/Mongo/Elasticsearch/Keycloak/Mailpit/
+Vault/Grafana-Loki-Tempo) — not docker-compose's own app containers (Option B, irrelevant when
+using k8s) and not the pieces that are dev-only now that Kafka/Redis run in-cluster (Kafka, Redis,
+Kafka UI, and docker-compose's own Prometheus — k8s has its own separate one, `k8s/prometheus.yaml`).
+Pass `--with-dev` to also start/stop those, e.g. if `start-local.sh`'s host-JVM services are running
+against the same docker-compose stack at the same time.
 
 ## Default credentials
 
