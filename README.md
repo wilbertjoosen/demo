@@ -168,7 +168,13 @@ right tool if you want to test a *local, unpushed* code change without going thr
 Docker Compose infra containers, `--services` builds and runs (or stops) the backend services and
 frontend dev server, and running either script with no flags does both. `k8s-local.sh start|stop|restart|status`
 manages the k3d cluster together with the host infra it depends on — `--no-watch` skips the
-post-start `kubectl get pods -A -w` and returns immediately.
+post-start `kubectl get pods -A -w` and returns immediately. `start`/`stop` only touch the infra
+pods actually need (MySQL/Mongo/Elasticsearch/Keycloak/Mailpit/Vault/Grafana-Loki-Tempo) — not
+docker-compose's own app containers (Option B, irrelevant when using k8s) and not the pieces that
+are dev-only now that Kafka/Redis run in-cluster (Kafka, Redis, Kafka UI, and docker-compose's own
+Prometheus — k8s has its own separate one, `k8s/prometheus.yaml`). Pass `--with-dev` to also
+start/stop those, e.g. if `start-local.sh`'s host-JVM services are running against the same
+docker-compose stack at the same time.
 
 ## Default credentials
 
