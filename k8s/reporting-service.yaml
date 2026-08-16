@@ -24,7 +24,7 @@ spec:
         - name: reporting-service
           image: ghcr.io/wilbertjoosen/demo-reporting-service:12d4474669dcfcfe91f819879bbf25fb7f8f9292
           imagePullPolicy: Always
-          ports: [{ containerPort: 8089 }]
+          ports: [{ containerPort: 8096 }]
           envFrom:
             - configMapRef: { name: demo-common-config }
           env:
@@ -40,11 +40,11 @@ spec:
             requests: { cpu: "200m", memory: "384Mi" }
             limits: { cpu: "750m", memory: "640Mi" }
           readinessProbe:
-            httpGet: { path: /actuator/health/readiness, port: 8089 }
+            httpGet: { path: /actuator/health/readiness, port: 8096 }
             initialDelaySeconds: 20
             periodSeconds: 10
           livenessProbe:
-            httpGet: { path: /actuator/health/liveness, port: 8089 }
+            httpGet: { path: /actuator/health/liveness, port: 8096 }
             initialDelaySeconds: 30
             periodSeconds: 15
   volumeClaimTemplates:
@@ -72,7 +72,7 @@ metadata:
 spec:
   clusterIP: None
   selector: { app: reporting-service }
-  ports: [{ name: http, port: 8089, targetPort: 8089 }]
+  ports: [{ name: http, port: 8096, targetPort: 8096 }]
 ---
 # Regular ClusterIP Service — this is what actually carries traffic today. Eureka registers each
 # instance under EUREKA_INSTANCE_HOSTNAME (fixed to "reporting-service" above), and other services'
@@ -85,4 +85,4 @@ metadata:
   labels: { monitored: "true" }
 spec:
   selector: { app: reporting-service }
-  ports: [{ name: http, port: 8089, targetPort: 8089 }]
+  ports: [{ name: http, port: 8096, targetPort: 8096 }]
