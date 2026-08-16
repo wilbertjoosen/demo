@@ -1,14 +1,15 @@
 # Shared by every app Deployment via envFrom.configMapRef.
 #
-# Kafka, Redis, MySQL, Keycloak, Mailpit, and Vault now all run IN this cluster (k8s/kafka.yaml,
-# k8s/redis.yaml, k8s/mysql.yaml, k8s/keycloak.yaml, k8s/mailpit.yaml, k8s/vault.yaml) instead of
-# on the host — the corresponding docker-compose.yml containers still exist for host-JVM debugging
-# (kcat, redis-cli, mysql client, a local IDE run) but the cluster itself no longer depends on any
-# of them. The demo-qa namespace (testing branch) reaches these same in-cluster instances
-# cross-namespace (e.g. mysql.demo.svc.cluster.local) rather than getting its own copies — MySQL,
-# Keycloak, and Vault were already shared between prod and QA on the host (same instance, separate
-# DB/realm names) specifically to avoid running two of everything on one machine; this preserves
-# that. Mailpit stays genuinely separate per namespace, also matching the host setup.
+# Kafka, Redis, MySQL, Keycloak, Mailpit, Vault, MongoDB, and Elasticsearch now all run IN this
+# cluster (k8s/kafka.yaml, k8s/redis.yaml, k8s/mysql.yaml, k8s/keycloak.yaml, k8s/mailpit.yaml,
+# k8s/vault.yaml, k8s/mongo.yaml, k8s/elasticsearch.yaml) instead of on the host — the
+# corresponding docker-compose.yml containers still exist for host-JVM debugging (kcat, redis-cli,
+# mysql client, a local IDE run) but the cluster itself no longer depends on any of them. The
+# demo-qa namespace (testing branch) reaches these same in-cluster instances cross-namespace (e.g.
+# mysql.demo.svc.cluster.local) rather than getting its own copies — all of these were already
+# shared between prod and QA on the host (same instance, separate DB/realm/index names)
+# specifically to avoid running two of everything on one machine; this preserves that. Mailpit
+# stays genuinely separate per namespace, also matching the host setup.
 #
 # KEYCLOAK_ISSUER_URI stays http://localhost:8081 deliberately — every service's `iss` claim
 # validation needs that exact string, browser or server-to-server alike (see k8s/keycloak.yaml's
@@ -17,8 +18,9 @@
 # go straight through the cluster (faster, and no host round-trip needed) — only the issuer itself
 # has to be the externally-reachable address.
 #
-# MongoDB and Elasticsearch are the remaining host-based pieces — host.k3d.internal is k3d's
-# built-in DNS name for the host machine, reaching whatever docker-compose still publishes there.
+# Loki (docker/grafana's own datasources) and Tempo's OTLP endpoint below stay host-based on
+# purpose — see k8s/loki.yaml's comment for why Loki specifically got a genuinely separate
+# in-cluster instance rather than being pointed here.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -32,16 +34,13 @@ data:
   KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/demo/protocol/openid-connect/certs
   KEYCLOAK_TOKEN_URI: http://keycloak:8080/realms/demo/protocol/openid-connect/token
   KEYCLOAK_ADMIN_URI: http://keycloak:8080/admin/realms/demo
-  # 3-node replica set (task #74) — host.docker.internal, not host.k3d.internal: the replica set's
-  # own config (see docker-compose.yml's mongo-rs-init) identifies its members by that address, so
-  # using it directly here avoids a seed-then-redirect hop. Verified reachable from k8s pods
-  # (k3d's own nodes are themselves Docker Desktop containers, so this resolves the same way
-  # host.k3d.internal does — proven via a live nslookup + nc from inside this cluster).
-  MONGO_HOST: host.docker.internal:27017,host.docker.internal:27018,host.docker.internal:27019
+  # 3-node replica set (task #74), now in-cluster (k8s/mongo.yaml) — each member's own stable
+  # per-pod DNS name via the headless Service, no host.docker.internal indirection needed anymore.
+  MONGO_HOST: mongo-0.mongo-headless.demo.svc.cluster.local:27017,mongo-1.mongo-headless.demo.svc.cluster.local:27017,mongo-2.mongo-headless.demo.svc.cluster.local:27017
   MONGO_REPLICA_SET_PARAM: "?replicaSet=rs0"
   REDIS_HOST: redis
   REDIS_PORT: "6379"
-  ELASTICSEARCH_URI: http://host.k3d.internal:9200
+  ELASTICSEARCH_URI: http://elasticsearch:9200
   DB_HOST: mysql
   DB_PORT: "3306"
   DB_NAME: demo

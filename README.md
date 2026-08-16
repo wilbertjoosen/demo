@@ -154,9 +154,10 @@ k3d cluster create demo --servers 1 --agents 2 -p "18090:80@loadbalancer" -p "18
 kubectl apply -f k8s/
 ```
 
-App: http://demo.localhost:18090 — Kafka, Redis, MySQL, Keycloak, Mailpit, and Vault all run
-in-cluster now (see [Kubernetes / GitOps](#kubernetes--gitops)); only MongoDB and Elasticsearch
-still run via Docker Compose on the host, reached through `host.k3d.internal`. The `-p
+App: http://demo.localhost:18090 — Kafka, Redis, MySQL, Keycloak, Mailpit, Vault, MongoDB, and
+Elasticsearch all run in-cluster now (see [Kubernetes / GitOps](#kubernetes--gitops)); only
+Grafana/Tempo/Kibana still run via Docker Compose on the host, reached through `host.k3d.internal`.
+The `-p
 "8081:8081@loadbalancer"` mapping is load-bearing, not optional: every service's
 `KEYCLOAK_ISSUER_URI` (and the frontend's) is hardcoded to `http://localhost:8081`, so in-cluster
 Keycloak has to keep answering there too — see `k8s/keycloak.yaml`'s comment for the full
@@ -173,10 +174,11 @@ Docker Compose infra containers, `--services` builds and runs (or stops) the bac
 frontend dev server, and running either script with no flags does both. `k8s-local.sh start|stop|restart|status`
 manages the k3d cluster together with the host infra it depends on — `--no-watch` skips the
 post-start `kubectl get pods -A -w` and returns immediately. `start`/`stop` only touch the infra
-pods actually need now (Mongo, Elasticsearch, Grafana/Loki/Tempo) — not docker-compose's own app
-containers (Option B, irrelevant when using k8s) and not the pieces that are dev-only now that
-Kafka, Redis, MySQL, Keycloak, Mailpit, and Vault all run in-cluster (docker-compose's own
-Prometheus is dev-only too — k8s has its own separate one, `k8s/prometheus.yaml`). Pass
+pods actually need now (just Grafana, Tempo, and Kibana) — not docker-compose's own app containers
+(Option B, irrelevant when using k8s) and not the pieces that are dev-only now that Kafka, Redis,
+MySQL, Keycloak, Mailpit, Vault, MongoDB, and Elasticsearch all run in-cluster (docker-compose's
+own Prometheus/Loki/Promtail are dev-only too — k8s has its own separate Prometheus and Loki,
+`k8s/prometheus.yaml`/`k8s/loki.yaml`, and its own Promtail, `k8s/promtail-daemonset.yaml`). Pass
 `--with-dev` to also start/stop those, e.g. if `start-local.sh`'s host-JVM services are running
 against the same docker-compose stack at the same time.
 
@@ -199,9 +201,10 @@ Realm: `demo` (prod) / `demo-qa` (QA) — same users/passwords in both. Client: 
 | Frontend (k8s, QA) | http://qa.demo.localhost:18090 | — (realm `demo-qa`, same users as above) |
 | Keycloak admin | http://localhost:8081 | `admin` / `admin` (realm: **`demo`** for prod, **`demo-qa`** for QA — not `master`, see note below) |
 | Swagger UI (aggregated) | http://localhost:8080/swagger-ui.html | — |
-| Grafana | http://localhost:3000 | `admin` / `admin` — datasources: **Prometheus** (host-JVM/compose flow), **Prometheus (k8s)** (both k8s namespaces), **Loki** |
+| Grafana | http://localhost:3000 | `admin` / `admin` — datasources: **Prometheus**/**Loki** (host-JVM/compose flow), **Prometheus (k8s)**/**Loki (k8s)** (both k8s namespaces), **Tempo** (traces from both flows — trace-to-logs jump only resolves for host-JVM/compose-originated traces, see `k8s/loki.yaml`'s comment) |
 | Prometheus (host-JVM/compose) | http://localhost:9090 | — |
 | Prometheus (k8s, prod + QA) | http://prometheus.demo.localhost:18090 | — |
+| Loki (k8s, prod + QA) | http://loki.demo.localhost:18090 | — |
 | Kibana | http://localhost:5601 | — |
 | Kafka UI | http://localhost:8095 | prod Kafka only — QA's Kafka has no UI wired up |
 | Mailpit (SMTP inbox, prod) | http://localhost:8025 | — |
@@ -216,26 +219,24 @@ Realm: `demo` (prod) / `demo-qa` (QA) — same users/passwords in both. Client: 
 
 ### Infrastructure connection ports
 
-For connecting a DB client, `redis-cli`, `kcat`, etc. directly rather than through a UI. MySQL,
-MongoDB, Elasticsearch, and Keycloak are **shared** between prod and QA (same server, QA uses its own
-database/index/realm names — see [QA / testing environment](#qa--testing-environment)); Kafka, Redis,
-and Mailpit are genuinely separate instances per environment.
+For connecting a DB client, `redis-cli`, `kcat`, etc. directly rather than through a UI. Rows below
+marked **dev-only** are host containers that k8s no longer depends on (its own in-cluster instances
+took over — see [Kubernetes / GitOps](#kubernetes--gitops)); the host containers still exist purely
+for host-JVM/`start-local.sh` debugging.
 
 | Service | Host:Port | Notes |
 |---|---|---|
-| MySQL | `localhost:3306` | `order-service`'s write model — db `demo` (prod) / `demo_qa` (QA), user/pass `demo`/`demo` |
-| MongoDB | `localhost:27017` | every other service's store, one logical DB per service, `_qa`-suffixed for QA |
-| Kafka (host clients, prod) | `localhost:9092` | `PLAINTEXT` listener for local JVM services / host tools |
-| Kafka (k8s pods, prod) | `kafka:9092` (in-cluster only) | in-cluster Deployment (`k8s/kafka.yaml`), not `demo-kafka` — see [Kubernetes / GitOps](#kubernetes--gitops) |
-| Kafka (host clients, QA) | `localhost:9192` | separate broker — shared topics would mean QA test traffic triggering prod's saga |
-| Kafka (k8s pods, QA) | `host.k3d.internal:9194` | QA's own `PLAINTEXT_K8S` listener |
-| Redis (prod, host clients) | `localhost:6379` | Resilience4j response caching |
-| Redis (prod, k8s pods) | `redis:6379` (in-cluster only) | in-cluster Deployment (`k8s/redis.yaml`), not `demo-redis` |
-| Redis (QA) | `localhost:6380` | separate instance (cheap either way, kept isolated for simplicity) |
-| Elasticsearch | `localhost:9200` | `audit-service`'s store — index `audit-log` (prod) / `audit-log-qa` (QA) |
-| Loki | `localhost:3100` | log storage; query via Grafana's Explore tab rather than the raw API — one shared instance, filter by the `namespace` label (`demo`/`demo-qa`) |
-| Mailpit SMTP (prod) | `localhost:1025` | what `notification-service` actually sends to; `:8025` above is its web inbox |
-| Mailpit SMTP (QA) | `localhost:1026` | QA's own instance; `:8026` above is its web inbox |
+| MySQL (host / dev) | `localhost:3306` | `demo-mysql` — `order-service`'s write model, db `demo` (prod) / `demo_qa` (QA), user/pass `demo`/`demo`; **dev-only**, in-cluster instance is shared cross-namespace from the `demo` namespace (`mysql.demo.svc.cluster.local`) |
+| MongoDB (host / dev) | `localhost:27017` | `demo-mongo1/2/3` — every other service's store, `_qa`-suffixed for QA; **dev-only**, in-cluster is a proper 3-node replica set (`k8s/mongo.yaml`) shared cross-namespace |
+| Kafka (host clients / dev, prod) | `localhost:9092` | **dev-only**; prod k8s pods use their own in-cluster Kafka (`kafka:9092` inside the `demo` namespace, `k8s/kafka.yaml`) |
+| Kafka (host clients / dev, QA) | `localhost:9192` | **dev-only**; QA k8s pods use their own separate in-cluster Kafka (`demo-qa` namespace) — shared topics would mean QA test traffic triggering prod's saga |
+| Redis (host / dev, prod) | `localhost:6379` | **dev-only**; prod k8s pods use their own in-cluster Redis (`k8s/redis.yaml`, `demo` namespace) |
+| Redis (host / dev, QA) | `localhost:6380` | **dev-only**; QA's own separate in-cluster Redis (`demo-qa` namespace) |
+| Elasticsearch (host / dev) | `localhost:9200` | `demo-elasticsearch` — `audit-service`'s store, index `audit-log` (prod) / `audit-log-qa` (QA); **dev-only**, in-cluster instance is shared cross-namespace |
+| Loki (host / dev) | `localhost:3100` | `demo-loki`; **dev-only** for k8s — query via Grafana's Explore tab; k8s pods' logs go to the separate in-cluster Loki instead (see the Loki (k8s) row in Useful URLs above) |
+| Mailpit SMTP (host / dev, prod) | `localhost:1025` | `demo-mailpit`; **dev-only**, prod's in-cluster Mailpit (`k8s/mailpit.yaml`, `demo` namespace) is what `notification-service` sends to in k8s |
+| Mailpit SMTP (host / dev, QA) | `localhost:1026` | **dev-only**; QA's own in-cluster Mailpit (`demo-qa` namespace) |
+| Vault (host / dev) | `localhost:8200` | `demo-vault`, fixed dev root token; **dev-only**, in-cluster instance is shared cross-namespace |
 | Rancher (HTTP) | `http://localhost:9080` | redirects to the HTTPS UI at `:9443` |
 
 k3d cluster ports (`k3d cluster create`, see [Kubernetes / GitOps](#kubernetes--gitops)): `18090` →
@@ -287,11 +288,14 @@ own. `k8s-argocd/` holds the manifests applied once by hand, not GitOps-managed 
 `Application` CRs themselves and the ArgoCD ingress (chicken-and-egg: nothing can sync them into
 existence before ArgoCD is watching anything).
 
-Kafka and Redis run **in-cluster** for the `demo` namespace (`k8s/kafka.yaml`, `k8s/redis.yaml`) —
-pods reach them as the in-cluster `kafka`/`redis` Services rather than via `host.k3d.internal`. The
-`demo-redis`/`demo-kafka` containers in `docker-compose.yml` are still used by the local mvnw/IDE dev
-flow and by docker-compose's own containerized app services, but the cluster itself no longer
-depends on them.
+Kafka, Redis, MySQL, Keycloak, Mailpit, Vault, MongoDB, and Elasticsearch all run **in-cluster** for
+the `demo` namespace (`k8s/kafka.yaml`, `k8s/redis.yaml`, `k8s/mysql.yaml`, `k8s/keycloak.yaml`,
+`k8s/mailpit.yaml`, `k8s/vault.yaml`, `k8s/mongo.yaml`, `k8s/elasticsearch.yaml`) — pods reach them
+as in-cluster Services rather than via `host.k3d.internal`. The corresponding `demo-*` containers in
+`docker-compose.yml` are still used by the local mvnw/IDE dev flow and by docker-compose's own
+containerized app services, but the cluster itself no longer depends on any of them. Prometheus and
+Loki similarly run in-cluster, but in their own shared `monitoring` namespace rather than `demo` —
+see [QA / testing environment](#qa--testing-environment) for why.
 
 `Dockerfile.service` (repo root) is a single parameterized Dockerfile (`--build-arg SERVICE=<module>`) shared
 by every backend service — build context is the repo root so the multi-module Maven build can see
@@ -315,19 +319,25 @@ flowchart LR
     subgraph K8S["k3d cluster"]
         subgraph DEMO["namespace: demo (prod)"]
             APPS_PROD["17 services\n+ frontend"]
+            MYSQL[("MySQL\ndb: demo / demo_qa")]
+            MONGO[("MongoDB (3-node rs)\ndb: <svc> / <svc>_qa")]
+            ES[("Elasticsearch\nindex: audit-log / audit-log-qa")]
+            KC["Keycloak\nrealm: demo / demo-qa"]
+            VAULT["Vault"]
+            MAILPIT_PROD["Mailpit"]
         end
         subgraph DEMOQA["namespace: demo-qa (QA)"]
             APPS_QA["17 services\n+ frontend"]
+            KAFKA_QA["Kafka"]
+            REDIS_QA["Redis"]
+            MAILPIT_QA["Mailpit"]
+        end
+        subgraph MON["namespace: monitoring — cluster-wide, shared by both"]
+            PROM_K8S["Prometheus (k8s)"]
+            LOKI_K8S["Loki (k8s)"]
         end
         ARGO_PROD["ArgoCD app: demo"]
         ARGO_QA["ArgoCD app: demo-qa"]
-    end
-
-    subgraph SHARED["Shared infra — one instance, environment-scoped by name"]
-        MYSQL[("MySQL\ndb: demo / demo_qa")]
-        MONGO[("MongoDB\ndb: <svc> / <svc>_qa")]
-        ES[("Elasticsearch\nindex: audit-log / audit-log-qa")]
-        KC["Keycloak\nrealm: demo / demo-qa"]
     end
 
     subgraph ISO_PROD["Prod-only infra"]
@@ -335,20 +345,15 @@ flowchart LR
         REDIS_PROD["Redis :6379"]
     end
 
-    subgraph ISO_QA["QA-only infra"]
-        KAFKA_QA["Kafka :9192/:9194"]
-        REDIS_QA["Redis :6380"]
-    end
-
     MAIN -- "CI/CD: build, push, bump k8s/" --> ARGO_PROD
     TEST -- "CI/CD: build, push, bump k8s/" --> ARGO_QA
     ARGO_PROD --> APPS_PROD
     ARGO_QA --> APPS_QA
 
-    APPS_PROD --> MYSQL & MONGO & ES & KC
-    APPS_QA --> MYSQL & MONGO & ES & KC
+    APPS_PROD --> MYSQL & MONGO & ES & KC & VAULT & MAILPIT_PROD
+    APPS_QA --> KAFKA_QA & REDIS_QA & MAILPIT_QA
+    APPS_QA -. "cross-namespace Service DNS" .-> MYSQL & MONGO & ES & KC & VAULT
     APPS_PROD --> KAFKA_PROD & REDIS_PROD
-    APPS_QA --> KAFKA_QA & REDIS_QA
 ```
 
 - **Branch model**: `main` is production (bugfixes branch from here); `develop` is where feature
@@ -356,24 +361,34 @@ flowchart LR
   deploys to QA the same way pushing to `main` deploys to prod.
 - **k8s**: namespace `demo-qa`, ArgoCD Application `demo-qa` (tracks the `testing` branch's own
   `k8s/` path), ingress at `qa.demo.localhost` — same port (`18090`) as prod, routed by hostname.
-- **Infra**: MySQL, MongoDB, and Elasticsearch are the **same instances** production uses — QA gets
-  its own database/index names (`demo_qa`, `<service>_qa`, `audit-log-qa`) instead of duplicate
-  containers. Keycloak is the same server too, with a separate realm (`demo-qa`,
-  `docker/keycloak/realm-demo-qa.json`). Kafka, Redis, and Mailpit are genuinely separate containers
-  (`docker-compose.qa.yml`) — Kafka specifically because shared topics would mean QA test traffic
-  triggering production's saga and vice versa.
+- **Infra**: MySQL, MongoDB, Elasticsearch, Keycloak, and Vault now run **in-cluster in the `demo`
+  namespace** (`k8s/mysql.yaml`, `k8s/mongo.yaml`, `k8s/elasticsearch.yaml`, `k8s/keycloak.yaml`,
+  `k8s/vault.yaml`) — QA reaches them **cross-namespace** (`mysql.demo.svc.cluster.local` etc. — k8s
+  Services are reachable across namespaces by default, no NetworkPolicy restricting it here) instead
+  of getting duplicate containers, same "one shared instance, environment-scoped by name" reasoning
+  as before (QA gets its own `demo_qa` database / `<service>_qa` Mongo databases / `audit-log-qa`
+  index / `demo-qa` Keycloak realm). Kafka, Redis, and Mailpit run **in-cluster and genuinely
+  separate per namespace** (`k8s/kafka.yaml`, `k8s/redis.yaml`, `k8s/mailpit.yaml`) — Kafka/Redis
+  because shared topics would mean QA test traffic triggering production's saga, Mailpit because it
+  was always a separate instance per environment even on the host. Prometheus and Loki run
+  **in-cluster in their own `monitoring` namespace**, shared by both `demo` and `demo-qa`
+  (`k8s/prometheus.yaml`, `k8s/loki.yaml`) — see [Observability](#observability). Every one of these
+  has a host-based equivalent in `docker-compose.yml`/`docker-compose.qa.yml` still, kept purely for
+  host-JVM debugging (`kcat`, `redis-cli`, a mysql client, a local IDE run) — the k8s namespaces
+  themselves don't depend on any of them anymore.
 - **One frontend image, two Keycloak realms**: Vite bakes `VITE_KEYCLOAK_REALM` in at build time, but
   the same built image is deployed to both `demo` and `demo-qa` — a build-time value can't vary per
   environment. `frontend/src/auth/keycloak.ts` instead resolves the realm at runtime from the
   hostname (`qa.` prefix → `demo-qa`, anything else → the build-time default), matching the
   `demo.localhost` / `qa.demo.localhost` ingress split above.
-- **One-time setup on the shared MySQL** (see `docker-compose.qa.yml`'s header comment for the exact
-  command): create the `demo_qa` database and grant the `demo` user access to it. MongoDB and
-  Elasticsearch need no equivalent step — both auto-create on first write.
-- **Excluded from QA on purpose**: `promtail-daemonset.yaml` and `prometheus.yaml` are cluster-wide,
-  single-shared-instance resources (see [Observability](#observability)) — duplicating them per
-  environment would just make the `demo` and `demo-qa` Applications fight over the same
-  ClusterRole/ClusterRoleBinding names.
+- **`demo_qa` database creation** on the shared in-cluster MySQL is handled automatically by a Job
+  (`mysql-create-qa-db` in `k8s/mysql.yaml`) rather than a manual step. MongoDB and Elasticsearch
+  need no equivalent step — both auto-create on first write.
+- **Excluded from QA on purpose**: `promtail-daemonset.yaml`, `prometheus.yaml`, and `loki.yaml` are
+  cluster-wide, single-shared-instance resources (see [Observability](#observability)) — duplicating
+  them per environment would just make the `demo` and `demo-qa` Applications fight over the same
+  ClusterRole/ClusterRoleBinding names (`promtail-daemonset.yaml`, `prometheus.yaml`) or the same
+  `monitoring` Namespace object (`prometheus.yaml`, `loki.yaml`).
 
 ## Observability
 
@@ -391,20 +406,27 @@ flowchart LR
   (Services Up/Down for each), so environment health is a single glance, not two separate dashboards.
 - **Logs**: services log to stdout; in Docker Compose that's `docker logs <container>`. In k8s,
   Promtail (`k8s/promtail-daemonset.yaml`, one shared instance, not per-environment) ships every pod's
-  logs — from both namespaces — to the same Loki instance, labeled by `namespace`. Query either
-  through Grafana's Explore tab, e.g. `{namespace="demo-qa"}` to see QA only.
+  logs — from both namespaces — to the separate in-cluster Loki (`k8s/loki.yaml`, namespace
+  `monitoring`, mirroring `k8s/prometheus.yaml`'s host/cluster split), labeled by `namespace`. Query
+  through Grafana's Explore tab against the **Loki (k8s)** datasource, e.g. `{namespace="demo-qa"}`
+  to see QA only; the plain **Loki** datasource is the host-JVM/docker-compose flow's own instance —
+  Tempo's trace-to-logs jump only resolves against that one, so it stops finding logs for
+  k8s-originated traces (accepted tradeoff — see `k8s/loki.yaml`'s comment).
 - **Audit trail**: every REST call across every service is captured (who, what, when, request/response
   bodies with secrets redacted) and shipped to Elasticsearch — index `audit-log` for prod, `audit-log-qa`
-  for QA (same shared ES instance, see [QA / testing environment](#qa--testing-environment)). The admin
-  UI's history icons (Users, Products, Media, Chat) show the full change timeline with before/after
-  diffs per field, powered by `audit-service`'s `RecordHistoryService`. Three Kibana dashboards cover
-  the same data for ad-hoc querying, all auto-imported on startup (`kibana-dashboard-init` in
-  `docker-compose.yml`): **"Audit Trail"** (`audit-trail-dashboard.ndjson`, the original — index
-  pattern `audit-log*`, both environments together, for cross-environment searching), and
-  **"Audit Trail — Production"** / **"Audit Trail — QA"** (`audit-trail-dashboard-{prod,qa}.ndjson`),
-  each pinned to its own exact index instead of relying on a filter — matches the Grafana dashboard's
-  approach of making the environment split a first-class view, not something the reader has to
-  remember to filter for.
+  for QA (same shared in-cluster ES instance, `k8s/elasticsearch.yaml`, see
+  [QA / testing environment](#qa--testing-environment)). The admin UI's history icons (Users,
+  Products, Media, Chat) show the full change timeline with before/after diffs per field, powered by
+  `audit-service`'s `RecordHistoryService`. Three Kibana dashboards cover the same data for ad-hoc
+  querying — **Kibana itself stays host-based** (`docker-compose.yml`), pointed at
+  `docker-compose.yml`'s own dev-only Elasticsearch, not the in-cluster one — same "host copy is its
+  own independent dev-flow instance" pattern as MySQL/Mongo/etc. now, not a live view into k8s
+  environment data. All auto-imported on startup (`kibana-dashboard-init` in `docker-compose.yml`):
+  **"Audit Trail"** (`audit-trail-dashboard.ndjson`, the original — index pattern `audit-log*`, both
+  environments together, for cross-environment searching), and **"Audit Trail — Production"** /
+  **"Audit Trail — QA"** (`audit-trail-dashboard-{prod,qa}.ndjson`), each pinned to its own exact
+  index instead of relying on a filter — matches the Grafana dashboard's approach of making the
+  environment split a first-class view, not something the reader has to remember to filter for.
 
 ## Repo layout
 

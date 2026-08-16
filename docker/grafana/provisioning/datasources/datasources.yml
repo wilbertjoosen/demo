@@ -16,11 +16,23 @@ datasources:
     access: proxy
     url: http://prometheus.demo.localhost:18090
 
+  # Host-JVM/docker-compose dev flow only — same split as Prometheus above, see the Loki (k8s)
+  # datasource below. k8s/promtail-daemonset.yaml used to push here too before it moved to its own
+  # in-cluster Loki (k8s/loki.yaml).
   - name: Loki
     uid: loki
     type: loki
     access: proxy
     url: http://loki:3100
+
+  # The in-cluster Loki (k8s/loki.yaml) — covers both the demo and demo-qa namespaces (labeled by
+  # "namespace"/"pod"/"container", see k8s/promtail-daemonset.yaml's relabel_configs), reached
+  # through the k3d ingress by hostname, same pattern as Prometheus (k8s) above.
+  - name: Loki (k8s)
+    uid: loki-k8s
+    type: loki
+    access: proxy
+    url: http://loki.demo.localhost:18090
 
   - name: Tempo
     type: tempo
@@ -31,7 +43,10 @@ datasources:
       # classpath (see common-security/gateway-service poms), and promtail already ships container
       # stdout to Loki — so a trace can jump straight to its own log lines with no extra wiring.
       # Explicit uid above so this reference is stable rather than relying on Grafana's
-      # auto-generated default.
+      # auto-generated default. Only resolves for host-JVM/docker-compose-originated traces now —
+      # k8s-originated traces' logs live in the separate Loki (k8s) datasource instead, and
+      # tracesToLogsV2 can only target one fixed datasource (accepted tradeoff, see
+      # k8s/loki.yaml's comment).
       tracesToLogsV2:
         datasourceUid: loki
         filterByTraceID: true
