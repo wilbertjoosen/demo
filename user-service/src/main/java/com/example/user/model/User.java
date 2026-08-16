@@ -1,6 +1,5 @@
 package com.example.user.model;
 
-import com.example.user.service.KeycloakAdminClient;
 
 import com.example.common.model.Address;
 import lombok.Getter;

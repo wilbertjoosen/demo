@@ -1,6 +1,5 @@
 package com.example.payment.config;
 
-import com.example.payment.service.PaymentGatewayClient;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

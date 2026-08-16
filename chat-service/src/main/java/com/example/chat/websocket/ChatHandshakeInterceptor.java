@@ -1,6 +1,5 @@
 package com.example.chat.websocket;
 
-import com.example.chat.config.WebSocketSecurityConfig;
 
 import org.springframework.http.server.ServerHttpRequest;
 import org.springframework.http.server.ServerHttpResponse;

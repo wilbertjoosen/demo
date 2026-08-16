@@ -5,6 +5,9 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PID_DIR="$ROOT_DIR/.local-pids"
 
+# shellcheck source=local-infra.sh
+source "$ROOT_DIR/local-infra.sh"
+
 # ================================================================
 # Argument parsing
 # ================================================================
@@ -144,27 +147,7 @@ if $DO_INFRA; then
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         echo
 
-        docker compose stop \
-            mysql \
-            mongo1 \
-            mongo2 \
-            mongo3 \
-            mongo-rs-init \
-            kafka \
-            keycloak \
-            mailpit \
-            elasticsearch \
-            redis \
-            vault \
-            grafana \
-            kafka-ui \
-            kafka-ui \
-            kibana \
-            loki \
-            prometheus \
-            tempo \
-            promtail \
-            vault-init
+        docker compose stop "${INFRASTRUCTURE[@]}"
 
         echo
         echo "✓ Infrastructure stopped."

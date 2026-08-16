@@ -18,7 +18,7 @@
       passing null here is intentional, not a real null-deref risk.
     -->
     <Match>
-        <Class name="com.example.order.OrderViewModelAssembler"/>
+        <Class name="com.example.order.model.OrderViewModelAssembler"/>
         <Bug pattern="NP_NULL_PARAM_DEREF_ALL_TARGETS_DANGEROUS"/>
     </Match>
 </FindBugsFilter>
