@@ -150,17 +150,21 @@ Everything (infra + all 19 backend services + frontend) runs in containers on on
 ### Option C — Kubernetes (k3d) + GitOps
 
 ```bash
-k3d cluster create demo --servers 1 --agents 2 -p "18090:80@loadbalancer" -p "18453:443@loadbalancer" --api-port 6550
+k3d cluster create demo --servers 1 --agents 2 -p "18090:80@loadbalancer" -p "18453:443@loadbalancer" -p "8081:8081@loadbalancer" --api-port 6550
 kubectl apply -f k8s/
 ```
 
-App: http://demo.localhost:18090 — most infra (MySQL/Mongo/Elasticsearch/Keycloak/Mailpit/Vault)
-still runs via Docker Compose on the host, reached through `host.k3d.internal`; Kafka and Redis run
-in-cluster instead (see [Kubernetes / GitOps](#kubernetes--gitops)). `kubectl apply -f k8s/` here is
-a one-time bootstrap — from then on, ArgoCD watches the repo and CI/CD (see [CI/CD & versioning](#cicd--versioning))
-handles building, pushing to GHCR, and bumping the manifests ArgoCD syncs; there's no `k3d image import`
-step in the normal flow, since images live in a real registry now. (`k3d image import` is still the
-right tool if you want to test a *local, unpushed* code change without going through CI.)
+App: http://demo.localhost:18090 — Kafka, Redis, MySQL, Keycloak, Mailpit, and Vault all run
+in-cluster now (see [Kubernetes / GitOps](#kubernetes--gitops)); only MongoDB and Elasticsearch
+still run via Docker Compose on the host, reached through `host.k3d.internal`. The `-p
+"8081:8081@loadbalancer"` mapping is load-bearing, not optional: every service's
+`KEYCLOAK_ISSUER_URI` (and the frontend's) is hardcoded to `http://localhost:8081`, so in-cluster
+Keycloak has to keep answering there too — see `k8s/keycloak.yaml`'s comment for the full
+reasoning. `kubectl apply -f k8s/` here is a one-time bootstrap — from then on, ArgoCD watches the
+repo and CI/CD (see [CI/CD & versioning](#cicd--versioning)) handles building, pushing to GHCR, and
+bumping the manifests ArgoCD syncs; there's no `k3d image import` step in the normal flow, since
+images live in a real registry now. (`k3d image import` is still the right tool if you want to
+test a *local, unpushed* code change without going through CI.)
 
 ### Local dev scripts
 
@@ -169,12 +173,12 @@ Docker Compose infra containers, `--services` builds and runs (or stops) the bac
 frontend dev server, and running either script with no flags does both. `k8s-local.sh start|stop|restart|status`
 manages the k3d cluster together with the host infra it depends on — `--no-watch` skips the
 post-start `kubectl get pods -A -w` and returns immediately. `start`/`stop` only touch the infra
-pods actually need (MySQL/Mongo/Elasticsearch/Keycloak/Mailpit/Vault/Grafana-Loki-Tempo) — not
-docker-compose's own app containers (Option B, irrelevant when using k8s) and not the pieces that
-are dev-only now that Kafka/Redis run in-cluster (Kafka, Redis, Kafka UI, and docker-compose's own
-Prometheus — k8s has its own separate one, `k8s/prometheus.yaml`). Pass `--with-dev` to also
-start/stop those, e.g. if `start-local.sh`'s host-JVM services are running against the same
-docker-compose stack at the same time.
+pods actually need now (Mongo, Elasticsearch, Grafana/Loki/Tempo) — not docker-compose's own app
+containers (Option B, irrelevant when using k8s) and not the pieces that are dev-only now that
+Kafka, Redis, MySQL, Keycloak, Mailpit, and Vault all run in-cluster (docker-compose's own
+Prometheus is dev-only too — k8s has its own separate one, `k8s/prometheus.yaml`). Pass
+`--with-dev` to also start/stop those, e.g. if `start-local.sh`'s host-JVM services are running
+against the same docker-compose stack at the same time.
 
 ## Default credentials
 

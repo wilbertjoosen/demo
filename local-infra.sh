@@ -25,17 +25,23 @@ INFRASTRUCTURE=(
     "kibana"
 )
 
-# Of the above, the ones k8s pods no longer depend on — everything else (MySQL, Mongo,
-# Elasticsearch, Keycloak, Mailpit, Vault, Grafana/Loki/Tempo/Kibana) is still reached by pods via
-# host.k3d.internal (see k8s/configmap-common.yaml). Kafka and Redis moved in-cluster
-# (k8s/kafka.yaml, k8s/redis.yaml); kafka-ui only makes sense once kafka itself is reachable from
-# the host; this compose file's own "prometheus" is the host-JVM/compose-flow instance
-# specifically — k8s has its own separate in-cluster one (k8s/prometheus.yaml).
+# Of the above, the ones k8s pods no longer depend on — Mongo/Elasticsearch/Grafana/Loki/Tempo/
+# Kibana are still reached by pods via host.k3d.internal (see k8s/configmap-common.yaml), but
+# Kafka, Redis, MySQL, Keycloak, Mailpit, and Vault all moved in-cluster (k8s/kafka.yaml,
+# k8s/redis.yaml, k8s/mysql.yaml, k8s/keycloak.yaml, k8s/mailpit.yaml, k8s/vault.yaml); kafka-ui
+# only makes sense once kafka itself is reachable from the host; this compose file's own
+# "prometheus" is the host-JVM/compose-flow instance specifically — k8s has its own separate
+# in-cluster one (k8s/prometheus.yaml).
 DEV_ONLY_INFRASTRUCTURE=(
     "kafka"
     "kafka-ui"
     "redis"
     "prometheus"
+    "mysql"
+    "keycloak"
+    "mailpit"
+    "vault"
+    "vault-init"
 )
 
 # What a k8s-only workflow (k8s-local.sh's default) actually needs: INFRASTRUCTURE minus

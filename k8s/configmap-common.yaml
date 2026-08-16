@@ -1,16 +1,24 @@
-# Shared by every app Deployment via envFrom.configMapRef. Most infra deliberately stays in
-# docker-compose on the host, not in this cluster (matches the project's existing "infra on host,
-# app services containerized" split). host.k3d.internal is k3d's built-in DNS name for the host
-# machine, reaching whatever docker-compose already publishes there.
+# Shared by every app Deployment via envFrom.configMapRef.
 #
-# Kafka and Redis are the exception: they now run IN this cluster (k8s/kafka.yaml, k8s/redis.yaml)
-# instead of on the host, so KAFKA_BOOTSTRAP_SERVERS/REDIS_HOST below point at their in-cluster
-# Service names, not host.k3d.internal. docker-compose.yml's kafka/redis containers still exist for
-# host-JVM debugging (kcat, redis-cli, a local IDE run) but the cluster itself no longer depends on
-# them. The demo-qa namespace (testing branch) already made the same switch.
+# Kafka, Redis, MySQL, Keycloak, Mailpit, and Vault now all run IN this cluster (k8s/kafka.yaml,
+# k8s/redis.yaml, k8s/mysql.yaml, k8s/keycloak.yaml, k8s/mailpit.yaml, k8s/vault.yaml) instead of
+# on the host — the corresponding docker-compose.yml containers still exist for host-JVM debugging
+# (kcat, redis-cli, mysql client, a local IDE run) but the cluster itself no longer depends on any
+# of them. The demo-qa namespace (testing branch) reaches these same in-cluster instances
+# cross-namespace (e.g. mysql.demo.svc.cluster.local) rather than getting its own copies — MySQL,
+# Keycloak, and Vault were already shared between prod and QA on the host (same instance, separate
+# DB/realm names) specifically to avoid running two of everything on one machine; this preserves
+# that. Mailpit stays genuinely separate per namespace, also matching the host setup.
 #
-# MySQL/MongoDB/Elasticsearch/Keycloak/Mailpit/Vault stay host-based via host.k3d.internal, same as
-# before.
+# KEYCLOAK_ISSUER_URI stays http://localhost:8081 deliberately — every service's `iss` claim
+# validation needs that exact string, browser or server-to-server alike (see k8s/keycloak.yaml's
+# comment for the full reasoning, including why the k3d cluster now needs
+# `-p "8081:8081@loadbalancer"` at creation time). KEYCLOAK_JWK_SET_URI/TOKEN_URI/ADMIN_URI instead
+# go straight through the cluster (faster, and no host round-trip needed) — only the issuer itself
+# has to be the externally-reachable address.
+#
+# MongoDB and Elasticsearch are the remaining host-based pieces — host.k3d.internal is k3d's
+# built-in DNS name for the host machine, reaching whatever docker-compose still publishes there.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -21,9 +29,9 @@ data:
   EUREKA_URI: http://eureka-server:8761/eureka
   KAFKA_BOOTSTRAP_SERVERS: kafka:9092
   KEYCLOAK_ISSUER_URI: http://localhost:8081/realms/demo
-  KEYCLOAK_JWK_SET_URI: http://host.k3d.internal:8081/realms/demo/protocol/openid-connect/certs
-  KEYCLOAK_TOKEN_URI: http://host.k3d.internal:8081/realms/demo/protocol/openid-connect/token
-  KEYCLOAK_ADMIN_URI: http://host.k3d.internal:8081/admin/realms/demo
+  KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/demo/protocol/openid-connect/certs
+  KEYCLOAK_TOKEN_URI: http://keycloak:8080/realms/demo/protocol/openid-connect/token
+  KEYCLOAK_ADMIN_URI: http://keycloak:8080/admin/realms/demo
   # 3-node replica set (task #74) — host.docker.internal, not host.k3d.internal: the replica set's
   # own config (see docker-compose.yml's mongo-rs-init) identifies its members by that address, so
   # using it directly here avoids a seed-then-redirect hop. Verified reachable from k8s pods
@@ -34,10 +42,10 @@ data:
   REDIS_HOST: redis
   REDIS_PORT: "6379"
   ELASTICSEARCH_URI: http://host.k3d.internal:9200
-  DB_HOST: host.k3d.internal
+  DB_HOST: mysql
   DB_PORT: "3306"
   DB_NAME: demo
-  MAIL_HOST: host.k3d.internal
+  MAIL_HOST: mailpit
   MAIL_PORT: "1025"
   INVENTORY_SERVICE_URI: http://inventory-service:8089
   CORS_ALLOWED_ORIGINS: http://localhost:5173,http://demo.localhost:18090
@@ -45,8 +53,9 @@ data:
   # see config-server's config-repo/application.yml for how every service picks this up.
   OTLP_ENDPOINT: http://host.k3d.internal:4318/v1/traces
   # Task #75, real secrets management — Vault dev-mode instance, single node (no topology
-  # discovery needed, unlike Mongo's replica set), reached the same way as every other host-side
-  # infra process in this file. The token itself is sensitive and lives in the vault-token k8s
-  # Secret (created imperatively per-namespace, not committed — same pattern as ghcr-pull-secret).
-  VAULT_HOST: host.k3d.internal
+  # discovery needed, unlike Mongo's replica set), now in-cluster (k8s/vault.yaml). The token
+  # itself is sensitive and lives in the vault-token k8s Secret (created imperatively per-namespace,
+  # not committed — same pattern as ghcr-pull-secret) — it must match k8s/vault.yaml's fixed dev
+  # root token.
+  VAULT_HOST: vault
   VAULT_PORT: "8200"
