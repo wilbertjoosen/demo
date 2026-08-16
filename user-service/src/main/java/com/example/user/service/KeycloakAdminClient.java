@@ -1,5 +1,4 @@
 package com.example.user.service;
-import com.example.user.config.KeycloakAdminClientConfig;
 import com.example.user.model.KeycloakUserSummary;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;

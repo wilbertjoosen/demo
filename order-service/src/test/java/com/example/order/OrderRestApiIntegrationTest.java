@@ -1,5 +1,4 @@
 package com.example.order;
-import com.example.order.config.Resilience4jConfig;
 
 import com.example.order.support.AbstractIntegrationTest;
 import com.example.order.support.TestOAuth2ClientConfig;

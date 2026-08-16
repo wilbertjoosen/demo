@@ -1,5 +1,4 @@
 package com.example.order.service;
-import com.example.order.config.InventoryClientConfig;
 import com.example.order.config.Resilience4jConfig;
 
 import io.github.resilience4j.bulkhead.annotation.Bulkhead;
