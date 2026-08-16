@@ -39,12 +39,22 @@ spec:
           resources:
             requests: { cpu: "200m", memory: "384Mi" }
             limits: { cpu: "750m", memory: "640Mi" }
+          # Kafka Streams restores its RocksDB state stores by replaying 6 source topics
+          # (user/product/order/payment/shipping/delivery-events) from scratch on a cold start,
+          # which genuinely takes longer than a normal Spring Boot app's startup — without a
+          # startupProbe, livenessProbe's fixed 30s initialDelaySeconds was firing (and failing,
+          # nothing listening yet) before the app ever got a chance to finish, killing the
+          # container in an endless restart loop that never actually completed the restore.
+          startupProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8095 }
+            failureThreshold: 30
+            periodSeconds: 10
           readinessProbe:
-            httpGet: { path: /actuator/health/readiness, port: 8089 }
+            httpGet: { path: /actuator/health/readiness, port: 8095 }
             initialDelaySeconds: 20
             periodSeconds: 10
           livenessProbe:
-            httpGet: { path: /actuator/health/liveness, port: 8089 }
+            httpGet: { path: /actuator/health/liveness, port: 8095 }
             initialDelaySeconds: 30
             periodSeconds: 15
   volumeClaimTemplates:
@@ -72,7 +82,7 @@ metadata:
 spec:
   clusterIP: None
   selector: { app: reporting-service }
-  ports: [{ name: http, port: 8089, targetPort: 8089 }]
+  ports: [{ name: http, port: 8095, targetPort: 8095 }]
 ---
 # Regular ClusterIP Service — this is what actually carries traffic today. Eureka registers each
 # instance under EUREKA_INSTANCE_HOSTNAME (fixed to "reporting-service" above), and other services'
@@ -85,4 +95,4 @@ metadata:
   labels: { monitored: "true" }
 spec:
   selector: { app: reporting-service }
-  ports: [{ name: http, port: 8089, targetPort: 8089 }]
+  ports: [{ name: http, port: 8095, targetPort: 8095 }]
