@@ -43,6 +43,9 @@ services:
     volumes:
       - mongo_data:/data/db
 
+  # Dev/host-debug only: k8s pods no longer depend on this container — they have their own
+  # in-cluster Kafka now (see k8s/kafka.yaml). This one remains for the local mvnw/IDE dev flow
+  # and host-tool debugging (kcat) against localhost:9092.
   kafka:
     image: apache/kafka:3.8.0
     container_name: demo-kafka
@@ -166,6 +169,9 @@ services:
       - ./docker/kibana:/kibana:ro
     entrypoint: ["sh", "-c", "curl -s -X POST http://kibana:5601/api/saved_objects/_import?overwrite=true -H 'kbn-xsrf: true' --form file=@/kibana/audit-trail-dashboard.ndjson"]
 
+  # Dev/host-debug only: k8s pods no longer depend on this container — they have their own
+  # in-cluster Redis now (see k8s/redis.yaml). This one remains for the local mvnw/IDE dev flow
+  # and host-tool debugging (redis-cli) against localhost:6379.
   redis:
     image: redis:7-alpine
     container_name: demo-redis
