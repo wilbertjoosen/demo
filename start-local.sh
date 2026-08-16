@@ -32,27 +32,18 @@ SERVICES=(
     "reporting-service"
 )
 
-INFRASTRUCTURE=(
-    "mysql"
-    "mongo1"
-    "mongo2"
-    "mongo3"
-    "mongo-rs-init"
-    "kafka"
-    "kafka-ui"
-    "loki"
-    "prometheus"
-    "keycloak"
-    "mailpit"
-    "promtail"
-    "elasticsearch"
-    "redis"
-    "vault"
-    "vault-init"
-    "grafana"
-    "tempo"
-    "kibana"
-)
+# shellcheck source=local-infra.sh
+source "$ROOT_DIR/local-infra.sh"
+
+# Every mongoN port is published to the host (see docker-compose.yml), so the host-JVM flow can be
+# just as replica-set-aware as the containerized one (docker-compose.yml's own MONGO_HOST/
+# MONGO_REPLICA_SET_PARAM, used by app containers). Without this, every service falls back to
+# application.yaml's bare `localhost:27017` default — fine as long as mongo1 happens to be
+# primary, but a real replica-set election (a restart, a failover) can make it a secondary at any
+# time, and a non-replica-set-aware client has no way to find the actual primary: every write then
+# fails with "NotWritablePrimary" until mongo1 is primary again.
+export MONGO_HOST="localhost:27017,localhost:27018,localhost:27019"
+export MONGO_REPLICA_SET_PARAM="?replicaSet=rs0"
 
 # ================================================================
 # Argument parsing

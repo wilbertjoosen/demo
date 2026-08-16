@@ -1,5 +1,4 @@
 package com.example.gateway.filter;
-import com.example.gateway.config.CorsConfig;
 
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;

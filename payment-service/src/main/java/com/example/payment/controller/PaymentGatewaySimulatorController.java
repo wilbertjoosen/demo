@@ -1,5 +1,4 @@
 package com.example.payment.controller;
-import com.example.payment.service.PaymentGatewayClient;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;

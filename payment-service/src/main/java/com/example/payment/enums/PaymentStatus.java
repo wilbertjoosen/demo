@@ -1,6 +1,5 @@
 package com.example.payment.enums;
 
-import com.example.payment.service.PaymentServiceImpl;
 
 public enum PaymentStatus {
     /** BANK_TRANSFER/CASH only — awaiting the mock processing delay (see PaymentServiceImpl). */

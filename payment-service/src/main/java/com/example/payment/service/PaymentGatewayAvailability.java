@@ -1,5 +1,4 @@
 package com.example.payment.service;
-import com.example.payment.model.Payment;
 
 import com.example.common.model.PaymentMethod;
 import lombok.extern.slf4j.Slf4j;

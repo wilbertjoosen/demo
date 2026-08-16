@@ -1,5 +1,4 @@
 package com.example.order.config;
-import com.example.order.service.InventoryServiceClient;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;

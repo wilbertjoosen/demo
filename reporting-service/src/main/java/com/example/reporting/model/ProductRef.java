@@ -1,5 +1,4 @@
 package com.example.reporting.model;
-import com.example.reporting.config.ReportingTopology;
 
 import com.example.common.events.DomainEvent;
 import com.example.common.events.EventTypes;
