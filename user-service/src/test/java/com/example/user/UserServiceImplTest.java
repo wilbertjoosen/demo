@@ -1,4 +1,9 @@
 package com.example.user;
+import com.example.user.model.User;
+import com.example.user.model.UserProfileView;
+import com.example.user.repository.UserRepository;
+import com.example.user.service.KeycloakAdminClient;
+import com.example.user.service.UserServiceImpl;
 
 import com.example.common.events.DomainEvent;
 import com.example.common.events.EventContracts;

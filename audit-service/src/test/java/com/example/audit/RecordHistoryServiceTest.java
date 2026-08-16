@@ -1,4 +1,9 @@
 package com.example.audit;
+import com.example.audit.model.AuditLogDocument;
+import com.example.audit.model.FieldChange;
+import com.example.audit.model.RecordHistoryEntry;
+import com.example.audit.repository.AuditLogRepository;
+import com.example.audit.service.RecordHistoryService;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

@@ -1,4 +1,10 @@
 package com.example.shipping;
+import com.example.shipping.enums.ShipmentStatus;
+import com.example.shipping.enums.TrackingStatus;
+import com.example.shipping.model.Shipment;
+import com.example.shipping.repository.ShipmentRepository;
+import com.example.shipping.service.ShippingRateCalculator;
+import com.example.shipping.service.ShippingServiceImpl;
 
 import com.example.common.events.DomainEvent;
 import com.example.common.events.EventContracts;

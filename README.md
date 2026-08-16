@@ -154,12 +154,21 @@ k3d cluster create demo --servers 1 --agents 2 -p "18090:80@loadbalancer" -p "18
 kubectl apply -f k8s/
 ```
 
-App: http://demo.localhost:18090 — infra (MySQL/Mongo/Kafka/Keycloak/etc.) still runs via Docker
-Compose on the host; pods reach it through `host.k3d.internal`. `kubectl apply -f k8s/` here is a
-one-time bootstrap — from then on, ArgoCD watches the repo and CI/CD (see [CI/CD & versioning](#cicd--versioning))
+App: http://demo.localhost:18090 — most infra (MySQL/Mongo/Elasticsearch/Keycloak/Mailpit/Vault)
+still runs via Docker Compose on the host, reached through `host.k3d.internal`; Kafka and Redis run
+in-cluster instead (see [Kubernetes / GitOps](#kubernetes--gitops)). `kubectl apply -f k8s/` here is
+a one-time bootstrap — from then on, ArgoCD watches the repo and CI/CD (see [CI/CD & versioning](#cicd--versioning))
 handles building, pushing to GHCR, and bumping the manifests ArgoCD syncs; there's no `k3d image import`
 step in the normal flow, since images live in a real registry now. (`k3d image import` is still the
 right tool if you want to test a *local, unpushed* code change without going through CI.)
+
+### Local dev scripts
+
+`start-local.sh` / `stop-local.sh` wrap Option A above: `--infra` brings up (or tears down) just the
+Docker Compose infra containers, `--services` builds and runs (or stops) the backend services and
+frontend dev server, and running either script with no flags does both. `k8s-local.sh start|stop|restart|status`
+manages the k3d cluster together with the host infra it depends on — `--no-watch` skips the
+post-start `kubectl get pods -A -w` and returns immediately.
 
 ## Default credentials
 
@@ -207,10 +216,11 @@ and Mailpit are genuinely separate instances per environment.
 | MySQL | `localhost:3306` | `order-service`'s write model — db `demo` (prod) / `demo_qa` (QA), user/pass `demo`/`demo` |
 | MongoDB | `localhost:27017` | every other service's store, one logical DB per service, `_qa`-suffixed for QA |
 | Kafka (host clients, prod) | `localhost:9092` | `PLAINTEXT` listener for local JVM services / host tools |
-| Kafka (k8s pods, prod) | `host.k3d.internal:9094` | dedicated `PLAINTEXT_K8S` listener, only reachable from inside the k3d cluster |
+| Kafka (k8s pods, prod) | `kafka:9092` (in-cluster only) | in-cluster Deployment (`k8s/kafka.yaml`), not `demo-kafka` — see [Kubernetes / GitOps](#kubernetes--gitops) |
 | Kafka (host clients, QA) | `localhost:9192` | separate broker — shared topics would mean QA test traffic triggering prod's saga |
 | Kafka (k8s pods, QA) | `host.k3d.internal:9194` | QA's own `PLAINTEXT_K8S` listener |
-| Redis (prod) | `localhost:6379` | Resilience4j response caching |
+| Redis (prod, host clients) | `localhost:6379` | Resilience4j response caching |
+| Redis (prod, k8s pods) | `redis:6379` (in-cluster only) | in-cluster Deployment (`k8s/redis.yaml`), not `demo-redis` |
 | Redis (QA) | `localhost:6380` | separate instance (cheap either way, kept isolated for simplicity) |
 | Elasticsearch | `localhost:9200` | `audit-service`'s store — index `audit-log` (prod) / `audit-log-qa` (QA) |
 | Loki | `localhost:3100` | log storage; query via Grafana's Explore tab rather than the raw API — one shared instance, filter by the `namespace` label (`demo`/`demo-qa`) |
@@ -266,6 +276,12 @@ push-to-deploy — CI/CD above handles the build/push/manifest-bump, ArgoCD pick
 own. `k8s-argocd/` holds the manifests applied once by hand, not GitOps-managed — the ArgoCD
 `Application` CRs themselves and the ArgoCD ingress (chicken-and-egg: nothing can sync them into
 existence before ArgoCD is watching anything).
+
+Kafka and Redis run **in-cluster** for the `demo` namespace (`k8s/kafka.yaml`, `k8s/redis.yaml`) —
+pods reach them as the in-cluster `kafka`/`redis` Services rather than via `host.k3d.internal`. The
+`demo-redis`/`demo-kafka` containers in `docker-compose.yml` are still used by the local mvnw/IDE dev
+flow and by docker-compose's own containerized app services, but the cluster itself no longer
+depends on them.
 
 `Dockerfile.service` (repo root) is a single parameterized Dockerfile (`--build-arg SERVICE=<module>`) shared
 by every backend service — build context is the repo root so the multi-module Maven build can see
@@ -399,3 +415,13 @@ demo/
 ├── .github/workflows/       # CI/CD: test -> build & push to GHCR -> bump k8s manifests
 └── pom.xml                  # Maven reactor parent
 ```
+
+Each backend service module follows the same internal package layout under its base package
+(`com.example.<service>`): `config/` (Spring `@Configuration`/security config), `controller/`
+(REST endpoints), `enums/` (status/type enums), `model/` (entities, DTOs, `*ModelAssembler`s),
+`repository/` (Spring Data repositories), `saga/` (`@KafkaListener` domain-event consumers,
+including the choreographed-saga participants), `service/` (business logic, external clients).
+Modules with a WebSocket surface (`chat-service`, `notification-service`) add a `websocket/`
+package for handlers/interceptors; `gateway-service` adds a `filter/` package for its servlet
+filter. The `*ServiceApplication` bootstrap class stays directly in the base package, not in any
+sub-package.

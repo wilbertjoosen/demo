@@ -9,7 +9,7 @@
         <relativePath>../pom.xml</relativePath>
     </parent>
     <artifactId>reporting-service</artifactId>
-    <version>1.0.1</version>
+    <version>1.0.2</version>
     <name>reporting-service</name>
     <description>Consumes order/product/user/payment/shipping/delivery events into a denormalized read model and exposes admin-only analytics reports (CQRS, event-sourced)</description>
 
@@ -79,6 +79,11 @@
             <groupId>org.apache.kafka</groupId>
             <artifactId>kafka-streams-test-utils</artifactId>
             <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-devtools</artifactId>
+            <optional>true</optional>
         </dependency>
     </dependencies>
 

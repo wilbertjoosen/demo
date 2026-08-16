@@ -1,4 +1,5 @@
 package com.example.chat;
+import com.example.chat.controller.ConversationController;
 
 import com.example.chat.support.AbstractRestIntegrationTest;
 import com.fasterxml.jackson.databind.ObjectMapper;

@@ -9,7 +9,7 @@
         <relativePath>../pom.xml</relativePath>
     </parent>
     <artifactId>chat-service</artifactId>
-    <version>1.0.0</version>
+    <version>1.0.1</version>
     <name>chat-service</name>
     <description>Per-product live chat: WebSocket fan-out + MongoDB-persisted history</description>
 
@@ -109,6 +109,11 @@
             <artifactId>awaitility</artifactId>
             <version>4.3.0</version>
             <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-devtools</artifactId>
+            <optional>true</optional>
         </dependency>
     </dependencies>
 

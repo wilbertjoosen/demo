@@ -1,4 +1,8 @@
 package com.example.chat;
+import com.example.chat.model.Conversation;
+import com.example.chat.model.DirectMessage;
+import com.example.chat.repository.ConversationRepository;
+import com.example.chat.repository.DirectMessageRepository;
 
 import com.example.chat.support.AbstractWebSocketIntegrationTest;
 import com.example.chat.support.TestJwtDecoderConfig;
