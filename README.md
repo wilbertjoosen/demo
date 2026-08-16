@@ -159,30 +159,33 @@ Everything (infra + all 19 backend services + frontend) runs in containers on on
 ### Option C — Kubernetes (k3d) + GitOps
 
 ```bash
-k3d cluster create demo --servers 1 --agents 2 -p "18090:80@loadbalancer" -p "18453:443@loadbalancer" --api-port 6550
+k3d cluster create demo --servers 1 --agents 2 -p "18090:80@loadbalancer" -p "18453:443@loadbalancer" -p "8081:8081@loadbalancer" --api-port 6550
 kubectl apply -f k8s/
 ```
 
-App: http://demo.localhost:18090 — most infra (MySQL/Mongo/Elasticsearch/Keycloak/etc.) still runs
-via Docker Compose on the host, with pods reaching it through `host.k3d.internal`. Kafka and Redis
-are the exception: the cluster runs its own **in-cluster** Kafka + Redis instead (`k8s/kafka.yaml`,
-`k8s/redis.yaml`, wired up via `k8s/configmap-common.yaml`) — the Docker Compose `kafka`/`redis`
-containers are still there for host-JVM/IDE dev flows and host-tool debugging (`kcat`, `redis-cli`),
-they're just no longer what the cluster itself depends on. See [Kubernetes / GitOps](#kubernetes--gitops)
-for how ArgoCD takes over from here, and note the one manual step k3d always needs: **new/changed
-Docker images must be `k3d image import`ed** — there's no registry, so ArgoCD only manages manifests,
-never image builds.
+App: http://demo.localhost:18090 — Kafka, Redis, MySQL, Keycloak, and Mailpit all run in-cluster
+now (`k8s/kafka.yaml`, `k8s/redis.yaml`, `k8s/mysql.yaml`, `k8s/keycloak.yaml`,
+`k8s/mailpit.yaml`, wired up via `k8s/configmap-common.yaml`) — the Docker Compose equivalents are
+still there for host-JVM/IDE dev flows and host-tool debugging (`kcat`, `redis-cli`, a mysql
+client), they're just no longer what the cluster itself depends on. Only MongoDB and Elasticsearch
+still run via Docker Compose on the host, reached through `host.k3d.internal`. The `-p
+"8081:8081@loadbalancer"` mapping is load-bearing, not optional: every service's
+`KEYCLOAK_ISSUER_URI` (and the frontend's) is hardcoded to `http://localhost:8081`, so in-cluster
+Keycloak has to keep answering there too — see `k8s/keycloak.yaml`'s comment for the full
+reasoning. See [Kubernetes / GitOps](#kubernetes--gitops) for how ArgoCD takes over from here, and
+note the one manual step k3d always needs: **new/changed Docker images must be `k3d image
+import`ed** — there's no registry, so ArgoCD only manages manifests, never image builds.
 
 Day-to-day cluster start/stop (the cluster plus the host infra it depends on) is wrapped by
 `./k8s-local.sh {start|stop|restart|status}` — e.g. `./k8s-local.sh stop` runs `k3d cluster stop demo`
 then `docker compose stop`; `./k8s-local.sh start` runs `docker compose up -d` then
 `k3d cluster start demo` and tails `kubectl get pods -A -w` (pass `--no-watch` to skip the tail).
-`start`/`stop` only touch the infra pods actually need (MySQL/Mongo/Elasticsearch/Keycloak/Mailpit/
-Vault/Grafana-Loki-Tempo) — not docker-compose's own app containers (Option B, irrelevant when
-using k8s) and not the pieces that are dev-only now that Kafka/Redis run in-cluster (Kafka, Redis,
-Kafka UI, and docker-compose's own Prometheus — k8s has its own separate one, `k8s/prometheus.yaml`).
-Pass `--with-dev` to also start/stop those, e.g. if `start-local.sh`'s host-JVM services are running
-against the same docker-compose stack at the same time.
+`start`/`stop` only touch the infra pods actually need now (Mongo, Elasticsearch,
+Grafana/Loki/Tempo) — not docker-compose's own app containers (Option B, irrelevant when using
+k8s) and not the pieces that are dev-only now that Kafka, Redis, MySQL, Keycloak, and Mailpit all
+run in-cluster (docker-compose's own Prometheus is dev-only too — k8s has its own separate one,
+`k8s/prometheus.yaml`). Pass `--with-dev` to also start/stop those, e.g. if `start-local.sh`'s
+host-JVM services are running against the same docker-compose stack at the same time.
 
 ## Default credentials
 
@@ -218,24 +221,26 @@ Realm: `demo`. Client: `demo-spa` (public, PKCE).
 
 For connecting a DB client, `redis-cli`, `kcat`, etc. directly rather than through a UI. Note that
 these host ports back the Docker Compose containers used by the local JVM dev flow and host-tool
-debugging only — k8s pods reach their own **in-cluster** Kafka and Redis instead (`k8s/kafka.yaml`,
-`k8s/redis.yaml`), addressed as `kafka:9092` / `redis:6379` via `k8s/configmap-common.yaml`, not the
-ports below:
+debugging only — k8s pods reach their own **in-cluster** Kafka, Redis, MySQL, Keycloak, and Mailpit
+instead (`k8s/kafka.yaml`, `k8s/redis.yaml`, `k8s/mysql.yaml`, `k8s/keycloak.yaml`,
+`k8s/mailpit.yaml`), addressed via `k8s/configmap-common.yaml`, not the ports below:
 
 | Service | Host:Port | Notes |
 |---|---|---|
-| MySQL | `localhost:3306` | `order-service`'s write model (db `demo`, user/pass `demo`/`demo`) |
-| MongoDB | `localhost:27017` | every other service's store, one logical DB per service |
-| Kafka (host clients) | `localhost:9092` | `PLAINTEXT` listener for local JVM services / host tools |
-| Redis | `localhost:6379` | Resilience4j response caching (host-JVM/IDE dev flow, `redis-cli`) |
-| Elasticsearch | `localhost:9200` | `audit-service`'s store |
-| Loki | `localhost:3100` | log storage; query via Grafana's Explore tab rather than the raw API |
-| Mailpit SMTP | `localhost:1025` | what `notification-service` actually sends to; `:8025` above is its web inbox |
+| MySQL | `localhost:3306` | `order-service`'s write model (db `demo`, user/pass `demo`/`demo`); dev-only, see above |
+| MongoDB | `localhost:27017` | every other service's store, one logical DB per service — still host-based for both dev and k8s |
+| Kafka (host clients) | `localhost:9092` | `PLAINTEXT` listener for local JVM services / host tools; dev-only, see above |
+| Redis | `localhost:6379` | Resilience4j response caching (host-JVM/IDE dev flow, `redis-cli`); dev-only, see above |
+| Elasticsearch | `localhost:9200` | `audit-service`'s store — still host-based for both dev and k8s |
+| Loki | `localhost:3100` | log storage; query via Grafana's Explore tab rather than the raw API — still host-based |
+| Mailpit SMTP | `localhost:1025` | what `notification-service` actually sends to; `:8025` above is its web inbox; dev-only, see above |
 | Rancher (HTTP) | `http://localhost:9080` | redirects to the HTTPS UI at `:9443` |
 
 k3d cluster ports (`k3d cluster create`, see [Kubernetes / GitOps](#kubernetes--gitops)): `18090` →
-Traefik HTTP (frontend + ArgoCD ingress), `18453` → Traefik HTTPS, `6550` → the k8s API server
-(`kubectl` uses this automatically via your kubeconfig context, not something you visit directly).
+Traefik HTTP (frontend + ArgoCD ingress), `18453` → Traefik HTTPS, `8081` → in-cluster Keycloak
+specifically (load-bearing, not a convenience port — see `k8s/keycloak.yaml`'s comment), `6550` →
+the k8s API server (`kubectl` uses this automatically via your kubeconfig context, not something
+you visit directly).
 
 ## Kubernetes / GitOps
 

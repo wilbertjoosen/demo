@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 #
-# Starts/stops the local k3d cluster ("demo") together with the docker-compose infra it depends
-# on (pods reach MySQL/Mongo/Elasticsearch/Keycloak/Mailpit/Vault/Grafana-Loki-Tempo via
-# host.k3d.internal — see k8s/configmap-common.yaml and docker-compose.yml). Wraps the manual
-# sequence:
+# Starts/stops the local k3d cluster ("demo") together with the docker-compose infra it still
+# depends on (pods reach Mongo/Elasticsearch/Grafana-Loki-Tempo via host.k3d.internal — see
+# k8s/configmap-common.yaml and docker-compose.yml). Wraps the manual sequence:
 #
 #   k3d cluster stop demo && docker compose stop
 #   docker compose up -d && k3d cluster start demo && kubectl get pods -A -w
 #
 # Only starts the infra k8s pods actually need, NOT docker-compose's app containers (Option B's
 # full-docker-compose-stack mode — irrelevant here, the cluster runs its own pods) and NOT the
-# dev-only pieces docker-compose also happens to host: Kafka/Redis now run in-cluster
-# (k8s/kafka.yaml, k8s/redis.yaml), kafka-ui only matters once kafka is reachable from the host,
+# dev-only pieces docker-compose also happens to host: Kafka, Redis, MySQL, Keycloak, and Mailpit
+# all now run in-cluster (k8s/kafka.yaml, k8s/redis.yaml, k8s/mysql.yaml, k8s/keycloak.yaml,
+# k8s/mailpit.yaml); kafka-ui only matters once kafka is reachable from the host,
 # and this compose file's own Prometheus is the host-JVM/compose-flow instance specifically — k8s
 # has its own separate in-cluster one (k8s/prometheus.yaml). Pass --with-dev to also start/stop
 # those, e.g. if you're running start-local.sh's host-JVM services against the cluster at the
@@ -38,9 +38,9 @@ Usage: $(basename "$0") <start|stop|restart|status> [--with-dev] [--no-watch]
   status     k3d cluster list + kubectl get pods -A
 
   --with-dev   Also start (or explicitly target on stop) the dev-only infra pieces docker-compose
-               hosts but k8s pods don't use: Kafka, Redis, Kafka UI, and docker-compose's own
-               Prometheus. Use this if you're also running start-local.sh's host-JVM services
-               against the same docker-compose stack.
+               hosts but k8s pods don't use: Kafka, Redis, Kafka UI, MySQL, Keycloak, Mailpit,
+               and docker-compose's own Prometheus. Use this if you're also running
+               start-local.sh's host-JVM services against the same docker-compose stack.
   --no-watch   After "start" or "restart", don't tail pod status
                (by default, start/restart end with 'kubectl get pods -A -w')
 EOF
