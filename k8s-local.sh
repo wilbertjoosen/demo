@@ -137,7 +137,7 @@ do_start() {
     if ! cluster_exists; then
         echo "  → Cluster '$CLUSTER_NAME' does not exist yet."
         echo "    Create it first — see README.md's 'Kubernetes / GitOps' section:"
-        echo "    k3d cluster create $CLUSTER_NAME --servers 1 --agents 2 -p \"18090:80@loadbalancer\" -p \"18453:443@loadbalancer\" --api-port 6550"
+        echo "    k3d cluster create $CLUSTER_NAME --servers 1 --agents 2 -p \"18090:80@loadbalancer\" -p \"18453:443@loadbalancer\" -p \"8081:8081@loadbalancer\" --api-port 6550"
         exit 1
     fi
 
