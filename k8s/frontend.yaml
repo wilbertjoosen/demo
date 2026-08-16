@@ -16,7 +16,7 @@ spec:
         - name: ghcr-pull-secret
       containers:
         - name: frontend
-          image: ghcr.io/wilbertjoosen/demo-frontend:724a8a2d40840e17c8e80d1c73b41fb5b4be752b
+          image: ghcr.io/wilbertjoosen/demo-frontend:ddac784a15a94f04e285bbf762d3385491327ff7
           imagePullPolicy: Always
           ports: [{ containerPort: 80 }]
           resources:
