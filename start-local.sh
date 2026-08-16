@@ -35,15 +35,21 @@ SERVICES=(
 # shellcheck source=local-infra.sh
 source "$ROOT_DIR/local-infra.sh"
 
-# Every mongoN port is published to the host (see docker-compose.yml), so the host-JVM flow can be
-# just as replica-set-aware as the containerized one (docker-compose.yml's own MONGO_HOST/
-# MONGO_REPLICA_SET_PARAM, used by app containers). Without this, every service falls back to
-# application.yaml's bare `localhost:27017` default — fine as long as mongo1 happens to be
-# primary, but a real replica-set election (a restart, a failover) can make it a secondary at any
-# time, and a non-replica-set-aware client has no way to find the actual primary: every write then
-# fails with "NotWritablePrimary" until mongo1 is primary again.
-export MONGO_HOST="localhost:27017,localhost:27018,localhost:27019"
-export MONGO_REPLICA_SET_PARAM="?replicaSet=rs0"
+# NOT setting MONGO_HOST/MONGO_REPLICA_SET_PARAM here, on purpose: the replica set's own config
+# (mongo-rs-init) advertises every member as host.docker.internal:2701{7,8,9} — the ONE name that
+# resolves consistently from containers and k8s pods (see k8s/configmap-common.yaml), but which
+# does NOT resolve from the host machine itself (no Docker Desktop DNS entry for it there). A
+# host-JVM client that connects with ?replicaSet=rs0 discovers that member list via the replica
+# set's own hello response and then tries to monitor/route through those same unresolvable
+# host.docker.internal addresses — i.e. adding replica-set awareness here breaks it *worse* than
+# the plain single-host default (application.yaml's bare localhost:27017), which just talks
+# directly to whichever host it's given and never needs the other members' names at all.
+#
+# So this flow instead relies on mongo1 (localhost:27017) actually staying primary — see the
+# priority weighting (member 0 = 2, others = 1) applied via mongosh on the mongo1 container, which
+# makes elections converge back to it. If a write ever fails with "NotWritablePrimary" here, that
+# priority got lost (e.g. containers recreated from scratch) — reapply it, don't reach for
+# ?replicaSet=rs0 as the fix.
 
 # ================================================================
 # Argument parsing
