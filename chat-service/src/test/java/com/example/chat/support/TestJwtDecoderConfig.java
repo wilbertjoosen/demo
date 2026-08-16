@@ -1,7 +1,5 @@
 package com.example.chat.support;
 
-import com.example.chat.config.WebSocketSecurityConfig;
-import com.example.chat.websocket.DirectMessageHandshakeInterceptor;
 
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;

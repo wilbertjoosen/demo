@@ -1,6 +1,5 @@
 package com.example.inventory.model;
 
-import com.example.inventory.service.InventoryServiceImpl;
 
 import lombok.Getter;
 import lombok.NoArgsConstructor;

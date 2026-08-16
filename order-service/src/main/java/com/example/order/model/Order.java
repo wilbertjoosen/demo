@@ -1,6 +1,5 @@
 package com.example.order.model;
 
-import com.example.order.controller.OrderController;
 import com.example.order.enums.OrderStatus;
 
 import com.example.common.model.Address;

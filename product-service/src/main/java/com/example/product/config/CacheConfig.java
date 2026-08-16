@@ -1,6 +1,5 @@
 package com.example.product.config;
 
-import com.example.product.model.Product;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.Cache;
