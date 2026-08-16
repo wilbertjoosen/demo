@@ -1,5 +1,9 @@
 package com.example.media;
 
+import com.example.media.enums.MediaType;
+import com.example.media.model.MediaAsset;
+import com.example.media.repository.MediaAssetRepository;
+import com.example.media.service.MediaServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

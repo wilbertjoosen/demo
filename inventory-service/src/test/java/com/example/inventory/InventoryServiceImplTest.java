@@ -1,5 +1,8 @@
 package com.example.inventory;
 
+import com.example.inventory.model.InventoryItem;
+import com.example.inventory.repository.InventoryRepository;
+import com.example.inventory.service.InventoryServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

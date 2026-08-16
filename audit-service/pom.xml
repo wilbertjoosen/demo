@@ -9,7 +9,7 @@
         <relativePath>../pom.xml</relativePath>
     </parent>
     <artifactId>audit-service</artifactId>
-    <version>1.0.0</version>
+    <version>1.0.1</version>
     <name>audit-service</name>
     <description>Consumes audit-events from every service, indexes into Elasticsearch, exposes admin-only search</description>
 
@@ -61,6 +61,11 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-devtools</artifactId>
+            <optional>true</optional>
         </dependency>
     </dependencies>
 

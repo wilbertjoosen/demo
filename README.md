@@ -16,28 +16,29 @@ A choreographed Kafka saga drives an order through payment, shipping, and delive
 that isn't infrastructure is independently deployable — its own jar, its own Docker image, its own k8s
 Deployment.
 
-| Service | Port | Store | Responsibility |
-|---|---|---|---|
-| `gateway-service` | 8080 | — | Spring Cloud Gateway; routes `/api/**` to backend services by path, CORS |
-| `eureka-server` | 8761 | — | Service discovery — every backend registers here |
-| `config-server` | 8888 | — | Centralized config (currently minimal; most config is per-service `application.yaml`) |
-| `user-service` | 8082 | MongoDB | User profiles; identity fields (username/email/name) are read live from Keycloak, not duplicated locally |
-| `product-service` | 8083 | MongoDB | Product catalog; reserve/release stock; Spring Batch CSV bulk import |
-| `order-service` | 8084 | MySQL (write) + MongoDB (read) | **Saga initiator** + **CQRS**: `POST /api/orders` hits MySQL directly (ACID), `GET /api/orders*` reads from a Mongo projection kept in sync by the same Kafka listeners the saga needs anyway |
-| `payment-service` | 8086 | MongoDB | Saga participant: charges, refunds on downstream failure |
-| `shipping-service` | 8088 | MongoDB | Saga participant: carrier selection (UPS/DHL), tracking |
-| `delivery-service` | 8087 | MongoDB | Saga participant: last-mile delivery simulation |
-| `inventory-service` | 8089 | MongoDB | Per-warehouse stock, called synchronously by `order-service` (the one sync inter-service call in the system, see [Circuit breaker](#circuit-breaker)) |
-| `notification-service` | 8085 | — | Kafka consumer on every topic → WebSocket broadcast (`/ws/notifications`) + email via Mailpit |
-| `audit-service` | 8090 | Elasticsearch | Consumes the audit trail every service emits; reconstructs field-level diffs and full record history |
-| `chat-service` | 8094 | MongoDB | Public per-product chat rooms **and** private user-to-user direct messages (JWT-authenticated WebSocket, delivery/read receipts, typing indicators) |
-| `product-comment-service` | 8091 | MongoDB | Product comments, ownership-enforced editing |
-| `product-media-service` | 8092 | MongoDB + local disk | Product photos/videos/documents, file upload |
-| `product-review-service` | 8093 | MongoDB | Product ratings/reviews |
-| `common-security` | — | — | Shared JWT resource-server config, reused by every service |
-| `common-audit` | — | — | Shared aspect that captures every REST call's request/response for the audit trail |
-| `common-model` | — | — | Shared DTOs (e.g. `Address`) |
-| `frontend` | 5173 (dev) | — | Vue 3 SPA — the only thing that talks to the gateway; runs in the browser regardless of how the backend is deployed |
+| Service                   | Port       | Store | Responsibility                                                                                                                                                                                |
+|---------------------------|------------|---|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `gateway-service`         | 8080       | — | Spring Cloud Gateway; routes `/api/**` to backend services by path, CORS                                                                                                                      |
+| `eureka-server`           | 8761       | — | Service discovery — every backend registers here                                                                                                                                              |
+| `config-server`           | 8888       | — | Centralized config (currently minimal; most config is per-service `application.yaml`)                                                                                                         |
+| `user-service`            | 8082       | MongoDB | User profiles; identity fields (username/email/name) are read live from Keycloak, not duplicated locally                                                                                      |
+| `product-service`         | 8083       | MongoDB | Product catalog; reserve/release stock; Spring Batch CSV bulk import                                                                                                                          |
+| `order-service`           | 8084       | MySQL (write) + MongoDB (read) | **Saga initiator** + **CQRS**: `POST /api/orders` hits MySQL directly (ACID), `GET /api/orders*` reads from a Mongo projection kept in sync by the same Kafka listeners the saga needs anyway |
+| `payment-service`         | 8086       | MongoDB | Saga participant: charges, refunds on downstream failure                                                                                                                                      |
+| `shipping-service`        | 8088       | MongoDB | Saga participant: carrier selection (UPS/DHL), tracking                                                                                                                                       |
+| `delivery-service`        | 8087       | MongoDB | Saga participant: last-mile delivery simulation                                                                                                                                               |
+| `inventory-service`       | 8089       | MongoDB | Per-warehouse stock, called synchronously by `order-service` (the one sync inter-service call in the system, see [Circuit breaker](#circuit-breaker))                                         |
+| `notification-service`    | 8085       | — | Kafka consumer on every topic → WebSocket broadcast (`/ws/notifications`) + email via Mailpit                                                                                                 |
+| `audit-service`           | 8090       | Elasticsearch | Consumes the audit trail every service emits; reconstructs field-level diffs and full record history                                                                                          |
+| `chat-service`            | 8094       | MongoDB | Public per-product chat rooms **and** private user-to-user direct messages (JWT-authenticated WebSocket, delivery/read receipts, typing indicators)                                           |
+| `reporting-service`       | 8095       | MongoDB | Reporting (JWT-authenticated WebSocket, delivery/read receipts, typing indicators)                                                                                                            |
+| `product-comment-service` | 8091       | MongoDB | Product comments, ownership-enforced editing                                                                                                                                                  |
+| `product-media-service`   | 8092       | MongoDB + local disk | Product photos/videos/documents, file upload                                                                                                                                                  |
+| `product-review-service`  | 8093       | MongoDB | Product ratings/reviews                                                                                                                                                                       |
+| `common-security`         | —          | — | Shared JWT resource-server config, reused by every service                                                                                                                                    |
+| `common-audit`            | —          | — | Shared aspect that captures every REST call's request/response for the audit trail                                                                                                            |
+| `common-model`            | —          | — | Shared DTOs (e.g. `Address`)                                                                                                                                                                  |
+| `frontend`                | 5173 (dev) | — | Vue 3 SPA — the only thing that talks to the gateway; runs in the browser regardless of how the backend is deployed                                                                           |
 
 Kafka topics: `user-events`, `product-events`, `order-events`, `payment-events`, `shipping-events`,
 `delivery-events`. Plain JSON, no schema registry — deliberate simplicity for a demo.
@@ -139,6 +140,15 @@ cd frontend && npm install && npm run dev
 
 Frontend: http://localhost:5173
 
+`./start-local.sh` / `./stop-local.sh` automate the above (build, start every service + infra
+container in the background, tear down again). Both take `--infra` and/or `--services` to start or
+stop just one half — e.g. `./start-local.sh --infra` to bring up only the Docker containers, or
+`./stop-local.sh --services` to kill just the local `mvnw`/`npm` processes and leave infra running.
+With no flags, both do everything (unchanged default behavior). `stop-local.sh` also takes `-y` to
+skip its "stop infra too?" prompt. Every backend module also now has `spring-boot-devtools` on the
+classpath, so a rebuild while a service from these scripts (or an IDE run) is running triggers a
+fast in-process restart instead of a full relaunch.
+
 ### Option B — full Docker Compose stack
 
 ```bash
@@ -154,12 +164,20 @@ k3d cluster create demo --servers 1 --agents 2 -p "18090:80@loadbalancer" -p "18
 kubectl apply -f k8s/
 ```
 
-App: http://demo.localhost:18090 — infra (MySQL/Mongo/Kafka/Keycloak/etc.) still runs via Docker
-Compose on the host; pods reach it through `host.k3d.internal`. `kubectl apply -f k8s/` here is a
-one-time bootstrap — from then on, ArgoCD watches the repo and CI/CD (see [CI/CD & versioning](#cicd--versioning))
-handles building, pushing to GHCR, and bumping the manifests ArgoCD syncs; there's no `k3d image import`
-step in the normal flow, since images live in a real registry now. (`k3d image import` is still the
-right tool if you want to test a *local, unpushed* code change without going through CI.)
+App: http://demo.localhost:18090 — most infra (MySQL/Mongo/Elasticsearch/Keycloak/etc.) still runs
+via Docker Compose on the host, with pods reaching it through `host.k3d.internal`. Kafka and Redis
+are the exception: each namespace runs its own **in-cluster** Kafka + Redis instead
+(`k8s/kafka.yaml`, `k8s/redis.yaml`) — see [QA / testing environment](#qa--testing-environment) and
+`k8s/configmap-common.yaml` for why. `kubectl apply -f k8s/` here is a one-time bootstrap — from then
+on, ArgoCD watches the repo and CI/CD (see [CI/CD & versioning](#cicd--versioning)) handles building,
+pushing to GHCR, and bumping the manifests ArgoCD syncs; there's no `k3d image import` step in the
+normal flow, since images live in a real registry now. (`k3d image import` is still the right tool if
+you want to test a *local, unpushed* code change without going through CI.)
+
+Day-to-day cluster start/stop (the cluster plus the host infra it depends on) is wrapped by
+`./k8s-local.sh {start|stop|restart|status}` — e.g. `./k8s-local.sh stop` runs `k3d cluster stop demo`
+then `docker compose stop`; `./k8s-local.sh start` runs `docker compose up -d` then
+`k3d cluster start demo` and tails `kubectl get pods -A -w` (pass `--no-watch` to skip the tail).
 
 ## Default credentials
 
@@ -173,21 +191,21 @@ Realm: `demo` (prod) / `demo-qa` (QA) — same users/passwords in both. Client: 
 
 ## Useful URLs
 
-| Tool | URL | Credentials |
-|---|---|---|
-| Frontend (dev) | http://localhost:5173 | — |
-| Frontend (k8s, prod) | http://demo.localhost:18090 | — |
-| Frontend (k8s, QA) | http://qa.demo.localhost:18090 | — (realm `demo-qa`, same users as above) |
-| Keycloak admin | http://localhost:8081 | `admin` / `admin` (realm: **`demo`** for prod, **`demo-qa`** for QA — not `master`, see note below) |
-| Swagger UI (aggregated) | http://localhost:8080/swagger-ui.html | — |
-| Grafana | http://localhost:3000 | `admin` / `admin` — datasources: **Prometheus** (host-JVM/compose flow), **Prometheus (k8s)** (both k8s namespaces), **Loki** |
-| Prometheus (host-JVM/compose) | http://localhost:9090 | — |
-| Prometheus (k8s, prod + QA) | http://prometheus.demo.localhost:18090 | — |
-| Kibana | http://localhost:5601 | — |
-| Kafka UI | http://localhost:8095 | prod Kafka only — QA's Kafka has no UI wired up |
-| Mailpit (SMTP inbox, prod) | http://localhost:8025 | — |
-| Mailpit (SMTP inbox, QA) | http://localhost:8026 | — |
-| Rancher (Docker container) | https://localhost:9443 | bootstrap password `rancherdemo123` (set via `CATTLE_BOOTSTRAP_PASSWORD` in `docker-compose.yml`) |
+| Tool | URL                                                           | Credentials |
+|---|---------------------------------------------------------------|---|
+| Frontend (dev) | http://localhost:5173                                         | — |
+| Frontend (k8s, prod) | http://demo.localhost:18090                                   | — |
+| Frontend (k8s, QA) | http://qa.demo.localhost:18090                                | — (realm `demo-qa`, same users as above) |
+| Keycloak admin | http://localhost:8081                                         | `admin` / `admin` (realm: **`demo`** for prod, **`demo-qa`** for QA — not `master`, see note below) |
+| Swagger UI (aggregated) | http://localhost:8080/swagger-ui.html                         | — |
+| Grafana | http://localhost:3000                                         | `admin` / `admin` — datasources: **Prometheus** (host-JVM/compose flow), **Prometheus (k8s)** (both k8s namespaces), **Loki** |
+| Prometheus (host-JVM/compose) | http://localhost:9090                                         | — |
+| Prometheus (k8s, prod + QA) | http://prometheus.demo.localhost:18090                        | — |
+| Kibana | http://localhost:5601                                         | — |
+| Kafka UI | http://localhost:8099                                         | prod Kafka only — QA's Kafka has no UI wired up |
+| Mailpit (SMTP inbox, prod) | http://localhost:8025                                         | — |
+| Mailpit (SMTP inbox, QA) | http://localhost:8026                                         | — |
+| Rancher (Docker container) | https://localhost:9443                                        | bootstrap password `rancherdemo123` (set via `CATTLE_BOOTSTRAP_PASSWORD` in `docker-compose.yml`) |
 | ArgoCD | http://argocd.localhost:18090 (via `k8s-argocd/ingress.yaml`) | `admin` / `kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' \| base64 -d` — manages two Applications, `demo` (prod) and `demo-qa` |
 
 > **Keycloak gotcha:** the admin console defaults to the `master` realm, which only ever contains the
@@ -200,18 +218,17 @@ Realm: `demo` (prod) / `demo-qa` (QA) — same users/passwords in both. Client: 
 For connecting a DB client, `redis-cli`, `kcat`, etc. directly rather than through a UI. MySQL,
 MongoDB, Elasticsearch, and Keycloak are **shared** between prod and QA (same server, QA uses its own
 database/index/realm names — see [QA / testing environment](#qa--testing-environment)); Kafka, Redis,
-and Mailpit are genuinely separate instances per environment.
+and Mailpit are genuinely separate instances per environment. Kafka/Redis are dev-only on the host now
+(see below) — k8s pods reach their own in-cluster instances instead.
 
 | Service | Host:Port | Notes |
 |---|---|---|
 | MySQL | `localhost:3306` | `order-service`'s write model — db `demo` (prod) / `demo_qa` (QA), user/pass `demo`/`demo` |
 | MongoDB | `localhost:27017` | every other service's store, one logical DB per service, `_qa`-suffixed for QA |
-| Kafka (host clients, prod) | `localhost:9092` | `PLAINTEXT` listener for local JVM services / host tools |
-| Kafka (k8s pods, prod) | `host.k3d.internal:9094` | dedicated `PLAINTEXT_K8S` listener, only reachable from inside the k3d cluster |
-| Kafka (host clients, QA) | `localhost:9192` | separate broker — shared topics would mean QA test traffic triggering prod's saga |
-| Kafka (k8s pods, QA) | `host.k3d.internal:9194` | QA's own `PLAINTEXT_K8S` listener |
-| Redis (prod) | `localhost:6379` | Resilience4j response caching |
-| Redis (QA) | `localhost:6380` | separate instance (cheap either way, kept isolated for simplicity) |
+| Kafka (host clients / dev, prod) | `localhost:9092` | `PLAINTEXT` listener for local JVM services / host tools — **dev-only**; QA and prod k8s pods use their own in-cluster Kafka (`kafka:9092` inside the cluster, `k8s/kafka.yaml`), not this container |
+| Kafka (host clients / dev, QA) | `localhost:9192` | separate broker — shared topics would mean QA test traffic triggering prod's saga; host-JVM debugging only, same in-cluster-Kafka caveat as above |
+| Redis (host / dev, prod) | `localhost:6379` | `demo-redis` — Resilience4j response caching for the local `mvnw`/IDE flow; **dev-only**, QA and prod k8s pods use their own in-cluster Redis (`redis:6379` inside the cluster, `k8s/redis.yaml`) |
+| Redis (host / dev, QA) | `localhost:6380` | same caveat — host-JVM debugging only, QA's k8s namespace has its own in-cluster Redis |
 | Elasticsearch | `localhost:9200` | `audit-service`'s store — index `audit-log` (prod) / `audit-log-qa` (QA) |
 | Loki | `localhost:3100` | log storage; query via Grafana's Explore tab rather than the raw API — one shared instance, filter by the `namespace` label (`demo`/`demo-qa`) |
 | Mailpit SMTP (prod) | `localhost:1025` | what `notification-service` actually sends to; `:8025` above is its web inbox |
@@ -292,6 +309,8 @@ flowchart LR
         end
         subgraph DEMOQA["namespace: demo-qa (QA)"]
             APPS_QA["17 services\n+ frontend"]
+            KAFKA_QA["Kafka (in-cluster)\nk8s/kafka.yaml"]
+            REDIS_QA["Redis (in-cluster)\nk8s/redis.yaml"]
         end
         ARGO_PROD["ArgoCD app: demo"]
         ARGO_QA["ArgoCD app: demo-qa"]
@@ -304,14 +323,9 @@ flowchart LR
         KC["Keycloak\nrealm: demo / demo-qa"]
     end
 
-    subgraph ISO_PROD["Prod-only infra"]
+    subgraph ISO_PROD["Prod-only host infra — dev/host-debug only once main gets its own in-cluster Kafka/Redis too"]
         KAFKA_PROD["Kafka :9092/:9094"]
         REDIS_PROD["Redis :6379"]
-    end
-
-    subgraph ISO_QA["QA-only infra"]
-        KAFKA_QA["Kafka :9192/:9194"]
-        REDIS_QA["Redis :6380"]
     end
 
     MAIN -- "CI/CD: build, push, bump k8s/" --> ARGO_PROD
@@ -333,9 +347,15 @@ flowchart LR
 - **Infra**: MySQL, MongoDB, and Elasticsearch are the **same instances** production uses — QA gets
   its own database/index names (`demo_qa`, `<service>_qa`, `audit-log-qa`) instead of duplicate
   containers. Keycloak is the same server too, with a separate realm (`demo-qa`,
-  `docker/keycloak/realm-demo-qa.json`). Kafka, Redis, and Mailpit are genuinely separate containers
-  (`docker-compose.qa.yml`) — Kafka specifically because shared topics would mean QA test traffic
-  triggering production's saga and vice versa.
+  `docker/keycloak/realm-demo-qa.json`). Kafka and Redis run **in-cluster** for QA (`k8s/kafka.yaml`,
+  `k8s/redis.yaml`, namespace `demo-qa`) instead of on the host — genuinely isolated from prod's own
+  Kafka/Redis either way (shared topics would mean QA test traffic triggering production's saga), but
+  no longer via a separate host container reached through `host.k3d.internal`. `docker-compose.qa.yml`
+  still runs `kafka-qa`/`redis-qa` for host-JVM debugging (`kcat`, `redis-cli`, a local IDE run against
+  QA) — the k8s namespace itself just doesn't depend on them anymore. Mailpit is still a genuinely
+  separate host container per environment (`docker-compose.qa.yml`). Prod's k8s manifests (on `main`)
+  are next in line for the same in-cluster Kafka/Redis switch — until then, prod pods still reach
+  `demo-kafka`/`demo-redis` on the host via `host.k3d.internal`.
 - **One frontend image, two Keycloak realms**: Vite bakes `VITE_KEYCLOAK_REALM` in at build time, but
   the same built image is deployed to both `demo` and `demo-qa` — a build-time value can't vary per
   environment. `frontend/src/auth/keycloak.ts` instead resolves the realm at runtime from the
@@ -393,9 +413,23 @@ demo/
 ├── frontend/                # Vue 3 SPA
 ├── docker/                  # Keycloak realms (demo + demo-qa), Grafana/Kibana/Prometheus provisioning
 ├── k8s/                     # Kubernetes manifests — prod content on main, QA content on testing
+│                             #   (includes kafka.yaml/redis.yaml — in-cluster infra, QA namespace)
 ├── k8s-argocd/              # ArgoCD Application CRs + ingress, applied once by hand, not GitOps-synced
-├── docker-compose.yml       # full local stack (prod infra + every service + frontend)
-├── docker-compose.qa.yml    # QA-only infra (Kafka/Redis/Mailpit); MySQL/Mongo/ES/Keycloak are shared
+├── docker-compose.yml       # full local stack (dev-only Kafka/Redis + every service + frontend)
+├── docker-compose.qa.yml    # QA host-debug infra (Kafka/Redis/Mailpit) — Mailpit's real dependency;
+│                             #   Kafka/Redis here are for host-JVM debugging only, not used by k8s
+├── start-local.sh, stop-local.sh  # host-JVM/npm dev flow — each takes --infra and/or --services
+├── k8s-local.sh              # k3d cluster + its host infra: start/stop/restart/status
 ├── .github/workflows/       # CI/CD: test -> build & push to GHCR -> bump k8s manifests
 └── pom.xml                  # Maven reactor parent
 ```
+
+Each backend service module follows the same internal package layout under its base package
+(`com.example.<service>`): `config/` (Spring `@Configuration`/security config), `controller/`
+(REST endpoints), `enums/` (status/type enums), `model/` (entities, DTOs, `*ModelAssembler`s),
+`repository/` (Spring Data repositories), `saga/` (`@KafkaListener` domain-event consumers,
+including the choreographed-saga participants), `service/` (business logic, external clients).
+Modules with a WebSocket surface (`chat-service`, `notification-service`) add a `websocket/`
+package for handlers/interceptors; `gateway-service` adds a `filter/` package for its servlet
+filter. The `*ServiceApplication` bootstrap class stays directly in the base package, not in any
+sub-package.

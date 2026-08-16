@@ -15,6 +15,10 @@ export const paymentsApi = {
     const { data } = await http.get(`/api/payments/order/${orderId}`)
     return data
   },
+  async getProof(proof: string): Promise<Blob> {
+    const { data } = await http.get(proof, { responseType: 'blob' })
+    return data
+  },
   async uploadProof(paymentId: string, file: File): Promise<Payment> {
     const formData = new FormData()
     formData.append('file', file)
