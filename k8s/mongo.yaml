@@ -1,0 +1,58 @@
+# In-cluster MongoDB for the demo namespace. This branch's docker-compose.yml runs a single
+# "mongodb" container (no 3-node replica set — that's a main/testing-only feature, task #74's HA
+# work), so this mirrors that: a plain single-replica Deployment + PVC, not a StatefulSet/replica
+# set like main/testing's k8s/mongo.yaml. No cross-namespace sharing either — this branch has no
+# demo-qa counterpart namespace.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mongodb
+  namespace: demo
+  labels: { app: mongodb }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: mongodb } }
+  template:
+    metadata: { labels: { app: mongodb } }
+    spec:
+      containers:
+        - name: mongodb
+          image: mongo:7
+          env:
+            - { name: MONGO_INITDB_DATABASE, value: "demo" }
+          ports: [{ containerPort: 27017 }]
+          volumeMounts:
+            - { name: data, mountPath: /data/db }
+          resources:
+            requests: { cpu: "200m", memory: "384Mi" }
+            limits: { cpu: "750m", memory: "768Mi" }
+          readinessProbe:
+            exec: { command: ["mongosh", "--quiet", "--eval", "db.runCommand({ping:1})"] }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            exec: { command: ["mongosh", "--quiet", "--eval", "db.runCommand({ping:1})"] }
+            initialDelaySeconds: 20
+            periodSeconds: 20
+      volumes:
+        - name: data
+          persistentVolumeClaim: { claimName: mongodb-data }
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mongodb-data
+  namespace: demo
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests: { storage: 2Gi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb
+  namespace: demo
+spec:
+  selector: { app: mongodb }
+  ports: [{ name: mongo, port: 27017, targetPort: 27017 }]

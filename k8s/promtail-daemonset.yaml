@@ -1,8 +1,9 @@
-# Ships every pod's stdout in the k3d cluster to the same Loki instance docker-compose's own
-# Promtail already writes to (host.k3d.internal, matching the project's "infra lives on the host"
-# pattern) — closes the gap where docker-compose containers get log history automatically but
+# Ships every pod's stdout in the k3d cluster to the in-cluster Loki (k8s/loki.yaml, "monitoring"
+# namespace) — closes the gap where docker-compose containers get log history automatically but
 # k8s-deployed pods didn't, since their logs live under containerd on the node, not Docker's log
-# driver that the host-side Promtail scrapes.
+# driver that the host-side Promtail scrapes. Previously pushed to docker-compose's own Loki via
+# host.k3d.internal (push-direction traffic works fine across the host/cluster boundary); now goes
+# to the in-cluster instance instead, for consistency with the rest of this migration.
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -43,7 +44,7 @@ data:
     positions:
       filename: /run/promtail/positions.yaml
     clients:
-      - url: http://host.k3d.internal:3100/loki/api/v1/push
+      - url: http://loki.monitoring.svc.cluster.local:3100/loki/api/v1/push
     scrape_configs:
       - job_name: kubernetes-pods
         kubernetes_sd_configs:

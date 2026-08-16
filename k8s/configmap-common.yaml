@@ -1,9 +1,10 @@
 # Shared by every app Deployment via envFrom.configMapRef.
 #
-# Kafka, Redis, MySQL, Keycloak, and Mailpit now all run IN this cluster (k8s/kafka.yaml,
-# k8s/redis.yaml, k8s/mysql.yaml, k8s/keycloak.yaml, k8s/mailpit.yaml) instead of on the host — the
-# corresponding docker-compose.yml containers still exist for host-JVM debugging (kcat, redis-cli,
-# mysql client, a local IDE run) but the cluster itself no longer depends on any of them.
+# Kafka, Redis, MySQL, Keycloak, Mailpit, MongoDB, and Elasticsearch now all run IN this cluster
+# (k8s/kafka.yaml, k8s/redis.yaml, k8s/mysql.yaml, k8s/keycloak.yaml, k8s/mailpit.yaml,
+# k8s/mongo.yaml, k8s/elasticsearch.yaml) instead of on the host — the corresponding
+# docker-compose.yml containers still exist for host-JVM debugging (kcat, redis-cli, mysql client,
+# a local IDE run) but the cluster itself no longer depends on any of them.
 #
 # KEYCLOAK_ISSUER_URI stays http://localhost:8081 deliberately — every service's `iss` claim
 # validation needs that exact string, browser or server-to-server alike (see k8s/keycloak.yaml's
@@ -12,8 +13,8 @@
 # go straight through the cluster (faster, and no host round-trip needed) — only the issuer itself
 # has to be the externally-reachable address.
 #
-# MongoDB and Elasticsearch are the remaining host-based pieces — host.k3d.internal is k3d's
-# built-in DNS name for the host machine, reaching whatever docker-compose still publishes there.
+# Loki (docker/grafana's own datasources) stays host-based on purpose — see k8s/loki.yaml's
+# comment for why it got a genuinely separate in-cluster instance rather than being pointed here.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -27,11 +28,11 @@ data:
   KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/demo/protocol/openid-connect/certs
   KEYCLOAK_TOKEN_URI: http://keycloak:8080/realms/demo/protocol/openid-connect/token
   KEYCLOAK_ADMIN_URI: http://keycloak:8080/admin/realms/demo
-  MONGO_HOST: host.k3d.internal
+  MONGO_HOST: mongodb
   MONGO_PORT: "27017"
   REDIS_HOST: redis
   REDIS_PORT: "6379"
-  ELASTICSEARCH_URI: http://host.k3d.internal:9200
+  ELASTICSEARCH_URI: http://elasticsearch:9200
   DB_HOST: mysql
   DB_PORT: "3306"
   DB_NAME: demo
