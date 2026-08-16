@@ -1,11 +1,18 @@
-# QA/testing environment infra. The heavy stateful stores (MySQL, MongoDB, Elasticsearch) AND
-# Keycloak are all SHARED with docker-compose.yml's production instances — QA gets its own
-# database/index names and its own Keycloak realm ("demo-qa", see docker/keycloak/realm-demo-qa.json,
-# imported by the SAME prod Keycloak container) instead of its own containers, to avoid running two
-# of everything on one machine. What actually needs real isolation stays separate here: Kafka
-# (shared topics would mean QA test traffic triggering prod's saga and vice versa), Redis, Mailpit.
-# The actual build/deploy path (k8s namespace, ArgoCD Application) is fully separate regardless —
-# see the testing branch's own k8s/*.yaml.
+# QA/testing environment infra — for HOST-JVM debugging only (kcat, redis-cli, a local IDE run
+# against QA). The demo-qa k8s namespace itself no longer depends on kafka-qa/redis-qa: it runs
+# its own in-cluster Kafka and Redis instead (k8s/kafka.yaml, k8s/redis.yaml), the same way
+# docker-compose.yml's redis/kafka are dev-only now too — see that file's redis comment. kafka-qa
+# therefore only carries the plain host listeners below (no PLAINTEXT_K8S split anymore, since
+# nothing in the cluster reaches this container).
+#
+# The heavy stateful stores (MySQL, MongoDB, Elasticsearch) AND Keycloak are all SHARED with
+# docker-compose.yml's production instances — QA gets its own database/index names and its own
+# Keycloak realm ("demo-qa", see docker/keycloak/realm-demo-qa.json, imported by the SAME prod
+# Keycloak container) instead of its own containers, to avoid running two of everything on one
+# machine. Kafka/Redis/Mailpit stay genuinely isolated (their own QA-only containers): Kafka
+# specifically because shared topics would mean QA test traffic triggering prod's saga and vice
+# versa. The actual build/deploy path (k8s namespace, ArgoCD Application) is fully separate
+# regardless — see the testing branch's own k8s/*.yaml.
 #
 # One-time setup on the shared MySQL (run once, not part of any automated flow):
 #   docker exec demo-mysql mysql -uroot -proot -e \
@@ -27,12 +34,13 @@ services:
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
-      # Same two-listener split as the prod stack (see docker-compose.yml's comment) — PLAINTEXT for
-      # host-JVM debugging against QA infra, PLAINTEXT_K8S dedicated to pods in the demo-qa namespace.
-      KAFKA_LISTENERS: PLAINTEXT://:9092,PLAINTEXT_INTERNAL://:29092,PLAINTEXT_K8S://:9194,CONTROLLER://:9093
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9192,PLAINTEXT_INTERNAL://kafka-qa:29092,PLAINTEXT_K8S://host.k3d.internal:9194
+      # Two listeners only, now that k8s pods use their own in-cluster kafka.demo-qa Service
+      # instead of this container — PLAINTEXT_INTERNAL is what lets host-JVM clients on
+      # localhost:9192 and containers on the demo-qa-network talk to the same broker consistently.
+      KAFKA_LISTENERS: PLAINTEXT://:9092,PLAINTEXT_INTERNAL://:29092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9192,PLAINTEXT_INTERNAL://kafka-qa:29092
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT,PLAINTEXT_K8S:PLAINTEXT
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1

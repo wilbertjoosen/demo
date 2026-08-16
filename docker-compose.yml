@@ -117,9 +117,15 @@ services:
           }
         '
 
+  # PLAINTEXT_K8S below is dev/prod-host-transition infra: the demo-qa namespace has already moved
+  # to its own in-cluster Kafka (k8s/kafka.yaml) instead of reaching this container via
+  # host.k3d.internal, matching this file's redis comment. Prod's k8s manifests (on main, not this
+  # branch) should get the equivalent in-cluster Kafka + Redis next, at which point PLAINTEXT_K8S
+  # here stops being used by anything and can be dropped.
   kafka:
     image: apache/kafka:3.8.0
     container_name: demo-kafka
+    hostname: kafka
     restart: unless-stopped
     ports:
       - "9092:9092"
@@ -150,7 +156,7 @@ services:
       KAFKA_CLUSTERS_0_NAME: demo
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
     ports:
-      - "8095:8080"
+      - "8099:8080"
     depends_on:
       - kafka
 
@@ -243,6 +249,12 @@ services:
     # exact index (audit-log / audit-log-qa) instead of relying on a reader to filter the combined one.
     entrypoint: ["sh", "-c", "for f in audit-trail-dashboard audit-trail-dashboard-prod audit-trail-dashboard-qa; do curl -s -X POST http://kibana:5601/api/saved_objects/_import?overwrite=true -H 'kbn-xsrf: true' --form file=@/kibana/$$f.ndjson; done"]
 
+  # Dev-only: for host-JVM services (./start-local.sh, an IDE run) and for host-tool debugging
+  # (redis-cli) against a local instance. Prod and QA k8s namespaces no longer depend on this
+  # container — they each run their own in-cluster Redis instead (k8s/redis.yaml), the same way
+  # they now run their own in-cluster Kafka (k8s/kafka.yaml) rather than reaching out to
+  # demo-kafka/kafka-qa via host.k3d.internal. See k8s/configmap-common.yaml for the QA side of
+  # that switch; prod's k8s manifests (not in this branch) get the equivalent change.
   redis:
     image: redis:7-alpine
     container_name: demo-redis
@@ -365,8 +377,9 @@ services:
 
   # --- App services -----------------------------------------------------------------------
   # Not meant to run alongside the local `mvn spring-boot:run` processes used throughout dev —
-  # both bind the same host ports. Run `docker compose up -d mysql mongo1 mongo2 mongo3 mongo-rs-init kafka mailpit keycloak
-  # elasticsearch redis` for infra-only (the local-JVM flow), or `docker compose up -d --build` for
+  # both bind the same host ports. Run `docker compose up -d mysql mongo1 mongo2 mongo3 mongo-rs-init kafka mailpit
+  # keycloak grafana tempo elasticsearch redis promtail prometheus loki kibana-dashboard-init kibana
+  # for infra-only (the local-JVM flow), or `docker compose up -d --build` for
   # the fully containerized stack.
 
   eureka-server:
@@ -589,6 +602,28 @@ services:
       <<: *app-env
       EUREKA_INSTANCE_HOSTNAME: inventory-service
       MONGO_DB: inventory
+    ports:
+      - "8089:8089"
+    depends_on:
+      - eureka-server
+      - config-server
+      - mongo-rs-init
+      - kafka
+      - keycloak
+      - redis
+
+  reporting-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+      args:
+        SERVICE: reporting-service
+    container_name: demo-reporting-service
+    restart: unless-stopped
+    environment:
+      <<: *app-env
+      EUREKA_INSTANCE_HOSTNAME: reporting-service
+      MONGO_DB: reporting
     ports:
       - "8089:8089"
     depends_on:

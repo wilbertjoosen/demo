@@ -24,7 +24,7 @@ spec:
         - name: reporting-service
           image: ghcr.io/wilbertjoosen/demo-reporting-service:12d4474669dcfcfe91f819879bbf25fb7f8f9292
           imagePullPolicy: Always
-          ports: [{ containerPort: 8089 }]
+          ports: [{ containerPort: 8095 }]
           envFrom:
             - configMapRef: { name: demo-common-config }
           env:

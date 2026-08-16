@@ -1,13 +1,19 @@
-# Shared by every app Deployment via envFrom.configMapRef — infra deliberately stays in docker-
-# compose on the host, not in this cluster (matches the project's existing "infra on host, app
-# services containerized" split). host.k3d.internal is k3d's built-in DNS name for the host
+# Shared by every app Deployment via envFrom.configMapRef. Most infra deliberately stays in
+# docker-compose on the host, not in this cluster (matches the project's existing "infra on host,
+# app services containerized" split). host.k3d.internal is k3d's built-in DNS name for the host
 # machine, reaching whatever docker-compose already publishes there.
+#
+# Kafka and Redis are the exception: they now run IN this cluster (k8s/kafka.yaml, k8s/redis.yaml)
+# instead of on the host, so KAFKA_BOOTSTRAP_SERVERS/REDIS_HOST below point at their in-cluster
+# Service names, not host.k3d.internal. docker-compose.qa.yml's kafka-qa/redis-qa containers still
+# exist for host-JVM debugging (kcat, redis-cli, a local IDE run against QA) but the cluster itself
+# no longer depends on them. Kafka needed isolation from prod either way — shared topics would mean
+# QA test traffic triggering prod's saga and vice versa — that isolation now comes from being a
+# separate in-cluster Deployment in the demo-qa namespace rather than a separate host container.
 #
 # MySQL/MongoDB/Elasticsearch/Keycloak here are the SAME instances production uses (see
 # docker-compose.qa.yml) — QA gets its own database/index/realm instead of its own containers.
-# Kafka/Redis/Mailpit stay genuinely isolated (their own QA-only containers, ports 9194/6380/1026):
-# Kafka specifically because shared topics would mean QA test traffic triggering prod's saga and
-# vice versa.
+# Mailpit stays genuinely isolated (its own QA-only host container, port 1026).
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -16,7 +22,7 @@ metadata:
 data:
   CONFIG_SERVER_URI: http://config-server:8888
   EUREKA_URI: http://eureka-server:8761/eureka
-  KAFKA_BOOTSTRAP_SERVERS: host.k3d.internal:9194
+  KAFKA_BOOTSTRAP_SERVERS: kafka:9092
   KEYCLOAK_ISSUER_URI: http://localhost:8081/realms/demo-qa
   KEYCLOAK_JWK_SET_URI: http://host.k3d.internal:8081/realms/demo-qa/protocol/openid-connect/certs
   KEYCLOAK_TOKEN_URI: http://host.k3d.internal:8081/realms/demo-qa/protocol/openid-connect/token
@@ -28,8 +34,8 @@ data:
   # host.k3d.internal does — proven via a live nslookup + nc from inside this cluster).
   MONGO_HOST: host.docker.internal:27017,host.docker.internal:27018,host.docker.internal:27019
   MONGO_REPLICA_SET_PARAM: "?replicaSet=rs0"
-  REDIS_HOST: host.k3d.internal
-  REDIS_PORT: "6380"
+  REDIS_HOST: redis
+  REDIS_PORT: "6379"
   ELASTICSEARCH_URI: http://host.k3d.internal:9200
   DB_HOST: host.k3d.internal
   DB_PORT: "3306"

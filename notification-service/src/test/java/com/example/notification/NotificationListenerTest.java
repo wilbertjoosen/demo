@@ -2,6 +2,8 @@ package com.example.notification;
 
 import com.example.common.events.DomainEvent;
 import com.example.common.events.EventTypes;
+import com.example.notification.saga.NotificationListener;
+import com.example.notification.websocket.NotificationWebSocketHandler;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.junit.jupiter.api.BeforeEach;
