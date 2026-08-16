@@ -38,3 +38,6 @@ build/
 node_modules/
 dist/
 *.local
+
+### Local data backups (mysqldump etc.) — may contain real local data, never committed ###
+backups/
