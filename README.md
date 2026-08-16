@@ -163,12 +163,13 @@ k3d cluster create demo --servers 1 --agents 2 -p "18090:80@loadbalancer" -p "18
 kubectl apply -f k8s/
 ```
 
-App: http://demo.localhost:18090 — Kafka, Redis, MySQL, Keycloak, and Mailpit all run in-cluster
-now (`k8s/kafka.yaml`, `k8s/redis.yaml`, `k8s/mysql.yaml`, `k8s/keycloak.yaml`,
-`k8s/mailpit.yaml`, wired up via `k8s/configmap-common.yaml`) — the Docker Compose equivalents are
-still there for host-JVM/IDE dev flows and host-tool debugging (`kcat`, `redis-cli`, a mysql
-client), they're just no longer what the cluster itself depends on. Only MongoDB and Elasticsearch
-still run via Docker Compose on the host, reached through `host.k3d.internal`. The `-p
+App: http://demo.localhost:18090 — Kafka, Redis, MySQL, Keycloak, Mailpit, MongoDB, and
+Elasticsearch all run in-cluster now (`k8s/kafka.yaml`, `k8s/redis.yaml`, `k8s/mysql.yaml`,
+`k8s/keycloak.yaml`, `k8s/mailpit.yaml`, `k8s/mongo.yaml`, `k8s/elasticsearch.yaml`, wired up via
+`k8s/configmap-common.yaml`) — the Docker Compose equivalents are still there for host-JVM/IDE dev
+flows and host-tool debugging (`kcat`, `redis-cli`, a mysql client), they're just no longer what
+the cluster itself depends on. Only Grafana and Kibana still run via Docker Compose on the host,
+reached through `host.k3d.internal`. The `-p
 "8081:8081@loadbalancer"` mapping is load-bearing, not optional: every service's
 `KEYCLOAK_ISSUER_URI` (and the frontend's) is hardcoded to `http://localhost:8081`, so in-cluster
 Keycloak has to keep answering there too — see `k8s/keycloak.yaml`'s comment for the full
@@ -180,12 +181,17 @@ Day-to-day cluster start/stop (the cluster plus the host infra it depends on) is
 `./k8s-local.sh {start|stop|restart|status}` — e.g. `./k8s-local.sh stop` runs `k3d cluster stop demo`
 then `docker compose stop`; `./k8s-local.sh start` runs `docker compose up -d` then
 `k3d cluster start demo` and tails `kubectl get pods -A -w` (pass `--no-watch` to skip the tail).
-`start`/`stop` only touch the infra pods actually need now (Mongo, Elasticsearch,
-Grafana/Loki/Tempo) — not docker-compose's own app containers (Option B, irrelevant when using
-k8s) and not the pieces that are dev-only now that Kafka, Redis, MySQL, Keycloak, and Mailpit all
-run in-cluster (docker-compose's own Prometheus is dev-only too — k8s has its own separate one,
-`k8s/prometheus.yaml`). Pass `--with-dev` to also start/stop those, e.g. if `start-local.sh`'s
-host-JVM services are running against the same docker-compose stack at the same time.
+`start`/`stop` only touch the infra pods actually need now (just Grafana and Kibana) — not
+docker-compose's own app containers (Option B, irrelevant when using k8s) and not the pieces that
+are dev-only now that Kafka, Redis, MySQL, Keycloak, Mailpit, MongoDB, and Elasticsearch all run
+in-cluster. docker-compose's own Loki is dev-only too — k8s has its own separate in-cluster one
+(`k8s/loki.yaml`), fed by `k8s/promtail-daemonset.yaml`. Prometheus is excluded from the k8s-only
+set too, but for a different reason: this branch has no in-cluster Prometheus at all (unlike
+main/testing's `k8s/prometheus.yaml`) — pod IPs on the k3d overlay network were never reachable
+from docker-compose's Prometheus anyway, so it was never actually scraping k8s pods here, just
+included for parity in case that gets added later. Pass `--with-dev` to also start/stop the
+dev-only set, e.g. if `start-local.sh`'s host-JVM services are running against the same
+docker-compose stack at the same time.
 
 ## Default credentials
 
@@ -221,18 +227,19 @@ Realm: `demo`. Client: `demo-spa` (public, PKCE).
 
 For connecting a DB client, `redis-cli`, `kcat`, etc. directly rather than through a UI. Note that
 these host ports back the Docker Compose containers used by the local JVM dev flow and host-tool
-debugging only — k8s pods reach their own **in-cluster** Kafka, Redis, MySQL, Keycloak, and Mailpit
-instead (`k8s/kafka.yaml`, `k8s/redis.yaml`, `k8s/mysql.yaml`, `k8s/keycloak.yaml`,
-`k8s/mailpit.yaml`), addressed via `k8s/configmap-common.yaml`, not the ports below:
+debugging only — k8s pods reach their own **in-cluster** Kafka, Redis, MySQL, Keycloak, Mailpit,
+MongoDB, and Elasticsearch instead (`k8s/kafka.yaml`, `k8s/redis.yaml`, `k8s/mysql.yaml`,
+`k8s/keycloak.yaml`, `k8s/mailpit.yaml`, `k8s/mongo.yaml`, `k8s/elasticsearch.yaml`), addressed via
+`k8s/configmap-common.yaml`, not the ports below:
 
 | Service | Host:Port | Notes |
 |---|---|---|
 | MySQL | `localhost:3306` | `order-service`'s write model (db `demo`, user/pass `demo`/`demo`); dev-only, see above |
-| MongoDB | `localhost:27017` | every other service's store, one logical DB per service — still host-based for both dev and k8s |
+| MongoDB | `localhost:27017` | every other service's store, one logical DB per service; dev-only, see above |
 | Kafka (host clients) | `localhost:9092` | `PLAINTEXT` listener for local JVM services / host tools; dev-only, see above |
 | Redis | `localhost:6379` | Resilience4j response caching (host-JVM/IDE dev flow, `redis-cli`); dev-only, see above |
-| Elasticsearch | `localhost:9200` | `audit-service`'s store — still host-based for both dev and k8s |
-| Loki | `localhost:3100` | log storage; query via Grafana's Explore tab rather than the raw API — still host-based |
+| Elasticsearch | `localhost:9200` | `audit-service`'s store; dev-only, see above |
+| Loki | `localhost:3100` | log storage; query via Grafana's Explore tab rather than the raw API; dev-only for k8s — k8s pods' logs go to the separate in-cluster Loki instead (`k8s/loki.yaml`, `http://loki.demo.localhost:18090`) |
 | Mailpit SMTP | `localhost:1025` | what `notification-service` actually sends to; `:8025` above is its web inbox; dev-only, see above |
 | Rancher (HTTP) | `http://localhost:9080` | redirects to the HTTPS UI at `:9443` |
 
@@ -265,13 +272,19 @@ sibling modules.
 - **Metrics**: every service exposes `/actuator/prometheus`; Prometheus scrapes them; Grafana has a
   pre-provisioned "Services Overview" dashboard (`docker/grafana/dashboards/`).
 - **Logs**: services log to stdout; in Docker Compose that's `docker logs <container>`. In k8s,
-  Promtail (`k8s/promtail-daemonset.yaml`) ships every pod's logs to the same Loki instance — query
-  either through Grafana's Explore tab.
+  Promtail (`k8s/promtail-daemonset.yaml`) ships every pod's logs to a separate in-cluster Loki
+  instead (`k8s/loki.yaml`, namespace `monitoring`) — query through Grafana's Explore tab against
+  the **Loki (k8s)** datasource; the plain **Loki** datasource is the host-JVM/docker-compose
+  flow's own instance.
 - **Audit trail**: every REST call across every service is captured (who, what, when, request/response
-  bodies with secrets redacted) and shipped to Elasticsearch. The admin UI's history icons (Users,
-  Products, Media, Chat) show the full change timeline with before/after diffs per field, powered by
-  `audit-service`'s `RecordHistoryService` — a Kibana dashboard (`docker/kibana/audit-trail-dashboard.ndjson`)
-  covers the same data for ad-hoc querying.
+  bodies with secrets redacted) and shipped to Elasticsearch (in-cluster, `k8s/elasticsearch.yaml`).
+  The admin UI's history icons (Users, Products, Media, Chat) show the full change timeline with
+  before/after diffs per field, powered by `audit-service`'s `RecordHistoryService` — a Kibana
+  dashboard (`docker/kibana/audit-trail-dashboard.ndjson`) covers the same data for ad-hoc
+  querying. **Kibana itself stays host-based** (`docker-compose.yml`), pointed at
+  `docker-compose.yml`'s own dev-only Elasticsearch, not the in-cluster one — same "host copy is
+  its own independent dev-flow instance" pattern as MySQL/Mongo/etc. now, not a live view into k8s
+  environment data.
 
 ## Repo layout
 
