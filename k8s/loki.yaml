@@ -1,0 +1,69 @@
+# In-cluster Loki, mirroring k8s/prometheus.yaml's split: a genuinely separate instance from
+# docker-compose.yml's own Loki (which stays, unchanged, covering the host-JVM/docker-compose dev
+# flow), living in the same "monitoring" namespace, reached through the k3d ingress at
+# loki.demo.localhost for Grafana's benefit (still in docker-compose, needs the external route).
+#
+# Unlike Prometheus, this split wasn't forced by a reachability problem — k8s's own Promtail
+# DaemonSet (k8s/promtail-daemonset.yaml) already pushes logs to the HOST Loki successfully today
+# (push-direction traffic works fine across the host/cluster boundary, unlike Prometheus's
+# pull-based scraping). This is a deliberate choice instead, matching the Prometheus precedent for
+# consistency — the tradeoff: Tempo's trace-to-logs jump (docker/grafana/provisioning/datasources/
+# datasources.yml's tracesToLogsV2) only finds logs in the SAME Loki a trace's originating service
+# wrote to, so it stops resolving for k8s-originated traces now that their logs live here instead
+# of the host Loki Tempo is wired to. Accepted tradeoff, not fixed further.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: loki
+  namespace: monitoring
+  labels: { app: loki }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: loki } }
+  template:
+    metadata: { labels: { app: loki } }
+    spec:
+      containers:
+        - name: loki
+          image: grafana/loki:latest
+          ports: [{ containerPort: 3100 }]
+          volumeMounts:
+            - { name: data, mountPath: /loki }
+          resources:
+            requests: { cpu: "100m", memory: "256Mi" }
+            limits: { cpu: "500m", memory: "512Mi" }
+          readinessProbe:
+            httpGet: { path: /ready, port: 3100 }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /ready, port: 3100 }
+            initialDelaySeconds: 20
+            periodSeconds: 20
+      volumes:
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: loki
+  namespace: monitoring
+spec:
+  selector: { app: loki }
+  ports: [{ port: 3100, targetPort: 3100 }]
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: loki-ingress
+  namespace: monitoring
+spec:
+  rules:
+    - host: loki.demo.localhost
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service: { name: loki, port: { number: 3100 } }
