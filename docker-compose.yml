@@ -117,6 +117,13 @@ services:
           }
         '
 
+  # k3d pods no longer reach this container — they now talk to their own in-cluster Kafka
+  # (k8s/kafka.yaml) instead of the PLAINTEXT_K8S listener below, matching the switch already made
+  # for demo-qa. This container is still very much in use, though: PLAINTEXT (localhost:9092) backs
+  # the local mvnw/IDE dev flow and host-tool debugging (kcat), and PLAINTEXT_INTERNAL (kafka:29092)
+  # backs docker-compose's own containerized app services (Option B, "full Docker Compose stack" in
+  # the README). PLAINTEXT_K8S (9094) is kept below even though nothing reaches it anymore, to avoid
+  # an unrelated listener-config change here.
   kafka:
     image: apache/kafka:3.8.0
     container_name: demo-kafka
@@ -243,6 +250,11 @@ services:
     # exact index (audit-log / audit-log-qa) instead of relying on a reader to filter the combined one.
     entrypoint: ["sh", "-c", "for f in audit-trail-dashboard audit-trail-dashboard-prod audit-trail-dashboard-qa; do curl -s -X POST http://kibana:5601/api/saved_objects/_import?overwrite=true -H 'kbn-xsrf: true' --form file=@/kibana/$$f.ndjson; done"]
 
+  # k3d pods no longer reach this container — they now talk to their own in-cluster Redis
+  # (k8s/redis.yaml) instead of via host.k3d.internal, matching the switch already made for
+  # demo-qa. This container is still very much in use, though: it backs the local mvnw/IDE dev
+  # flow, docker-compose's own containerized app services (Option B, "full Docker Compose stack"
+  # in the README — see the redis: entry in x-app-env above), and host-tool debugging (redis-cli).
   redis:
     image: redis:7-alpine
     container_name: demo-redis

@@ -1,4 +1,11 @@
 package com.example.order;
+import com.example.order.enums.OrderStatus;
+import com.example.order.model.Order;
+import com.example.order.model.OrderView;
+import com.example.order.repository.OrderRepository;
+import com.example.order.repository.OrderViewRepository;
+import com.example.order.service.InventoryServiceClient;
+import com.example.order.service.OrderServiceImpl;
 
 import com.example.common.events.EventContracts;
 import com.example.common.events.EventTypes;

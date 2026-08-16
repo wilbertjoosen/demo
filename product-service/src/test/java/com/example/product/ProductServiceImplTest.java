@@ -1,4 +1,7 @@
 package com.example.product;
+import com.example.product.model.Product;
+import com.example.product.repository.ProductRepository;
+import com.example.product.service.ProductServiceImpl;
 
 import com.example.common.events.DomainEvent;
 import com.example.common.events.EventContracts;

@@ -1,4 +1,10 @@
 package com.example.chat;
+import com.example.chat.model.Conversation;
+import com.example.chat.model.ConversationSummary;
+import com.example.chat.model.DirectMessage;
+import com.example.chat.repository.ConversationRepository;
+import com.example.chat.repository.DirectMessageRepository;
+import com.example.chat.service.ConversationServiceImpl;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

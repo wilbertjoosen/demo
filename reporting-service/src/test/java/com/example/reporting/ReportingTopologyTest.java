@@ -1,4 +1,8 @@
 package com.example.reporting;
+import com.example.reporting.config.ReportingTopology;
+import com.example.reporting.model.OrderMetric;
+import com.example.reporting.model.ProductRef;
+import com.example.reporting.model.UserRegistration;
 
 import com.example.common.events.DomainEvent;
 import com.example.common.events.EventContracts;
