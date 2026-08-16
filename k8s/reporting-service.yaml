@@ -39,6 +39,16 @@ spec:
           resources:
             requests: { cpu: "200m", memory: "384Mi" }
             limits: { cpu: "750m", memory: "640Mi" }
+          # Kafka Streams restores its RocksDB state stores by replaying 6 source topics
+          # (user/product/order/payment/shipping/delivery-events) from scratch on a cold start,
+          # which genuinely takes longer than a normal Spring Boot app's startup — without a
+          # startupProbe, livenessProbe's fixed 30s initialDelaySeconds was firing (and failing,
+          # nothing listening yet) before the app ever got a chance to finish, killing the
+          # container in an endless restart loop that never actually completed the restore.
+          startupProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8096 }
+            failureThreshold: 30
+            periodSeconds: 10
           readinessProbe:
             httpGet: { path: /actuator/health/readiness, port: 8096 }
             initialDelaySeconds: 20
