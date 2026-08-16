@@ -15,8 +15,9 @@
 # isolated — its own in-cluster instance in THIS namespace (k8s/mailpit.yaml), matching how it was
 # already a separate host container per environment.
 #
-# MongoDB and Elasticsearch are the remaining host-based pieces — host.k3d.internal is k3d's
-# built-in DNS name for the host machine, reaching whatever docker-compose still publishes there.
+# MongoDB and Elasticsearch are the SAME in-cluster instances production uses too now
+# (k8s/mongo.yaml, k8s/elasticsearch.yaml on the main branch), reached cross-namespace the same way
+# MySQL/Keycloak/Vault are — QA gets its own database/index names, same as before.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -30,16 +31,13 @@ data:
   KEYCLOAK_JWK_SET_URI: http://keycloak.demo.svc.cluster.local:8080/realms/demo-qa/protocol/openid-connect/certs
   KEYCLOAK_TOKEN_URI: http://keycloak.demo.svc.cluster.local:8080/realms/demo-qa/protocol/openid-connect/token
   KEYCLOAK_ADMIN_URI: http://keycloak.demo.svc.cluster.local:8080/admin/realms/demo-qa
-  # 3-node replica set (task #74) — host.docker.internal, not host.k3d.internal: the replica set's
-  # own config (see docker-compose.yml's mongo-rs-init) identifies its members by that address, so
-  # using it directly here avoids a seed-then-redirect hop. Verified reachable from k8s pods
-  # (k3d's own nodes are themselves Docker Desktop containers, so this resolves the same way
-  # host.k3d.internal does — proven via a live nslookup + nc from inside this cluster).
-  MONGO_HOST: host.docker.internal:27017,host.docker.internal:27018,host.docker.internal:27019
+  # 3-node replica set (task #74), now in-cluster on the main branch (k8s/mongo.yaml) — each
+  # member's own stable per-pod DNS name via its headless Service, reached cross-namespace.
+  MONGO_HOST: mongo-0.mongo-headless.demo.svc.cluster.local:27017,mongo-1.mongo-headless.demo.svc.cluster.local:27017,mongo-2.mongo-headless.demo.svc.cluster.local:27017
   MONGO_REPLICA_SET_PARAM: "?replicaSet=rs0"
   REDIS_HOST: redis
   REDIS_PORT: "6379"
-  ELASTICSEARCH_URI: http://host.k3d.internal:9200
+  ELASTICSEARCH_URI: http://elasticsearch.demo.svc.cluster.local:9200
   DB_HOST: mysql.demo.svc.cluster.local
   DB_PORT: "3306"
   DB_NAME: demo_qa
