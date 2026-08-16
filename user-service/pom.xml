@@ -9,7 +9,7 @@
         <relativePath>../pom.xml</relativePath>
     </parent>
     <artifactId>user-service</artifactId>
-    <version>1.0.0</version>
+    <version>1.0.1</version>
     <name>user-service</name>
     <description>User profiles (MongoDB), publishes user-events</description>
 
@@ -77,6 +77,11 @@
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-devtools</artifactId>
             <optional>true</optional>
         </dependency>
     </dependencies>

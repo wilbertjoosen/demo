@@ -139,6 +139,15 @@ cd frontend && npm install && npm run dev
 
 Frontend: http://localhost:5173
 
+`./start-local.sh` / `./stop-local.sh` automate the above (build, start every service + infra
+container in the background, tear down again). Both take `--infra` and/or `--services` to start or
+stop just one half — e.g. `./start-local.sh --infra` to bring up only the Docker containers, or
+`./stop-local.sh --services` to kill just the local `mvnw`/`npm` processes and leave infra running.
+With no flags, both do everything (unchanged default behavior). `stop-local.sh` also takes `-y` to
+skip its "stop infra too?" prompt. Every backend module also now has `spring-boot-devtools` on the
+classpath, so a rebuild while a service from these scripts (or an IDE run) is running triggers a
+fast in-process restart instead of a full relaunch.
+
 ### Option B — full Docker Compose stack
 
 ```bash
@@ -154,11 +163,20 @@ k3d cluster create demo --servers 1 --agents 2 -p "18090:80@loadbalancer" -p "18
 kubectl apply -f k8s/
 ```
 
-App: http://demo.localhost:18090 — infra (MySQL/Mongo/Kafka/Keycloak/etc.) still runs via Docker
-Compose on the host; pods reach it through `host.k3d.internal`. See [Kubernetes / GitOps](#kubernetes--gitops)
+App: http://demo.localhost:18090 — most infra (MySQL/Mongo/Elasticsearch/Keycloak/etc.) still runs
+via Docker Compose on the host, with pods reaching it through `host.k3d.internal`. Kafka and Redis
+are the exception: the cluster runs its own **in-cluster** Kafka + Redis instead (`k8s/kafka.yaml`,
+`k8s/redis.yaml`, wired up via `k8s/configmap-common.yaml`) — the Docker Compose `kafka`/`redis`
+containers are still there for host-JVM/IDE dev flows and host-tool debugging (`kcat`, `redis-cli`),
+they're just no longer what the cluster itself depends on. See [Kubernetes / GitOps](#kubernetes--gitops)
 for how ArgoCD takes over from here, and note the one manual step k3d always needs: **new/changed
 Docker images must be `k3d image import`ed** — there's no registry, so ArgoCD only manages manifests,
 never image builds.
+
+Day-to-day cluster start/stop (the cluster plus the host infra it depends on) is wrapped by
+`./k8s-local.sh {start|stop|restart|status}` — e.g. `./k8s-local.sh stop` runs `k3d cluster stop demo`
+then `docker compose stop`; `./k8s-local.sh start` runs `docker compose up -d` then
+`k3d cluster start demo` and tails `kubectl get pods -A -w` (pass `--no-watch` to skip the tail).
 
 ## Default credentials
 
@@ -192,15 +210,18 @@ Realm: `demo`. Client: `demo-spa` (public, PKCE).
 
 ### Infrastructure connection ports
 
-For connecting a DB client, `redis-cli`, `kcat`, etc. directly rather than through a UI:
+For connecting a DB client, `redis-cli`, `kcat`, etc. directly rather than through a UI. Note that
+these host ports back the Docker Compose containers used by the local JVM dev flow and host-tool
+debugging only — k8s pods reach their own **in-cluster** Kafka and Redis instead (`k8s/kafka.yaml`,
+`k8s/redis.yaml`), addressed as `kafka:9092` / `redis:6379` via `k8s/configmap-common.yaml`, not the
+ports below:
 
 | Service | Host:Port | Notes |
 |---|---|---|
 | MySQL | `localhost:3306` | `order-service`'s write model (db `demo`, user/pass `demo`/`demo`) |
 | MongoDB | `localhost:27017` | every other service's store, one logical DB per service |
 | Kafka (host clients) | `localhost:9092` | `PLAINTEXT` listener for local JVM services / host tools |
-| Kafka (k8s pods) | `host.k3d.internal:9094` | dedicated `PLAINTEXT_K8S` listener, only reachable from inside the k3d cluster |
-| Redis | `localhost:6379` | Resilience4j response caching |
+| Redis | `localhost:6379` | Resilience4j response caching (host-JVM/IDE dev flow, `redis-cli`) |
 | Elasticsearch | `localhost:9200` | `audit-service`'s store |
 | Loki | `localhost:3100` | log storage; query via Grafana's Explore tab rather than the raw API |
 | Mailpit SMTP | `localhost:1025` | what `notification-service` actually sends to; `:8025` above is its web inbox |
@@ -253,7 +274,19 @@ demo/
 │   product-comment-service/, product-media-service/, product-review-service/
 ├── frontend/                # Vue 3 SPA
 ├── docker/                  # Keycloak realm, Grafana/Kibana/Prometheus provisioning
-├── k8s/                     # Kubernetes manifests (ArgoCD-synced)
+├── k8s/                     # Kubernetes manifests (ArgoCD-synced), incl. kafka.yaml/redis.yaml
+│                             #   for the in-cluster infra those pods depend on
 ├── docker-compose.yml       # full local stack (infra + every service + frontend)
+├── start-local.sh, stop-local.sh  # host-JVM/npm dev flow — each takes --infra and/or --services
+├── k8s-local.sh             # k3d cluster + its host infra: start/stop/restart/status
 └── pom.xml                  # Maven reactor parent
 ```
+
+Each backend service module follows the same internal package layout under its base package
+(`com.example.<service>`): `config/` (Spring `@Configuration`/security config), `controller/`
+(REST endpoints), `enums/` (status/type enums), `model/` (entities, DTOs, `*ModelAssembler`s),
+`repository/` (Spring Data repositories), `saga/` (`@KafkaListener` domain-event consumers,
+including the choreographed-saga participants), `service/` (business logic, external clients).
+Modules with a WebSocket surface (`chat-service`, `notification-service`) add a `websocket/`
+package for handlers/interceptors. The `*ServiceApplication` bootstrap class stays directly in the
+base package, not in any sub-package.

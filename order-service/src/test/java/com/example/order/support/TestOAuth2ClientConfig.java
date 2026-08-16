@@ -1,5 +1,7 @@
 package com.example.order.support;
 
+import com.example.order.config.InventoryClientConfig;
+
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;

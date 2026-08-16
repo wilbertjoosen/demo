@@ -1,8 +1,10 @@
-# Shared by every app Deployment via envFrom.configMapRef — infra (MySQL/Mongo/Kafka/Redis/
-# Keycloak/Elasticsearch/Mailpit) deliberately stays in docker-compose on the host, not in this
-# cluster (matches the project's existing "infra on host, app services containerized" split).
+# Shared by every app Deployment via envFrom.configMapRef — infra (MySQL/Mongo/Elasticsearch/
+# Keycloak/Mailpit/Vault) deliberately stays in docker-compose on the host, not in this cluster
+# (matches the project's existing "infra on host, app services containerized" split).
 # host.k3d.internal is k3d's built-in DNS name for the host machine, reaching whatever
-# docker-compose already publishes there.
+# docker-compose already publishes there. Kafka and Redis are the exception: they now run
+# in-cluster (see k8s/kafka.yaml, k8s/redis.yaml) and are reached at their in-cluster Service
+# names below instead of host.k3d.internal.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -11,15 +13,14 @@ metadata:
 data:
   CONFIG_SERVER_URI: http://config-server:8888
   EUREKA_URI: http://eureka-server:8761/eureka
-  # port 9094: Kafka's PLAINTEXT_K8S listener, dedicated to pods in this cluster (see docker-compose.yml).
-  KAFKA_BOOTSTRAP_SERVERS: host.k3d.internal:9094
+  KAFKA_BOOTSTRAP_SERVERS: kafka:9092
   KEYCLOAK_ISSUER_URI: http://localhost:8081/realms/demo
   KEYCLOAK_JWK_SET_URI: http://host.k3d.internal:8081/realms/demo/protocol/openid-connect/certs
   KEYCLOAK_TOKEN_URI: http://host.k3d.internal:8081/realms/demo/protocol/openid-connect/token
   KEYCLOAK_ADMIN_URI: http://host.k3d.internal:8081/admin/realms/demo
   MONGO_HOST: host.k3d.internal
   MONGO_PORT: "27017"
-  REDIS_HOST: host.k3d.internal
+  REDIS_HOST: redis
   REDIS_PORT: "6379"
   ELASTICSEARCH_URI: http://host.k3d.internal:9200
   DB_HOST: host.k3d.internal
