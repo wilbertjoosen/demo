@@ -1,4 +1,4 @@
-# In-cluster Mailpit for the demo (prod) namespace. Unlike MySQL/Vault/Keycloak, Mailpit was
+# In-cluster Mailpit, in the infra namespace (k8s/namespace-infra.yaml). Unlike MySQL/Vault/Keycloak, Mailpit was
 # already a genuinely separate instance per environment on the host (docker-compose.yml's mailpit
 # vs docker-compose.qa.yml's mailpit-qa) — moving in-cluster keeps that same split, just as its
 # own Deployment per namespace instead of its own host container per environment. The demo-qa
@@ -11,7 +11,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: mailpit
-  namespace: demo
+  namespace: infra
   labels: { app: mailpit }
 spec:
   replicas: 1
@@ -41,7 +41,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: mailpit
-  namespace: demo
+  namespace: infra
 spec:
   selector: { app: mailpit }
   ports:

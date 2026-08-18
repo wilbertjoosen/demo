@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # Starts/stops the local k3d cluster ("demo") together with the docker-compose infra it still
-# depends on (pods reach Grafana/Tempo/Kibana via host.k3d.internal — see k8s/configmap-common.yaml
+# depends on (pods reach Grafana/Tempo via host.k3d.internal — see k8s/configmap-common.yaml
 # and docker-compose.yml). Wraps the manual sequence:
 #
 #   k3d cluster stop demo && docker compose stop
@@ -10,14 +10,16 @@
 # Only starts the infra k8s pods actually need, NOT docker-compose's app containers (Option B's
 # full-docker-compose-stack mode — irrelevant here, the cluster runs its own pods) and NOT the
 # dev-only pieces docker-compose also happens to host: Kafka, Redis, MySQL, Keycloak, Mailpit,
-# Vault, MongoDB, and Elasticsearch all now run in-cluster (k8s/kafka.yaml, k8s/redis.yaml,
+# Vault, MongoDB, Elasticsearch, and Kibana all now run in-cluster (k8s/kafka.yaml, k8s/redis.yaml,
 # k8s/mysql.yaml, k8s/keycloak.yaml, k8s/mailpit.yaml, k8s/vault.yaml, k8s/mongo.yaml,
-# k8s/elasticsearch.yaml); kafka-ui only matters once kafka is reachable from the host; this
-# compose file's own Prometheus/Loki are the host-JVM/compose-flow instances specifically — k8s
-# has its own separate in-cluster ones (k8s/prometheus.yaml, k8s/loki.yaml); its own Promtail only
-# ships logs to this file's own Loki (k8s pods get their logs shipped by the in-cluster
-# k8s/promtail-daemonset.yaml instead). Pass --with-dev to also start/stop those, e.g. if you're
-# running start-local.sh's host-JVM services against the cluster at the same time.
+# k8s/elasticsearch.yaml, k8s/kibana.yaml); kafka-ui only matters once kafka is reachable from the
+# host; this compose file's own Prometheus/Loki are the host-JVM/compose-flow instances
+# specifically — k8s has its own separate in-cluster ones (k8s/prometheus.yaml, k8s/loki.yaml);
+# its own Promtail only ships logs to this file's own Loki (k8s pods get their logs shipped by the
+# in-cluster k8s/promtail-daemonset.yaml instead). Rancher is also in-cluster now
+# (k8s-rancher/rancher.yaml), replacing the old docker-compose container entirely. Pass --with-dev
+# to also start/stop those, e.g. if you're running start-local.sh's host-JVM services against the
+# cluster at the same time.
 #
 # See start-local.sh/stop-local.sh for the non-k8s (mvnw/npm) local dev flow instead.
 
@@ -137,7 +139,7 @@ do_start() {
     if ! cluster_exists; then
         echo "  → Cluster '$CLUSTER_NAME' does not exist yet."
         echo "    Create it first — see README.md's 'Kubernetes / GitOps' section:"
-        echo "    k3d cluster create $CLUSTER_NAME --servers 1 --agents 2 -p \"18090:80@loadbalancer\" -p \"18453:443@loadbalancer\" -p \"8081:8081@loadbalancer\" --api-port 6550"
+        echo "    k3d cluster create $CLUSTER_NAME --servers 1 --agents 2 -p \"18090:80@loadbalancer\" -p \"18453:443@loadbalancer\" -p \"8081:8081@loadbalancer\" -p \"9080:9080@loadbalancer\" -p \"9443:9443@loadbalancer\" --api-port 6550"
         exit 1
     fi
 

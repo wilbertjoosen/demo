@@ -1,4 +1,5 @@
-# In-cluster MongoDB (3-node replica set) for the demo namespace — shared cross-namespace with
+# In-cluster MongoDB (3-node replica set), in the infra namespace (k8s/namespace-infra.yaml) —
+# shared cross-namespace with
 # demo-qa the same way MySQL/Keycloak/Vault are (k8s/mysql.yaml, k8s/keycloak.yaml, k8s/vault.yaml)
 # — QA gets its own database names, not a duplicate replica set.
 #
@@ -8,13 +9,13 @@
 # (the one name reachable from containers, host-JVM processes, and k8s pods alike, but NOT from
 # the host machine itself, which is exactly what broke local dev — see the git history around
 # start-local.sh's Mongo fix) — in-cluster members get proper, directly-addressable per-pod DNS
-# (mongo-0.mongo-headless.demo.svc.cluster.local etc.), so there's no equivalent host-resolution
+# (mongo-0.mongo-headless.infra.svc.cluster.local etc.), so there's no equivalent host-resolution
 # problem to design around here.
 apiVersion: v1
 kind: Service
 metadata:
   name: mongo-headless
-  namespace: demo
+  namespace: infra
   labels: { app: mongo }
 spec:
   clusterIP: None
@@ -25,7 +26,7 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: mongo
-  namespace: demo
+  namespace: infra
   labels: { app: mongo }
 spec:
   serviceName: mongo-headless
@@ -78,7 +79,7 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: mongo-rs-init
-  namespace: demo
+  namespace: infra
 spec:
   backoffLimit: 5
   template:
@@ -101,9 +102,9 @@ spec:
                   rs.initiate({
                     _id: "rs0",
                     members: [
-                      { _id: 0, host: "mongo-0.mongo-headless.demo.svc.cluster.local:27017" },
-                      { _id: 1, host: "mongo-1.mongo-headless.demo.svc.cluster.local:27017" },
-                      { _id: 2, host: "mongo-2.mongo-headless.demo.svc.cluster.local:27017" }
+                      { _id: 0, host: "mongo-0.mongo-headless.infra.svc.cluster.local:27017" },
+                      { _id: 1, host: "mongo-1.mongo-headless.infra.svc.cluster.local:27017" },
+                      { _id: 2, host: "mongo-2.mongo-headless.infra.svc.cluster.local:27017" }
                     ]
                   });
                   print("replica set initiated");

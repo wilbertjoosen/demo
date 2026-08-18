@@ -8,11 +8,7 @@
 # turned out not to be reachable from a container outside the cluster at all, discovery-via-API-
 # server notwithstanding. Grafana (still in docker-compose) reaches this one through the k3d
 # ingress at prometheus.demo.localhost, same port (18090) as everything else, routed by hostname.
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: monitoring
----
+# The "monitoring" namespace itself is k8s/namespace-monitoring.yaml, not declared here.
 apiVersion: v1
 kind: ServiceAccount
 metadata:

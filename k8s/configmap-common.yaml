@@ -29,22 +29,22 @@ metadata:
 data:
   CONFIG_SERVER_URI: http://config-server:8888
   EUREKA_URI: http://eureka-server:8761/eureka
-  KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+  KAFKA_BOOTSTRAP_SERVERS: kafka.infra.svc.cluster.local:9092
   KEYCLOAK_ISSUER_URI: http://localhost:8081/realms/demo
-  KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/demo/protocol/openid-connect/certs
-  KEYCLOAK_TOKEN_URI: http://keycloak:8080/realms/demo/protocol/openid-connect/token
-  KEYCLOAK_ADMIN_URI: http://keycloak:8080/admin/realms/demo
+  KEYCLOAK_JWK_SET_URI: http://keycloak.infra.svc.cluster.local:8080/realms/demo/protocol/openid-connect/certs
+  KEYCLOAK_TOKEN_URI: http://keycloak.infra.svc.cluster.local:8080/realms/demo/protocol/openid-connect/token
+  KEYCLOAK_ADMIN_URI: http://keycloak.infra.svc.cluster.local:8080/admin/realms/demo
   # 3-node replica set (task #74), now in-cluster (k8s/mongo.yaml) — each member's own stable
   # per-pod DNS name via the headless Service, no host.docker.internal indirection needed anymore.
-  MONGO_HOST: mongo-0.mongo-headless.demo.svc.cluster.local:27017,mongo-1.mongo-headless.demo.svc.cluster.local:27017,mongo-2.mongo-headless.demo.svc.cluster.local:27017
+  MONGO_HOST: mongo-0.mongo-headless.infra.svc.cluster.local:27017,mongo-1.mongo-headless.infra.svc.cluster.local:27017,mongo-2.mongo-headless.infra.svc.cluster.local:27017
   MONGO_REPLICA_SET_PARAM: "?replicaSet=rs0"
-  REDIS_HOST: redis
+  REDIS_HOST: redis.infra.svc.cluster.local
   REDIS_PORT: "6379"
-  ELASTICSEARCH_URI: http://elasticsearch:9200
-  DB_HOST: mysql
+  ELASTICSEARCH_URI: http://elasticsearch.infra.svc.cluster.local:9200
+  DB_HOST: mysql.infra.svc.cluster.local
   DB_PORT: "3306"
   DB_NAME: demo
-  MAIL_HOST: mailpit
+  MAIL_HOST: mailpit.infra.svc.cluster.local
   MAIL_PORT: "1025"
   INVENTORY_SERVICE_URI: http://inventory-service:8089
   CORS_ALLOWED_ORIGINS: http://localhost:5173,http://demo.localhost:18090
@@ -56,5 +56,5 @@ data:
   # itself is sensitive and lives in the vault-token k8s Secret (created imperatively per-namespace,
   # not committed — same pattern as ghcr-pull-secret) — it must match k8s/vault.yaml's fixed dev
   # root token.
-  VAULT_HOST: vault
+  VAULT_HOST: vault.infra.svc.cluster.local
   VAULT_PORT: "8200"

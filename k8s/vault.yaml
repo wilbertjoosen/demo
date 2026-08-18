@@ -1,7 +1,8 @@
-# In-cluster Vault (dev mode) for the demo namespace — shared across prod and QA the same way it
-# already is on the host (docker-compose.yml's own vault comment: "one throwaway local Vault, not
-# per-environment"). demo-qa reaches this via cross-namespace Service DNS
-# (vault.demo.svc.cluster.local — see k8s/configmap-common.yaml on the testing branch).
+# In-cluster Vault (dev mode), in the infra namespace (k8s/namespace-infra.yaml) — shared across
+# prod and QA the same way it already is on the host (docker-compose.yml's own vault comment: "one
+# throwaway local Vault, not per-environment"). Both demo and demo-qa reach this via cross-namespace
+# Service DNS (vault.infra.svc.cluster.local — see k8s/configmap-common.yaml here and on the
+# testing branch).
 #
 # emptyDir, not a PVC: dev-mode Vault is in-memory storage already (nothing persists across a
 # restart on the host either — see docker-compose.yml's comment), so there's nothing to preserve
@@ -11,7 +12,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: vault
-  namespace: demo
+  namespace: infra
   labels: { app: vault }
 spec:
   replicas: 1
@@ -42,7 +43,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: vault
-  namespace: demo
+  namespace: infra
 spec:
   selector: { app: vault }
   ports: [{ name: vault, port: 8200, targetPort: 8200 }]
@@ -54,7 +55,7 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: vault-init
-  namespace: demo
+  namespace: infra
 spec:
   backoffLimit: 5
   template:
