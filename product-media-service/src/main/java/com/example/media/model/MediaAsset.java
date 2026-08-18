@@ -12,7 +12,6 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
 
-/** {@code url} points at an externally-hosted asset (no file upload/storage backend in this demo). */
 @Document(collection = "media_assets")
 @Getter
 @NoArgsConstructor
@@ -24,6 +23,8 @@ public class MediaAsset {
     private String productId;
     private MediaType type;
     private String url;
+    private String fileMame;
+    private String path;
     private String caption;
     private int position;
 
@@ -42,10 +43,12 @@ public class MediaAsset {
     private boolean deleted = false;
     private Instant deletedAt;
 
-    public MediaAsset(String productId, MediaType type, String url, String caption, int position) {
+    public MediaAsset(String productId, MediaType type, String url, String fileMame, String path, String caption, int position) {
         this.productId = productId;
         this.type = type;
         this.url = url;
+        this.fileMame = fileMame;
+        this.path = path;
         this.caption = caption;
         this.position = position;
     }

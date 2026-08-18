@@ -50,8 +50,8 @@ async function uploadFile(rawFile: File) {
   form.type = type
   uploading.value = true
   try {
-    const url = await mediaApi.upload(rawFile)
-    await mediaApi.create({ productId: props.product.id, type, url, caption: form.caption || undefined })
+    const data = await mediaApi.upload(rawFile)
+    await mediaApi.create({ productId: props.product.id, type, url: `${data.url}`, fileName: `${data.fileName}`, caption: form.caption || undefined })
     ElMessage.success(t('media.added'))
     form.caption = ''
     await load()

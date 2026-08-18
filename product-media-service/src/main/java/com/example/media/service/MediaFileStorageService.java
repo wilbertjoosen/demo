@@ -1,5 +1,7 @@
 package com.example.media.service;
 
+import com.example.media.dto.MediaFileResponse;
+import com.example.media.ports.StoragePort;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -7,15 +9,9 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.util.Set;
 import java.util.UUID;
 
-/** Local-disk storage — no S3/MinIO in this demo (see application.yaml's media.upload-dir comment). */
 @Service
 public final class MediaFileStorageService {
 
@@ -23,39 +19,26 @@ public final class MediaFileStorageService {
             "jpg", "jpeg", "png", "gif", "webp", "mp4", "webm", "mov",
             "pdf", "doc", "docx", "xls", "xlsx");
 
-    private final Path uploadDir;
+    private final String uploadDir;
+    private final StoragePort storage;
 
-    public MediaFileStorageService(@Value("${media.upload-dir}") String uploadDir) {
-        this.uploadDir = Paths.get(uploadDir);
-        try {
-            Files.createDirectories(this.uploadDir);
-        } catch (IOException e) {
-            throw new IllegalStateException("Could not create media upload directory: " + this.uploadDir, e);
-        }
+    public MediaFileStorageService(@Value("${media.upload-dir}") String uploadDir,
+                                   StoragePort storage) {
+        this.storage = storage;
+        this.uploadDir = uploadDir;
     }
 
-    public String store(MultipartFile file) {
+    public MediaFileResponse store(MultipartFile file) throws IOException {
         String extension = extensionOf(file.getOriginalFilename());
         if (!ALLOWED_EXTENSIONS.contains(extension)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported file type: " + extension);
         }
-        String filename = UUID.randomUUID() + "." + extension;
-        Path target = resolve(filename);
-        try (InputStream in = file.getInputStream()) {
-            Files.copy(in, target, StandardCopyOption.REPLACE_EXISTING);
-        } catch (IOException e) {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Could not store file", e);
-        }
-        return filename;
-    }
+        String fileName = UUID.randomUUID() + "." + extension;
+        String fullPath = String.join("/", uploadDir, fileName);
 
-    /** filename is always our own UUID-based name, but resolve defensively — it still comes in over HTTP as a path variable. */
-    public Path resolve(String filename) {
-        Path target = uploadDir.resolve(filename).normalize();
-        if (!target.startsWith(uploadDir)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid filename");
-        }
-        return target;
+        String url = storage.uploadFile(file.getBytes(), fullPath, file.getContentType());
+
+        return new MediaFileResponse(url, fileName, uploadDir);
     }
 
     private String extensionOf(String originalFilename) {
