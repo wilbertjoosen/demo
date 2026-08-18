@@ -1,6 +1,5 @@
-# In-cluster Loki for the demo namespace, in its own "monitoring" namespace (this branch has no
-# k8s/prometheus.yaml, so this file owns creating that namespace — main/testing's equivalent
-# namespace is instead created by their own k8s/prometheus.yaml).
+# In-cluster Loki for the demo namespace, in its own "monitoring" namespace
+# (k8s/namespace-monitoring.yaml, alongside Prometheus/Grafana/Kibana).
 #
 # Unlike main/testing, k8s's own Promtail DaemonSet (k8s/promtail-daemonset.yaml) already pushed
 # to the HOST Loki successfully before this (push-direction traffic works fine across the
@@ -8,11 +7,6 @@
 # architecture, not a fix for a reachability problem. Tradeoff: Tempo's trace-to-logs jump would
 # only find logs in one fixed Loki, but this branch has no Tempo at all, so that tradeoff doesn't
 # apply here.
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: monitoring
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
