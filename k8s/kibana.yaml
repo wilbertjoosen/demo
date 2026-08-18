@@ -87,11 +87,20 @@ spec:
 # command). Jobs have no native "wait for another Deployment's readiness" primitive the way
 # docker-compose's `depends_on: condition: service_healthy` does, so an initContainer polls Kibana's
 # own /api/status first.
+#
+# ArgoCD hook, not a plain synced resource: a Job's spec.template is immutable, so once ArgoCD has
+# applied this once, every later sync tries to patch the completed Job in place and fails with
+# "field is immutable". hook-delete-policy: BeforeHookCreation makes ArgoCD delete the previous
+# run and create a fresh one each sync instead of patching — the correct fix for any
+# apply-once/immutable-spec resource under GitOps, not something to work around by hand.
 apiVersion: batch/v1
 kind: Job
 metadata:
   name: kibana-dashboard-init
   namespace: monitoring
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
 spec:
   backoffLimit: 3
   template:
