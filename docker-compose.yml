@@ -129,33 +129,6 @@ services:
       timeout: 5s
       retries: 10
 
-  kibana:
-    image: docker.elastic.co/kibana/kibana:9.1.0
-    container_name: demo-kibana
-    restart: unless-stopped
-    environment:
-      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
-    ports:
-      - "5601:5601"
-    depends_on:
-      - elasticsearch
-    healthcheck:
-      test: ["CMD-SHELL", "curl -s http://localhost:5601/api/status | grep -q '\"level\":\"available\"'"]
-      interval: 10s
-      timeout: 5s
-      retries: 30
-
-  kibana-dashboard-init:
-    image: curlimages/curl:latest
-    container_name: demo-kibana-dashboard-init
-    restart: "no"
-    depends_on:
-      kibana:
-        condition: service_healthy
-    volumes:
-      - ./docker/kibana:/kibana:ro
-    entrypoint: ["sh", "-c", "curl -s -X POST http://kibana:5601/api/saved_objects/_import?overwrite=true -H 'kbn-xsrf: true' --form file=@/kibana/audit-trail-dashboard.ndjson"]
-
   # Dev/host-debug only: k8s pods no longer depend on this container — they have their own
   # in-cluster Redis now (see k8s/redis.yaml). This one remains for the local mvnw/IDE dev flow
   # and host-tool debugging (redis-cli) against localhost:6379.
@@ -167,56 +140,6 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
-
-  prometheus:
-    image: prom/prometheus:latest
-    container_name: demo-prometheus
-    restart: unless-stopped
-    volumes:
-      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - prometheus_data:/prometheus
-    ports:
-      - "9090:9090"
-    # Lets the container resolve host.docker.internal on Linux too (already built-in on Docker Desktop/macOS).
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-
-  loki:
-    image: grafana/loki:latest
-    container_name: demo-loki
-    restart: unless-stopped
-    ports:
-      - "3100:3100"
-    volumes:
-      - loki_data:/loki
-
-  promtail:
-    image: grafana/promtail:latest
-    container_name: demo-promtail
-    restart: unless-stopped
-    volumes:
-      - ./docker/promtail/promtail-config.yml:/etc/promtail/config.yml:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    command: -config.file=/etc/promtail/config.yml
-    depends_on:
-      - loki
-
-  grafana:
-    image: grafana/grafana:latest
-    container_name: demo-grafana
-    restart: unless-stopped
-    environment:
-      GF_SECURITY_ADMIN_USER: admin
-      GF_SECURITY_ADMIN_PASSWORD: admin
-    volumes:
-      - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./docker/grafana/dashboards:/etc/grafana/dashboards:ro
-      - grafana_data:/var/lib/grafana
-    ports:
-      - "3000:3000"
-    depends_on:
-      - prometheus
-      - loki
 
   # --- App services -----------------------------------------------------------------------
   # Not meant to run alongside the local `mvn spring-boot:run` processes used throughout dev —
@@ -566,7 +489,4 @@ volumes:
   mongo_data:
   elasticsearch_data:
   redis_data:
-  prometheus_data:
-  loki_data:
-  grafana_data:
   media_uploads:

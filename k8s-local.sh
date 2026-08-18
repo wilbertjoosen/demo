@@ -5,18 +5,20 @@
 #   k3d cluster stop demo && docker compose stop
 #   docker compose up -d && k3d cluster start demo && kubectl get pods -A -w
 #
-# Only starts the infra k8s pods actually need — which, as of k8s/grafana.yaml, k8s/prometheus.yaml,
-# and k8s/kibana.yaml, is none of docker-compose's infra at all (K8S_INFRASTRUCTURE in
-# local-infra.sh is empty). NOT docker-compose's app containers either (Option B's
-# full-docker-compose-stack mode — irrelevant here, the cluster runs its own pods) and NOT the
-# dev-only pieces docker-compose also happens to host: Kafka, Redis, MySQL, Keycloak, Mailpit,
-# MongoDB, Elasticsearch, Loki, Promtail, Prometheus, Grafana, and Kibana all now run in-cluster
-# (k8s/kafka.yaml, k8s/redis.yaml, k8s/mysql.yaml, k8s/keycloak.yaml, k8s/mailpit.yaml,
-# k8s/mongo.yaml, k8s/elasticsearch.yaml, k8s/loki.yaml, k8s/promtail-daemonset.yaml,
-# k8s/prometheus.yaml, k8s/grafana.yaml, k8s/kibana.yaml) — the docker-compose versions all stay
-# for the host-JVM/compose-flow dev loop specifically, wired to host.docker.internal/localhost
-# targets, same as every dev-only piece. Pass --with-dev to also start/stop that dev-only set, e.g.
-# if you're running start-local.sh's host-JVM services against the cluster at the same time.
+# Only starts the infra k8s pods actually need — which is none of docker-compose's infra at all
+# (K8S_INFRASTRUCTURE in local-infra.sh is empty). NOT docker-compose's app containers either
+# (Option B's full-docker-compose-stack mode — irrelevant here, the cluster runs its own pods) and
+# NOT the dev-only pieces docker-compose also happens to host: Kafka, Redis, MySQL, Keycloak,
+# Mailpit, MongoDB, and Elasticsearch all now run in-cluster (k8s/kafka.yaml, k8s/redis.yaml,
+# k8s/mysql.yaml, k8s/keycloak.yaml, k8s/mailpit.yaml, k8s/mongo.yaml, k8s/elasticsearch.yaml) — the
+# docker-compose versions stay for the host-JVM/compose-flow dev loop specifically, wired to
+# host.docker.internal/localhost targets, same as every dev-only piece. Grafana/Prometheus/Loki/
+# Promtail/Kibana aren't in docker-compose.yml at all any more — every one of them already has an
+# in-cluster equivalent (k8s/grafana.yaml, k8s/prometheus.yaml, k8s/loki.yaml,
+# k8s/promtail-daemonset.yaml, k8s/kibana.yaml), so the host-compose copies were pure duplication
+# regardless of which local dev flow you're using. Pass --with-dev to also start/stop the dev-only
+# set, e.g. if you're running start-local.sh's host-JVM services against the cluster at the same
+# time.
 #
 # See start-local.sh/stop-local.sh for the non-k8s (mvnw/npm) local dev flow instead.
 

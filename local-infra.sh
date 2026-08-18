@@ -7,50 +7,38 @@
 # no vault/vault-init (order-service here still reads DB_USERNAME/DB_PASSWORD as plain env vars,
 # no Vault integration to wire up), no tempo (not defined at all here), and a single "mongodb"
 # container rather than a 3-node mongo1/2/3 + mongo-rs-init replica set.
+#
+# Grafana/Prometheus/Loki/Promtail/Kibana aren't in docker-compose.yml at all any more — every one
+# of them already has an in-cluster equivalent (k8s/grafana.yaml, k8s/prometheus.yaml, k8s/loki.yaml,
+# k8s/promtail-daemonset.yaml, k8s/kibana.yaml), so the host-compose copies were pure duplication
+# regardless of which local dev flow (host-JVM or k8s) you're using — removed rather than kept
+# dev-only.
 
 INFRASTRUCTURE=(
     "mysql"
     "mongodb"
     "kafka"
     "kafka-ui"
-    "loki"
-    "prometheus"
     "keycloak"
     "mailpit"
-    "promtail"
     "elasticsearch"
     "redis"
-    "grafana"
-    "kibana"
 )
 
-# Of the above, the ones k8s pods no longer depend on — as of k8s/grafana.yaml, k8s/prometheus.yaml,
-# and k8s/kibana.yaml, that's now everything: Grafana and Kibana were the last two pieces still
-# reached by pods via host.k3d.internal, and now have in-cluster equivalents of their own too, same
-# as Kafka, Redis, MySQL, Keycloak, Mailpit (k8s/kafka.yaml, k8s/redis.yaml, k8s/mysql.yaml,
-# k8s/keycloak.yaml, k8s/mailpit.yaml), MongoDB, and Elasticsearch (k8s/mongo.yaml,
-# k8s/elasticsearch.yaml). kafka-ui only makes sense once kafka itself is reachable from the host;
-# this compose file's own "loki"/"grafana"/"prometheus"/"kibana" are the host-JVM/compose-flow
-# instances specifically, wired to host.docker.internal/localhost targets
-# (docker/prometheus/prometheus.yml) — k8s has its own separate in-cluster ones instead
-# (k8s/loki.yaml, k8s/grafana.yaml, k8s/prometheus.yaml, k8s/kibana.yaml); "promtail" only ships
-# logs to this file's own "loki" (k8s pods get their own logs shipped by the in-cluster
-# k8s/promtail-daemonset.yaml instead, a resource applied directly rather than run through
-# docker-compose at all).
+# Of the above, the ones k8s pods no longer depend on — Kafka, Redis, MySQL, Keycloak, Mailpit
+# (k8s/kafka.yaml, k8s/redis.yaml, k8s/mysql.yaml, k8s/keycloak.yaml, k8s/mailpit.yaml), MongoDB,
+# and Elasticsearch (k8s/mongo.yaml, k8s/elasticsearch.yaml) all have in-cluster equivalents.
+# kafka-ui only makes sense once kafka itself is reachable from the host, i.e. only for the
+# host-JVM dev flow.
 DEV_ONLY_INFRASTRUCTURE=(
     "kafka"
     "kafka-ui"
     "redis"
-    "prometheus"
     "mysql"
     "keycloak"
     "mailpit"
     "mongodb"
     "elasticsearch"
-    "loki"
-    "promtail"
-    "grafana"
-    "kibana"
 )
 
 # What a k8s-only workflow (k8s-local.sh's default) actually needs: INFRASTRUCTURE minus

@@ -18,8 +18,9 @@
 # go straight through the cluster (faster, and no host round-trip needed) — only the issuer itself
 # has to be the externally-reachable address.
 #
-# Loki (docker/grafana's own datasources) stays host-based on purpose — see k8s/loki.yaml's
-# comment for why it got a genuinely separate in-cluster instance rather than being pointed here.
+# No LOKI_HOST here — app services never talk to Loki directly, Promtail ships their stdout logs
+# to it transparently. See k8s/loki.yaml's comment for why it's a genuinely separate in-cluster
+# instance rather than something app services would need to know the address of.
 apiVersion: v1
 kind: ConfigMap
 metadata:
