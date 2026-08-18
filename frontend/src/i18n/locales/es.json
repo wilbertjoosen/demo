@@ -47,6 +47,7 @@
     "profile": "Perfil",
     "messages": "Mensajes",
     "admin": "Administración",
+    "queues": "Colas",
     "logout": "Cerrar sesión",
     "login": "Iniciar sesión"
   },
@@ -114,7 +115,8 @@
       "IN_TRANSIT": "En tránsito",
       "OUT_FOR_DELIVERY": "En reparto",
       "DELIVERED": "Entregado"
-    }
+    },
+    "uploadProof": "Subir comprobante"
   },
   "profile": {
     "title": "Mi Perfil",
@@ -170,7 +172,50 @@
     "temporaryPassword": "Contraseña temporal",
     "identityStoredInKeycloak": "Al guardar, estos datos se actualizan directamente en Keycloak.",
     "userCreated": "Usuario creado",
-    "userCreateError": "No se pudo crear el usuario"
+    "userCreateError": "No se pudo crear el usuario",
+    "reports": "Informes"
+  },
+  "queues": {
+    "title": "Colas de tareas",
+    "paymentReview": "Revisión de pagos",
+    "shipments": "Envíos",
+    "deliveries": "Entregas",
+    "filter": {
+      "pending": "Pendiente",
+      "done": "Hecho",
+      "all": "Todo"
+    },
+    "dateRange": "Rango de fechas",
+    "orderId": "Pedido",
+    "method": "Método",
+    "quantity": "Cant.",
+    "email": "Correo",
+    "status": "Estado",
+    "created": "Creado",
+    "reason": "Motivo",
+    "approve": "Aprobar",
+    "reject": "Rechazar",
+    "confirmPicked": "Confirmar recogido",
+    "reportIssue": "Reportar problema",
+    "confirmDelivered": "Confirmar entregado",
+    "reasonPromptTitle": "Motivo (opcional)",
+    "reasonPromptPlaceholder": "¿Por qué se rechaza/marca?",
+    "confirmApprove": "¿Aprobar este pago? Esto avanza el pedido a PAID.",
+    "confirmConfirmPicked": "¿Confirmar que este envío fue recogido y entregado al transportista?",
+    "confirmConfirmDelivered": "¿Confirmar que esta entrega fue completada?",
+    "actionSuccess": "Listo",
+    "actionError": "No se pudo completar la acción",
+    "empty": "Nada por aquí",
+    "shipmentStatus": {
+      "PENDING_WAREHOUSE": "Pendiente de recogida",
+      "DISPATCHED": "Despachado",
+      "FAILED": "Fallido"
+    },
+    "deliveryStatus": {
+      "PENDING_DELIVERY_AGENT": "Pendiente de entrega",
+      "DELIVERED": "Entregado",
+      "FAILED": "Fallido"
+    }
   },
   "address": {
     "street": "Calle",
@@ -187,9 +232,26 @@
       "DEBIT_CARD": "Tarjeta de débito",
       "PAYPAL": "PayPal",
       "PIX": "Pix",
-      "BOLETO": "Boleto"
+      "BOLETO": "Boleto",
+      "BANK_TRANSFER": "Transferencia bancaria",
+      "CASH": "Efectivo"
     },
-    "unavailable": "No disponible actualmente"
+    "unavailable": "No disponible actualmente",
+    "status": {
+      "PENDING": "Pendiente",
+      "AWAITING_REVIEW": "En revisión",
+      "COMPLETED": "Completado",
+      "FAILED": "Fallido",
+      "REFUNDED": "Reembolsado"
+    },
+    "proofDialogTitle": "Comprobante de pago — pedido {id}",
+    "noPaymentYet": "Aún no hay registro de pago",
+    "noProofYet": "Aún no se subió comprobante",
+    "uploadProof": "Subir comprobante",
+    "replaceProof": "Reemplazar comprobante",
+    "viewProofFile": "Ver archivo subido",
+    "proofUploaded": "Comprobante subido",
+    "proofUploadError": "No se pudo subir el comprobante"
   },
   "shipping": {
     "carriers": {
@@ -232,5 +294,52 @@
     "deleteError": "No se pudo eliminar el comentario",
     "editError": "No se pudo editar el comentario",
     "edited": "editado"
+  },
+  "reports": {
+    "loadError": "No se pudieron cargar los datos del informe",
+    "ordersRevenue": {
+      "title": "Pedidos e ingresos",
+      "totalOrders": "Pedidos totales",
+      "totalRevenue": "Ingresos totales",
+      "byStatus": "Pedidos por estado",
+      "dailyOrders": "Pedidos por día"
+    },
+    "sagaHealth": {
+      "title": "Salud de la saga",
+      "inProgress": "En curso",
+      "completed": "Completados",
+      "cancelled": "Cancelados",
+      "cancellationRate": "Tasa de cancelación",
+      "avgTimeToConfirmation": "Tiempo medio hasta confirmación",
+      "minutes": "{count} min",
+      "noCompletedOrders": "Aún no hay pedidos completados",
+      "failuresByStage": "Cancelaciones por etapa",
+      "userCancelledBeforePayment": "Cancelado antes del pago"
+    },
+    "topProducts": {
+      "title": "Productos más vendidos e inventario",
+      "product": "Producto",
+      "sku": "SKU",
+      "quantityOrdered": "Cant. pedida",
+      "orderCount": "Pedidos",
+      "revenue": "Ingresos",
+      "inactive": "Eliminado",
+      "empty": "Aún no hay pedidos en este período"
+    },
+    "userGrowth": {
+      "title": "Crecimiento de usuarios",
+      "totalNewUsers": "Usuarios nuevos",
+      "dailyRegistrations": "Registros por día"
+    },
+    "drillDown": {
+      "ordersTitle": "Pedidos — {label}",
+      "usersTitle": "Usuarios nuevos — {label}",
+      "orderId": "Pedido",
+      "quantity": "Cant.",
+      "user": "Usuario",
+      "created": "Creado",
+      "empty": "Sin registros",
+      "loadError": "No se pudieron cargar los detalles"
+    }
   }
 }

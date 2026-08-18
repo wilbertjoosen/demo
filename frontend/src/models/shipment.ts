@@ -12,10 +12,15 @@ export interface ShipmentQuote {
   cost: number
 }
 
+export type ShipmentStatus = 'PENDING_WAREHOUSE' | 'DISPATCHED' | 'FAILED'
+
 export interface Shipment {
   id: string
   orderId: string
-  status: 'DISPATCHED' | 'FAILED'
+  email: string | null
+  quantity: number
+  status: ShipmentStatus
+  issueReason: string | null
   carrier: ShippingCarrier
   cost: number
   trackingStatus: TrackingStatus | null

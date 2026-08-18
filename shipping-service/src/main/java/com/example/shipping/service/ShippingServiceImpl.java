@@ -1,5 +1,4 @@
 package com.example.shipping.service;
-
 import com.example.shipping.enums.ShipmentStatus;
 import com.example.shipping.enums.TrackingStatus;
 import com.example.shipping.model.Shipment;
@@ -41,15 +40,52 @@ public class ShippingServiceImpl implements ShippingService {
     @Override
     public void ship(
             String orderId, String keycloakUserId, String email, int quantity, ShippingCarrier carrier) {
-        boolean success = quantity != SIMULATED_FAILURE_QUANTITY;
         BigDecimal cost = rateCalculator.quote(carrier, quantity);
-        shipmentRepository.save(new Shipment(
-                orderId, keycloakUserId, success ? ShipmentStatus.DISPATCHED : ShipmentStatus.FAILED, carrier, cost));
 
-        kafkaTemplate.send(Topics.SHIPPING_EVENTS, DomainEvent.of(
-                success ? EventTypes.SHIPPED : EventTypes.SHIPPING_FAILED,
-                orderId,
-                Map.of("email", email == null ? "" : email, "quantity", quantity)));
+        // Simulated stockout — a system-detected failure, not something a warehouse pick review
+        // would catch, so it fails immediately without needing PENDING_WAREHOUSE review.
+        if (quantity == SIMULATED_FAILURE_QUANTITY) {
+            shipmentRepository.save(new Shipment(orderId, keycloakUserId, ShipmentStatus.FAILED, carrier, cost));
+            kafkaTemplate.send(Topics.SHIPPING_EVENTS, DomainEvent.of(EventTypes.SHIPPING_FAILED, orderId,
+                    Map.of("email", email == null ? "" : email, "quantity", quantity)));
+            return;
+        }
+
+        Shipment shipment = shipmentRepository.save(new Shipment(
+                orderId, keycloakUserId, email, quantity, ShipmentStatus.PENDING_WAREHOUSE, carrier, cost));
+        log.info("Shipment {} for order {} is PENDING_WAREHOUSE — awaiting pick confirmation", shipment.getId(), orderId);
+    }
+
+    private Shipment findPendingWarehouse(String id) {
+        Shipment shipment = shipmentRepository.findByIdAndDeletedFalse(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (shipment.getStatus() != ShipmentStatus.PENDING_WAREHOUSE) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Shipment " + id + " is not pending warehouse review (status: " + shipment.getStatus() + ")");
+        }
+        return shipment;
+    }
+
+    @Override
+    public void confirmPicked(String id) {
+        Shipment shipment = findPendingWarehouse(id);
+        shipment.setStatus(ShipmentStatus.DISPATCHED);
+        shipment.advanceTracking(TrackingStatus.LABEL_CREATED);
+        shipmentRepository.save(shipment);
+        log.info("Shipment {} for order {} confirmed picked — DISPATCHED", shipment.getId(), shipment.getOrderId());
+        kafkaTemplate.send(Topics.SHIPPING_EVENTS, DomainEvent.of(EventTypes.SHIPPED, shipment.getOrderId(),
+                Map.of("email", shipment.getEmail() == null ? "" : shipment.getEmail(), "quantity", shipment.getQuantity())));
+    }
+
+    @Override
+    public void reportIssue(String id, String reason) {
+        Shipment shipment = findPendingWarehouse(id);
+        shipment.setStatus(ShipmentStatus.FAILED);
+        shipment.setIssueReason(reason == null || reason.isBlank() ? "reported_by_warehouse" : reason);
+        shipmentRepository.save(shipment);
+        log.info("Shipment {} for order {} reported as an issue: {}", shipment.getId(), shipment.getOrderId(), shipment.getIssueReason());
+        kafkaTemplate.send(Topics.SHIPPING_EVENTS, DomainEvent.of(EventTypes.SHIPPING_FAILED, shipment.getOrderId(),
+                Map.of("email", shipment.getEmail() == null ? "" : shipment.getEmail(), "quantity", shipment.getQuantity())));
     }
 
     @Override

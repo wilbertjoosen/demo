@@ -1,5 +1,4 @@
 package com.example.shipping.model;
-
 import com.example.shipping.enums.TrackingStatus;
 
 import lombok.Getter;

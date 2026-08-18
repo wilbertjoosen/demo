@@ -47,6 +47,7 @@
     "profile": "Profile",
     "messages": "Messages",
     "admin": "Admin",
+    "queues": "Queues",
     "logout": "Logout",
     "login": "Log in"
   },
@@ -114,7 +115,8 @@
       "IN_TRANSIT": "In transit",
       "OUT_FOR_DELIVERY": "Out for delivery",
       "DELIVERED": "Delivered"
-    }
+    },
+    "uploadProof": "Upload proof"
   },
   "profile": {
     "title": "My Profile",
@@ -170,7 +172,50 @@
     "temporaryPassword": "Temporary password",
     "identityStoredInKeycloak": "Saving these updates the account directly in Keycloak.",
     "userCreated": "User created",
-    "userCreateError": "Could not create user"
+    "userCreateError": "Could not create user",
+    "reports": "Reports"
+  },
+  "queues": {
+    "title": "Action Queues",
+    "paymentReview": "Payment Review",
+    "shipments": "Shipments",
+    "deliveries": "Deliveries",
+    "filter": {
+      "pending": "Pending",
+      "done": "Done",
+      "all": "All"
+    },
+    "dateRange": "Date range",
+    "orderId": "Order",
+    "method": "Method",
+    "quantity": "Qty",
+    "email": "Email",
+    "status": "Status",
+    "created": "Created",
+    "reason": "Reason",
+    "approve": "Approve",
+    "reject": "Reject",
+    "confirmPicked": "Confirm picked",
+    "reportIssue": "Report issue",
+    "confirmDelivered": "Confirm delivered",
+    "reasonPromptTitle": "Reason (optional)",
+    "reasonPromptPlaceholder": "Why is this being rejected/flagged?",
+    "confirmApprove": "Approve this payment? This advances the order to PAID.",
+    "confirmConfirmPicked": "Confirm this shipment was picked and handed to the carrier?",
+    "confirmConfirmDelivered": "Confirm this delivery was completed?",
+    "actionSuccess": "Done",
+    "actionError": "Could not complete the action",
+    "empty": "Nothing here",
+    "shipmentStatus": {
+      "PENDING_WAREHOUSE": "Awaiting pick",
+      "DISPATCHED": "Dispatched",
+      "FAILED": "Failed"
+    },
+    "deliveryStatus": {
+      "PENDING_DELIVERY_AGENT": "Awaiting delivery",
+      "DELIVERED": "Delivered",
+      "FAILED": "Failed"
+    }
   },
   "address": {
     "street": "Street",
@@ -187,9 +232,26 @@
       "DEBIT_CARD": "Debit card",
       "PAYPAL": "PayPal",
       "PIX": "Pix",
-      "BOLETO": "Boleto"
+      "BOLETO": "Boleto",
+      "BANK_TRANSFER": "Bank transfer",
+      "CASH": "Cash"
     },
-    "unavailable": "Currently unavailable"
+    "unavailable": "Currently unavailable",
+    "status": {
+      "PENDING": "Pending",
+      "AWAITING_REVIEW": "Awaiting review",
+      "COMPLETED": "Completed",
+      "FAILED": "Failed",
+      "REFUNDED": "Refunded"
+    },
+    "proofDialogTitle": "Payment proof — order {id}",
+    "noPaymentYet": "No payment record yet",
+    "noProofYet": "No proof uploaded yet",
+    "uploadProof": "Upload proof",
+    "replaceProof": "Replace proof",
+    "viewProofFile": "View uploaded file",
+    "proofUploaded": "Proof uploaded",
+    "proofUploadError": "Could not upload proof"
   },
   "shipping": {
     "carriers": {
@@ -232,5 +294,52 @@
     "deleteError": "Could not delete comment",
     "editError": "Could not edit comment",
     "edited": "edited"
+  },
+  "reports": {
+    "loadError": "Could not load report data",
+    "ordersRevenue": {
+      "title": "Orders & Revenue",
+      "totalOrders": "Total orders",
+      "totalRevenue": "Total revenue",
+      "byStatus": "Orders by status",
+      "dailyOrders": "Orders per day"
+    },
+    "sagaHealth": {
+      "title": "Saga Health",
+      "inProgress": "In progress",
+      "completed": "Completed",
+      "cancelled": "Cancelled",
+      "cancellationRate": "Cancellation rate",
+      "avgTimeToConfirmation": "Avg. time to confirmation",
+      "minutes": "{count} min",
+      "noCompletedOrders": "No completed orders yet",
+      "failuresByStage": "Cancellations by stage",
+      "userCancelledBeforePayment": "Cancelled before payment"
+    },
+    "topProducts": {
+      "title": "Top Products & Inventory",
+      "product": "Product",
+      "sku": "SKU",
+      "quantityOrdered": "Qty ordered",
+      "orderCount": "Orders",
+      "revenue": "Revenue",
+      "inactive": "Deleted",
+      "empty": "No orders in this period yet"
+    },
+    "userGrowth": {
+      "title": "User Growth",
+      "totalNewUsers": "New users",
+      "dailyRegistrations": "Registrations per day"
+    },
+    "drillDown": {
+      "ordersTitle": "Orders — {label}",
+      "usersTitle": "New users — {label}",
+      "orderId": "Order",
+      "quantity": "Qty",
+      "user": "User",
+      "created": "Created",
+      "empty": "No records",
+      "loadError": "Could not load details"
+    }
   }
 }

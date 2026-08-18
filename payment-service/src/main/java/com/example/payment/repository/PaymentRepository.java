@@ -1,5 +1,5 @@
 package com.example.payment.repository;
-
+import com.example.payment.enums.PaymentStatus;
 import com.example.payment.model.Payment;
 
 import org.springframework.data.mongodb.repository.MongoRepository;
@@ -15,4 +15,6 @@ public interface PaymentRepository extends MongoRepository<Payment, String> {
     List<Payment> findByDeletedFalse();
 
     Optional<Payment> findByIdAndDeletedFalse(String id);
+
+    List<Payment> findByStatus(PaymentStatus status);
 }

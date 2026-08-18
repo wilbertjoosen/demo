@@ -1,5 +1,4 @@
 package com.example.shipping.model;
-
 import com.example.shipping.controller.ShipmentController;
 
 import org.springframework.hateoas.CollectionModel;
