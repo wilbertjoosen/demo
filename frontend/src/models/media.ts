@@ -16,6 +16,7 @@ export interface MediaAsset {
   productId: string
   type: MediaType
   url: string
+  fileName: string
   caption: string | null
   position: number
   createdAt: string

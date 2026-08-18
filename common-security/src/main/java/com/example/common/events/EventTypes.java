@@ -5,6 +5,8 @@ public final class EventTypes {
     public static final String USER_REGISTERED = "USER_REGISTERED";
 
     public static final String PRODUCT_CREATED = "PRODUCT_CREATED";
+    public static final String PRODUCT_UPDATED = "PRODUCT_UPDATED";
+    public static final String PRODUCT_DELETED = "PRODUCT_DELETED";
 
     public static final String ORDER_CREATED = "ORDER_CREATED";
     public static final String ORDER_CANCELLED = "ORDER_CANCELLED";
