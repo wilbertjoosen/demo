@@ -11,6 +11,13 @@ notifications:
   fallback-email: ${NOTIFICATIONS_FALLBACK_EMAIL:admin@example.com}
 
 spring:
+  cloud:
+    aws:
+      region:
+        static: ${AWS_REGION:us-east-1}
+      credentials:
+        access-key: ${AWS_ACCESS_KEY_ID}
+        secret-key: ${AWS_SECRET_ACCESS_KEY}
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     producer:

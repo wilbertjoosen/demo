@@ -1,6 +1,5 @@
 server:
   port: 8092
-
 spring:
   application:
     name: product-media-service
@@ -25,9 +24,7 @@ spring:
       max-request-size: 25MB
 
 media:
-  # Local-disk storage — matches this project's "demo, not production" scope (no S3/MinIO). Needs a
-  # persistent volume in docker-compose/k8s or uploads are lost on container recreation.
-  upload-dir: ${MEDIA_UPLOAD_DIR:/tmp/media-uploads}
+  upload-dir: ${MEDIA_UPLOAD_DIR:media-uploads}
 
 eureka:
   client:
@@ -46,3 +43,7 @@ management:
     health:
       probes:
         enabled: true
+
+aws:
+  s3:
+    bucket-name: demo-wilbert

@@ -1,12 +1,10 @@
 package com.example.media.controller;
 
-import com.example.media.enums.MediaType;
+import com.example.media.dto.CreateMediaRequest;
 import com.example.media.model.MediaAsset;
 import com.example.media.model.MediaModelAssembler;
 import com.example.media.service.MediaService;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.hateoas.CollectionModel;
 import org.springframework.hateoas.EntityModel;
@@ -27,13 +25,10 @@ public class MediaController {
         return assembler.toCollectionModel(mediaService.listByProduct(productId));
     }
 
-    public record CreateMediaRequest(@NotBlank String productId, @NotNull MediaType type, @NotBlank String url, String caption) {
-    }
-
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'PRODUCT_MANAGER')")
     public ResponseEntity<EntityModel<MediaAsset>> create(@Valid @RequestBody CreateMediaRequest request) {
-        MediaAsset created = mediaService.create(request.productId(), request.type(), request.url(), request.caption());
+        MediaAsset created = mediaService.create(request.productId(), request.type(), request.url(), request.fileName(), request.caption());
         return ResponseEntity.status(201).body(assembler.toModel(created));
     }
 
