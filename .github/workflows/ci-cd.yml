@@ -210,6 +210,7 @@ jobs:
           print(root.find('m:version', ns).text)
           ")
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "short_sha=${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
         with:
@@ -225,12 +226,19 @@ jobs:
           # nothing here targets amd64 today, and it'd need QEMU emulation for no payoff.
           platforms: linux/arm64
           push: true
-          # SHA tag is what k8s manifests actually deploy by (immutable, guarantees every push
-          # rolls out even if the version wasn't bumped); the semver tag rides along on the same
-          # image purely for human-readable release tracking.
+          # <version>-<short-sha> is what k8s manifests actually deploy by — human-readable (shows
+          # the app version, unlike a bare SHA) while still guaranteed to change on every commit
+          # that touches this service, same as the plain SHA tag did. This was briefly pure semver
+          # (46984c2), which silently left a service's running pod stale in production whenever a
+          # commit forgot to bump its version (hit user-service, payment-service, reporting-service,
+          # and the frontend more than once) — the short-sha suffix removes that failure mode
+          # structurally, same reasoning as the SHA-only scheme it replaces, without losing the
+          # human-readable version. The plain SHA and plain semver tags still ride along on the
+          # same image too, purely for lookup convenience — neither is what gets deployed.
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/demo-${{ matrix.service }}:${{ github.sha }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/demo-${{ matrix.service }}:${{ steps.version.outputs.version }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/demo-${{ matrix.service }}:${{ steps.version.outputs.version }}-${{ steps.version.outputs.short_sha }}
           cache-from: type=gha,scope=${{ matrix.service }}
           cache-to: type=gha,mode=max,scope=${{ matrix.service }}
 
@@ -250,7 +258,9 @@ jobs:
       - uses: actions/checkout@v4
       - name: Read frontend version
         id: version
-        run: echo "version=$(jq -r .version frontend/package.json)" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "version=$(jq -r .version frontend/package.json)" >> "$GITHUB_OUTPUT"
+          echo "short_sha=${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
         with:
@@ -263,9 +273,12 @@ jobs:
           file: frontend/Dockerfile
           platforms: linux/arm64
           push: true
+          # <version>-<short-sha> is what gets deployed — see build-and-push's own tags comment for
+          # why (same reasoning applies here, frontend hit this exact staleness bug too).
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/demo-frontend:${{ github.sha }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/demo-frontend:${{ steps.version.outputs.version }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/demo-frontend:${{ steps.version.outputs.version }}-${{ steps.version.outputs.short_sha }}
           cache-from: type=gha,scope=frontend
           cache-to: type=gha,mode=max,scope=frontend
 
@@ -302,25 +315,37 @@ jobs:
             FILES="$FILES
           k8s/frontend.yaml"
           fi
-          # Deploys by the immutable git SHA (also tagged on every image in build-and-push above),
-          # not each service's own semver — every commit that touches a service therefore produces a
-          # genuinely new tag and a real manifest diff, so ArgoCD always has something to sync even
+          # Deploys by <version>-<short-sha> (also tagged on every image in build-and-push above),
+          # not each service's bare semver — every commit that touches a service therefore produces
+          # a genuinely new tag and a real manifest diff, so ArgoCD always has something to sync even
           # if nobody remembered to bump that service's version. This was briefly semver-only
           # (46984c2) on the theory that "each service's own version" should drive its own deploys;
           # in practice that meant any commit which forgot the version bump left the running pod
           # silently stale (hit user-service, payment-service, reporting-service, and the frontend
-          # more than once) — SHA-based deploy removes that whole failure mode structurally instead
-          # of relying on remembering every time. The semver tag still rides along on the same image
-          # purely for human-readable release tracking, not for deploys.
+          # more than once). The short-sha suffix removes that failure mode structurally while still
+          # keeping the version human-readable in the tag, unlike the bare-SHA scheme this replaces.
           # The local-tag pattern matches ANY tag under the demo/ prefix, not just a literal
           # ":local" — local iteration tags now match each service's real version (package.json/
           # pom.xml, e.g. demo/frontend:1.0.0, demo/order-service:1.0.3) rather than a placeholder;
           # the point is "this manifest still points at a locally-built image, not ghcr.io yet",
           # regardless of what that local tag's value actually is.
+          SHORT_SHA=${GITHUB_SHA:0:7}
           echo "$FILES" | while IFS= read -r f; do
             [ -f "$f" ] || continue
-            sed -i -E "s#image: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/demo-([a-z-]+):[a-zA-Z0-9._-]+#image: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/demo-\1:${{ github.sha }}#g" "$f"
-            sed -i -E "s#image: demo/([a-z-]+):[a-zA-Z0-9._-]+#image: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/demo-\1:${{ github.sha }}#g" "$f"
+            SERVICE=$(basename "$f" .yaml)
+            if [ "$SERVICE" = "frontend" ]; then
+              VERSION=$(jq -r .version frontend/package.json)
+            else
+              VERSION=$(python3 -c "
+          import xml.etree.ElementTree as ET
+          ns = {'m': 'http://maven.apache.org/POM/4.0.0'}
+          root = ET.parse('$SERVICE/pom.xml').getroot()
+          print(root.find('m:version', ns).text)
+          ")
+            fi
+            TAG="${VERSION}-${SHORT_SHA}"
+            sed -i -E "s#image: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/demo-([a-z-]+):[a-zA-Z0-9._-]+#image: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/demo-\1:${TAG}#g" "$f"
+            sed -i -E "s#image: demo/([a-z-]+):[a-zA-Z0-9._-]+#image: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/demo-\1:${TAG}#g" "$f"
           done
       - name: Commit and push
         run: |
