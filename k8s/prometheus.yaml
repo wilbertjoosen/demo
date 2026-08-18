@@ -9,9 +9,10 @@
 # a port named "http" (every one of those 16 Services already names its port "http"), then scrapes
 # /actuator/prometheus on it.
 #
-# docker-compose's own Prometheus (docker/prometheus/prometheus.yml) stays as-is for the
-# host-JVM/IDE dev flow — same "host copy kept for local dev" pattern as every other infra piece
-# already moved in-cluster.
+# Unlike every other infra piece moved in-cluster this session, there's no docker-compose host
+# copy kept alongside this one — Prometheus/Grafana/Loki/Promtail/Kibana were removed from Docker
+# Compose entirely rather than kept as unused duplicates, since neither dev flow ever needed a
+# separate instance of them.
 #
 # PVC-backed (not emptyDir): losing metrics history on every pod restart would be a real
 # regression, same reasoning as MySQL/Keycloak's PVCs.

@@ -198,7 +198,8 @@ in — app services reach it via fully-qualified cross-namespace DNS
 (`<service>.infra.svc.cluster.local`, see `k8s/configmap-common.yaml`), same pattern already used
 to reach Loki in `monitoring` (below). Grafana, Prometheus, and Kibana now run in-cluster too
 (`k8s/grafana.yaml`, `k8s/prometheus.yaml`, `k8s/kibana.yaml`, all in `monitoring` alongside Loki)
-— nothing still depends on the Docker Compose host copies. The `-p
+— they were removed from Docker Compose entirely rather than kept as unused host copies, since
+nothing (host-JVM dev included) ever needed a separate instance of them. The `-p
 "8081:8081@loadbalancer"` mapping is load-bearing, not optional: every service's
 `KEYCLOAK_ISSUER_URI` (and the frontend's) is hardcoded to `http://localhost:8081`, so in-cluster
 Keycloak has to keep answering there too — see `k8s/keycloak.yaml`'s comment for the full
@@ -210,9 +211,10 @@ Day-to-day cluster start/stop (the cluster plus the host infra it depends on) is
 `./k8s-local.sh {start|stop|restart|status}` — e.g. `./k8s-local.sh stop` runs `k3d cluster stop demo`
 then `docker compose stop`; `./k8s-local.sh start` runs `docker compose up -d` then
 `k3d cluster start demo` and tails `kubectl get pods -A -w` (pass `--no-watch` to skip the tail).
-`start`/`stop` only touch the infra pods actually need — which, now that Grafana, Prometheus, and
-Kibana joined Kafka, Redis, MySQL, Keycloak, Mailpit, MongoDB, Elasticsearch, and Loki in-cluster,
-is nothing at all (`K8S_INFRASTRUCTURE` in `local-infra.sh` is empty). Not docker-compose's own app
+`start`/`stop` only touch the infra pods actually need — which, with Kafka, Redis, MySQL, Keycloak,
+Mailpit, MongoDB, and Elasticsearch all in-cluster (and Grafana/Prometheus/Loki/Promtail/Kibana not
+in Docker Compose at all any more), is nothing at all (`K8S_INFRASTRUCTURE` in `local-infra.sh` is
+empty). Not docker-compose's own app
 containers either (Option B, irrelevant when using k8s). Pass `--with-dev` to also start/stop the
 full dev-only set, e.g. if `start-local.sh`'s host-JVM services are running against the same
 docker-compose stack at the same time.
@@ -235,11 +237,8 @@ Realm: `demo`. Client: `demo-spa` (public, PKCE).
 | Frontend (k8s) | http://demo.localhost:18090 | — |
 | Keycloak admin | http://localhost:8081 | `admin` / `admin` (realm: **`demo`**, not `master` — see note below) |
 | Swagger UI (aggregated) | http://localhost:8080/swagger-ui.html | — |
-| Grafana (dev, docker-compose) | http://localhost:3000 | `admin` / `admin` |
 | Grafana (k8s, in-cluster) | http://grafana.demo.localhost:18090 | `GF_SECURITY_ADMIN_USER`/`PASSWORD` from the `grafana-admin` Secret (create via Rancher's Secrets UI — see `k8s/grafana.yaml`'s comment) |
-| Prometheus (dev, docker-compose) | http://localhost:9090 | — |
 | Prometheus (k8s, in-cluster) | http://prometheus.demo.localhost:18090 | — |
-| Kibana (dev, docker-compose) | http://localhost:5601 | — |
 | Kibana (k8s, in-cluster) | http://kibana.demo.localhost:18090 | — |
 | Kafka UI | http://localhost:8095 | — |
 | Mailpit (SMTP inbox) | http://localhost:8025 | — |
@@ -267,7 +266,6 @@ ports below:
 | Kafka (host clients) | `localhost:9092` | `PLAINTEXT` listener for local JVM services / host tools; dev-only, see above |
 | Redis | `localhost:6379` | Resilience4j response caching (host-JVM/IDE dev flow, `redis-cli`); dev-only, see above |
 | Elasticsearch | `localhost:9200` | `audit-service`'s store; dev-only, see above |
-| Loki | `localhost:3100` | log storage; query via Grafana's Explore tab rather than the raw API; dev-only for k8s — k8s pods' logs go to the separate in-cluster Loki instead (`k8s/loki.yaml`, `http://loki.demo.localhost:18090`) |
 | Mailpit SMTP | `localhost:1025` | what `notification-service` actually sends to; `:8025` above is its web inbox; dev-only, see above |
 
 k3d cluster ports (`k3d cluster create`, see [Kubernetes / GitOps](#kubernetes--gitops)): `18090` →
@@ -322,21 +320,21 @@ manual cleanup needed once a service's pipeline has run at least once post-boots
 
 ## Observability
 
-- **Metrics**: every service exposes `/actuator/prometheus`. Two Prometheus instances scrape it —
-  the docker-compose one (`docker/prometheus/prometheus.yml`, static `host.docker.internal` targets,
-  host-JVM dev flow) and the in-cluster one (`k8s/prometheus.yaml`, native Kubernetes service
-  discovery — no Operator, no Helm — scraping every Service labeled `monitored: "true"`). Both feed
-  a Grafana with the same pre-provisioned "Services Overview" dashboard
-  (`docker/grafana/dashboards/services-overview.json`, reused verbatim by the in-cluster Grafana via
-  `k8s/grafana.yaml`).
-- **Logs**: services log to stdout; in Docker Compose that's `docker logs <container>`. In k8s,
-  Promtail (`k8s/promtail-daemonset.yaml`, namespace `infra`) ships every pod's logs to a separate
-  in-cluster Loki instead (`k8s/loki.yaml`, namespace `monitoring`) — query through either Grafana's
-  Explore tab (docker-compose one against the plain **Loki** datasource, in-cluster one against
-  **Loki (k8s)**) or directly at `http://grafana.demo.localhost:18090`.
+Grafana/Prometheus/Loki/Promtail/Kibana all run in-cluster only — there's no Docker Compose copy of
+any of them (removed entirely rather than kept as an unused host copy, since neither the host-JVM
+nor the k8s dev flow ever needed a separate instance).
+
+- **Metrics**: every service exposes `/actuator/prometheus`. `k8s/prometheus.yaml` scrapes it via
+  native Kubernetes service discovery (no Operator, no Helm) — every Service labeled
+  `monitored: "true"`. Feeds a Grafana (`k8s/grafana.yaml`) with a pre-provisioned "Services
+  Overview" dashboard (`docker/grafana/dashboards/services-overview.json`).
+- **Logs**: services log to stdout. In k8s, Promtail (`k8s/promtail-daemonset.yaml`, namespace
+  `infra`) ships every pod's logs to Loki (`k8s/loki.yaml`, namespace `monitoring`) — query through
+  Grafana's Explore tab (the **Loki** datasource) or directly at
+  `http://grafana.demo.localhost:18090`. In the host-JVM dev flow, logs just go to the terminal.
 - **Audit trail**: every REST call across every service is captured (who, what, when, request/response
   bodies with secrets redacted) and shipped to Elasticsearch (in-cluster, `k8s/elasticsearch.yaml`,
-  namespace `infra`).
+  namespace `infra`), viewable in Kibana (`k8s/kibana.yaml`).
   The admin UI's history icons (Users, Products, Media, Chat) show the full change timeline with
   before/after diffs per field, powered by `audit-service`'s `RecordHistoryService` — a Kibana
   dashboard (`docker/kibana/audit-trail-dashboard.ndjson`) covers the same data for ad-hoc
