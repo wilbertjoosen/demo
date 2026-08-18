@@ -1,5 +1,4 @@
 package com.example.shipping.saga;
-
 import com.example.shipping.service.ShippingService;
 
 import com.example.common.events.DomainEvent;

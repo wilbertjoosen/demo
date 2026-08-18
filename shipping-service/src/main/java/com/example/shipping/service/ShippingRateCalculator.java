@@ -15,7 +15,7 @@ import java.math.RoundingMode;
 @Component
 public class ShippingRateCalculator {
 
-    BigDecimal quote(ShippingCarrier carrier, int quantity) {
+    public BigDecimal quote(ShippingCarrier carrier, int quantity) {
         BigDecimal base = switch (carrier) {
             case UPS -> BigDecimal.valueOf(9.99);
             case DHL -> BigDecimal.valueOf(7.99);

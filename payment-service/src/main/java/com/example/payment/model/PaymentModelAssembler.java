@@ -1,5 +1,4 @@
 package com.example.payment.model;
-
 import com.example.payment.controller.PaymentController;
 
 import org.springframework.hateoas.CollectionModel;
