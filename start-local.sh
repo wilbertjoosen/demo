@@ -29,6 +29,7 @@ SERVICES=(
     "product-media-service"
     "product-review-service"
     "gateway-service"
+    "reporting-service"
 )
 
 # shellcheck source=local-infra.sh

@@ -4,7 +4,13 @@ import { useI18n } from 'vue-i18n'
 import type { OrderStatus, OrderView } from '../../models'
 
 const props = defineProps<{ orders: OrderView[]; loading: boolean }>()
-const emit = defineEmits<{ 'edit-address': [order: OrderView]; cancel: [order: OrderView]; track: [order: OrderView] }>()
+const emit = defineEmits<{
+  'edit-address': [order: OrderView]
+  cancel: [order: OrderView]
+  track: [order: OrderView]
+  'upload-proof': [order: OrderView]
+}>()
+const MANUAL_PAYMENT_METHODS = ['BANK_TRANSFER', 'CASH']
 const { t } = useI18n()
 
 const statusType: Record<OrderStatus, 'info' | 'success' | 'warning' | 'danger'> = {
@@ -68,6 +74,9 @@ watch(
           {{ t('orders.track') }}
         </el-button>
         <template v-if="row.status === 'PENDING_PAYMENT'">
+          <el-button v-if="MANUAL_PAYMENT_METHODS.includes(row.paymentMethod ?? '')" size="small" @click="emit('upload-proof', row)">
+            {{ t('orders.uploadProof') }}
+          </el-button>
           <el-button size="small" @click="emit('edit-address', row)">{{ t('orders.editAddress') }}</el-button>
           <el-button size="small" type="danger" @click="emit('cancel', row)">{{ t('orders.cancelOrder') }}</el-button>
         </template>

@@ -15,11 +15,21 @@ const router = createRouter({
       component: () => import('../views/AdminView.vue'),
       meta: { requiresAdmin: true },
     },
+    {
+      path: '/queues',
+      name: 'queues',
+      component: () => import('../views/ActionQueuesView.vue'),
+      meta: { requiresAnyRole: ['admin', 'finance', 'warehouse', 'delivery_agent'] },
+    },
   ],
 })
 
 router.beforeEach((to) => {
   if (to.meta.requiresAdmin && !hasRole('admin')) {
+    return { name: 'home' }
+  }
+  const anyRole = to.meta.requiresAnyRole as string[] | undefined
+  if (anyRole && !anyRole.some((role) => hasRole(role))) {
     return { name: 'home' }
   }
   return true
