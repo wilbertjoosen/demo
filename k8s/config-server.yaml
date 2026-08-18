@@ -17,6 +17,8 @@ spec:
           image: ghcr.io/wilbertjoosen/demo-config-server:ddac784a15a94f04e285bbf762d3385491327ff7
           imagePullPolicy: Always
           ports: [{ containerPort: 8888 }]
+          envFrom:
+            - configMapRef: { name: demo-common-config }
           resources:
             requests: { cpu: "100m", memory: "256Mi" }
             limits: { cpu: "500m", memory: "384Mi" }

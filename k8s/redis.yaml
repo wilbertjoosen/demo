@@ -1,4 +1,4 @@
-# In-cluster Redis for the demo (prod) namespace. Previously pods reached out to the host's
+# In-cluster Redis, in the infra namespace (k8s/namespace-infra.yaml). Previously pods reached out to the host's
 # demo-redis container via host.k3d.internal — see docker-compose.yml's redis service comment for
 # why that's now dev-only. This Deployment replaces that cross-boundary hop: pods resolve it
 # in-cluster as "redis" (ClusterIP Service, below), which is what k8s/configmap-common.yaml's
@@ -12,7 +12,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: redis
-  namespace: demo
+  namespace: infra
   labels: { app: redis }
 spec:
   replicas: 1
@@ -44,7 +44,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: redis
-  namespace: demo
+  namespace: infra
 spec:
   selector: { app: redis }
   ports: [{ name: redis, port: 6379, targetPort: 6379 }]

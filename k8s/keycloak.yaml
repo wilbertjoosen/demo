@@ -1,4 +1,5 @@
-# In-cluster Keycloak for the demo namespace — shared across prod and QA the same way it already
+# In-cluster Keycloak, in the infra namespace (k8s/namespace-infra.yaml) — shared across prod and
+# QA the same way it already
 # is on the host (one Keycloak server, two realms: "demo" and "demo-qa" — see docker-compose.qa.yml's
 # comment). The realm-import ConfigMap below embeds both docker/keycloak/realm-demo.json and
 # realm-demo-qa.json verbatim (Keycloak's --import-realm scans the whole mounted directory, same
@@ -263,13 +264,13 @@ data:
 kind: ConfigMap
 metadata:
   name: keycloak-realm-import
-  namespace: demo
+  namespace: infra
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: keycloak
-  namespace: demo
+  namespace: infra
   labels: { app: keycloak }
 spec:
   replicas: 1
@@ -314,7 +315,7 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: keycloak-data
-  namespace: demo
+  namespace: infra
 spec:
   accessModes: ["ReadWriteOnce"]
   resources:
@@ -324,7 +325,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: keycloak
-  namespace: demo
+  namespace: infra
 spec:
   selector: { app: keycloak }
   ports: [{ name: http, port: 8080, targetPort: 8080 }]

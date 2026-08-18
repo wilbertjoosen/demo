@@ -161,19 +161,6 @@ services:
     depends_on:
       - kafka
 
-  rancher:
-    image: rancher/rancher:latest
-    container_name: demo-rancher
-    restart: unless-stopped
-    privileged: true
-    environment:
-      CATTLE_BOOTSTRAP_PASSWORD: rancherdemo123
-    ports:
-      - "9080:80"
-      - "9443:443"
-    volumes:
-      - rancher_data:/var/lib/rancher
-
   mailpit:
     image: axllent/mailpit:latest
     container_name: demo-mailpit
@@ -741,6 +728,5 @@ volumes:
   loki_data:
   grafana_data:
   tempo_data:
-  rancher_data:
   media_uploads:
   payment_proofs:

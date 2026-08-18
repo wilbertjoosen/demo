@@ -312,10 +312,15 @@ jobs:
           # more than once) — SHA-based deploy removes that whole failure mode structurally instead
           # of relying on remembering every time. The semver tag still rides along on the same image
           # purely for human-readable release tracking, not for deploys.
+          # The local-tag pattern matches ANY tag under the demo/ prefix, not just a literal
+          # ":local" — local iteration tags now match each service's real version (package.json/
+          # pom.xml, e.g. demo/frontend:1.0.0, demo/order-service:1.0.3) rather than a placeholder;
+          # the point is "this manifest still points at a locally-built image, not ghcr.io yet",
+          # regardless of what that local tag's value actually is.
           echo "$FILES" | while IFS= read -r f; do
             [ -f "$f" ] || continue
             sed -i -E "s#image: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/demo-([a-z-]+):[a-zA-Z0-9._-]+#image: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/demo-\1:${{ github.sha }}#g" "$f"
-            sed -i -E "s#image: demo/([a-z-]+):local#image: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/demo-\1:${{ github.sha }}#g" "$f"
+            sed -i -E "s#image: demo/([a-z-]+):[a-zA-Z0-9._-]+#image: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/demo-\1:${{ github.sha }}#g" "$f"
           done
       - name: Commit and push
         run: |

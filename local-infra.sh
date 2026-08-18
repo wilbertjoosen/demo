@@ -25,16 +25,16 @@ INFRASTRUCTURE=(
     "kibana"
 )
 
-# Of the above, the ones k8s pods no longer depend on — Grafana/Tempo/Kibana are the only pieces
-# still reached by pods via host.k3d.internal now (see k8s/configmap-common.yaml); everything else
-# moved in-cluster: Kafka, Redis, MySQL, Keycloak, Mailpit, Vault (k8s/kafka.yaml, k8s/redis.yaml,
-# k8s/mysql.yaml, k8s/keycloak.yaml, k8s/mailpit.yaml, k8s/vault.yaml), and now MongoDB and
-# Elasticsearch too (k8s/mongo.yaml, k8s/elasticsearch.yaml). kafka-ui only makes sense once kafka
-# itself is reachable from the host; this compose file's own "prometheus" and "loki" are the
-# host-JVM/compose-flow instances specifically — k8s has its own separate in-cluster ones
-# (k8s/prometheus.yaml, k8s/loki.yaml); "promtail" only ships logs to this file's own "loki"
-# (k8s pods get their own logs shipped by the in-cluster k8s/promtail-daemonset.yaml instead, a
-# resource applied directly rather than run through docker-compose at all).
+# Of the above, the ones k8s pods no longer depend on — Grafana/Tempo are the only pieces still
+# reached by pods via host.k3d.internal now (see k8s/configmap-common.yaml); everything else moved
+# in-cluster: Kafka, Redis, MySQL, Keycloak, Mailpit, Vault (k8s/kafka.yaml, k8s/redis.yaml,
+# k8s/mysql.yaml, k8s/keycloak.yaml, k8s/mailpit.yaml, k8s/vault.yaml), MongoDB and Elasticsearch
+# (k8s/mongo.yaml, k8s/elasticsearch.yaml), and now Kibana too (k8s/kibana.yaml). kafka-ui only
+# makes sense once kafka itself is reachable from the host; this compose file's own "prometheus"
+# and "loki" are the host-JVM/compose-flow instances specifically — k8s has its own separate
+# in-cluster ones (k8s/prometheus.yaml, k8s/loki.yaml); "promtail" only ships logs to this file's
+# own "loki" (k8s pods get their own logs shipped by the in-cluster k8s/promtail-daemonset.yaml
+# instead, a resource applied directly rather than run through docker-compose at all).
 DEV_ONLY_INFRASTRUCTURE=(
     "kafka"
     "kafka-ui"
@@ -52,6 +52,7 @@ DEV_ONLY_INFRASTRUCTURE=(
     "elasticsearch"
     "loki"
     "promtail"
+    "kibana"
 )
 
 # What a k8s-only workflow (k8s-local.sh's default) actually needs: INFRASTRUCTURE minus
