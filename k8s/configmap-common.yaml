@@ -8,12 +8,14 @@
 # depends on them.
 #
 # MySQL, Keycloak, and Vault are the SAME instances production uses — reached cross-namespace
-# (<service>.demo.svc.cluster.local; k8s Services are reachable across namespaces by default, no
+# (<service>.infra.svc.cluster.local; k8s Services are reachable across namespaces by default, no
 # NetworkPolicy restricting it here) rather than duplicated, same "one shared instance" reasoning
 # already applied on the host (see docker-compose.qa.yml's header comment) — QA just gets its own
-# database/realm name instead of its own containers, same as before. Mailpit stays genuinely
-# isolated — its own in-cluster instance in THIS namespace (k8s/mailpit.yaml), matching how it was
-# already a separate host container per environment.
+# database/realm name instead of its own containers, same as before. Production's copies of these
+# (and MongoDB/Elasticsearch below) moved from the `demo` namespace into their own `infra`
+# namespace on main — this file's hostnames follow that move. Mailpit stays genuinely isolated —
+# its own in-cluster instance in THIS namespace (k8s/mailpit.yaml), matching how it was already a
+# separate host container per environment.
 #
 # MongoDB and Elasticsearch are the SAME in-cluster instances production uses too now
 # (k8s/mongo.yaml, k8s/elasticsearch.yaml on the main branch), reached cross-namespace the same way
@@ -28,17 +30,17 @@ data:
   EUREKA_URI: http://eureka-server:8761/eureka
   KAFKA_BOOTSTRAP_SERVERS: kafka:9092
   KEYCLOAK_ISSUER_URI: http://localhost:8081/realms/demo-qa
-  KEYCLOAK_JWK_SET_URI: http://keycloak.demo.svc.cluster.local:8080/realms/demo-qa/protocol/openid-connect/certs
-  KEYCLOAK_TOKEN_URI: http://keycloak.demo.svc.cluster.local:8080/realms/demo-qa/protocol/openid-connect/token
-  KEYCLOAK_ADMIN_URI: http://keycloak.demo.svc.cluster.local:8080/admin/realms/demo-qa
+  KEYCLOAK_JWK_SET_URI: http://keycloak.infra.svc.cluster.local:8080/realms/demo-qa/protocol/openid-connect/certs
+  KEYCLOAK_TOKEN_URI: http://keycloak.infra.svc.cluster.local:8080/realms/demo-qa/protocol/openid-connect/token
+  KEYCLOAK_ADMIN_URI: http://keycloak.infra.svc.cluster.local:8080/admin/realms/demo-qa
   # 3-node replica set (task #74), now in-cluster on the main branch (k8s/mongo.yaml) — each
   # member's own stable per-pod DNS name via its headless Service, reached cross-namespace.
-  MONGO_HOST: mongo-0.mongo-headless.demo.svc.cluster.local:27017,mongo-1.mongo-headless.demo.svc.cluster.local:27017,mongo-2.mongo-headless.demo.svc.cluster.local:27017
+  MONGO_HOST: mongo-0.mongo-headless.infra.svc.cluster.local:27017,mongo-1.mongo-headless.infra.svc.cluster.local:27017,mongo-2.mongo-headless.infra.svc.cluster.local:27017
   MONGO_REPLICA_SET_PARAM: "?replicaSet=rs0"
   REDIS_HOST: redis
   REDIS_PORT: "6379"
-  ELASTICSEARCH_URI: http://elasticsearch.demo.svc.cluster.local:9200
-  DB_HOST: mysql.demo.svc.cluster.local
+  ELASTICSEARCH_URI: http://elasticsearch.infra.svc.cluster.local:9200
+  DB_HOST: mysql.infra.svc.cluster.local
   DB_PORT: "3306"
   DB_NAME: demo_qa
   MAIL_HOST: mailpit
@@ -55,5 +57,5 @@ data:
   # sensitive and lives in the vault-token k8s Secret (created imperatively per-namespace, not
   # committed — same pattern as ghcr-pull-secret) — it must match main's k8s/vault.yaml's fixed dev
   # root token.
-  VAULT_HOST: vault.demo.svc.cluster.local
+  VAULT_HOST: vault.infra.svc.cluster.local
   VAULT_PORT: "8200"

@@ -66,7 +66,7 @@ spec:
           requests: { storage: 1Gi }
 ---
 # Headless (clusterIP: None) — required by StatefulSet for stable per-pod DNS identity
-# (reporting-service-0.reporting-service-headless.demo.svc.cluster.local, etc.). Not used for
+# (reporting-service-0.reporting-service-headless.demo-qa.svc.cluster.local, etc.). Not used for
 # routing today; it becomes relevant if reporting-service ever scales past 1 replica, since each
 # instance's Kafka Streams state store only holds its own partitions' data — Interactive Queries
 # for a key on the wrong instance need to be forwarded to the instance that actually owns it,

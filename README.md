@@ -238,7 +238,7 @@ debugging.
 
 | Service | Host:Port | Notes |
 |---|---|---|
-| MySQL (host / dev) | `localhost:3306` | `demo-mysql` — `order-service`'s write model, db `demo` (prod) / `demo_qa` (QA), user/pass `demo`/`demo`; **dev-only**, in-cluster instance is shared cross-namespace from the `demo` namespace (`mysql.demo.svc.cluster.local`) |
+| MySQL (host / dev) | `localhost:3306` | `demo-mysql` — `order-service`'s write model, db `demo` (prod) / `demo_qa` (QA), user/pass `demo`/`demo`; **dev-only**, in-cluster instance is shared cross-namespace from the `infra` namespace (`mysql.infra.svc.cluster.local`) |
 | MongoDB (host / dev) | `localhost:27017` | `demo-mongo1/2/3` — every other service's store, `_qa`-suffixed for QA; **dev-only**, in-cluster is a proper 3-node replica set (`k8s/mongo.yaml`) shared cross-namespace |
 | Kafka (host clients / dev, prod) | `localhost:9092` | `PLAINTEXT` listener for local JVM services / host tools — **dev-only**; QA and prod k8s pods use their own in-cluster Kafka (`kafka:9092` inside the cluster, `k8s/kafka.yaml`), not this container |
 | Kafka (host clients / dev, QA) | `localhost:9192` | separate broker — shared topics would mean QA test traffic triggering prod's saga; host-JVM debugging only, same in-cluster-Kafka caveat as above |
@@ -366,10 +366,10 @@ flowchart LR
   deploys to QA the same way pushing to `main` deploys to prod.
 - **k8s**: namespace `demo-qa`, ArgoCD Application `demo-qa` (tracks the `testing` branch's own
   `k8s/` path), ingress at `qa.demo.localhost` — same port (`18090`) as prod, routed by hostname.
-- **Infra**: MySQL, MongoDB, Elasticsearch, Keycloak, and Vault now run **in-cluster in the `demo`
+- **Infra**: MySQL, MongoDB, Elasticsearch, Keycloak, and Vault now run **in-cluster in the `infra`
   namespace** (main branch's `k8s/mysql.yaml`, `k8s/mongo.yaml`, `k8s/elasticsearch.yaml`,
   `k8s/keycloak.yaml`, `k8s/vault.yaml`) — QA reaches them **cross-namespace**
-  (`mysql.demo.svc.cluster.local` etc. — k8s Services are reachable across namespaces by default,
+  (`mysql.infra.svc.cluster.local` etc. — k8s Services are reachable across namespaces by default,
   no NetworkPolicy restricting it here) instead of getting duplicate containers, same "one shared
   instance, environment-scoped by name" reasoning as before (QA gets its own `demo_qa` database /
   `<service>_qa` Mongo databases / `audit-log-qa` index / `demo-qa` Keycloak realm). Kafka, Redis,
