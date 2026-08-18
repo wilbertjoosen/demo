@@ -172,6 +172,13 @@ jobs:
         with:
           context: frontend
           file: frontend/Dockerfile
+          # MODE=k8s (frontend/.env.k8s, not .env.production/its own default) — docker-compose.yml's
+          # own frontend service always builds straight from source locally, never pulls this image,
+          # so this published image has exactly one consumer: k8s/frontend.yaml. It needs the
+          # ingress-routed URLs (relative API base, ws://.../ws/* through Traefik), not the
+          # localhost:* ones .env.production bakes in for the docker-compose/host-JVM dev flow,
+          # where the browser reaches every backend service on its own published host port instead.
+          build-args: MODE=k8s
           platforms: linux/arm64
           push: true
           tags: |
@@ -206,13 +213,18 @@ jobs:
           k8s/frontend.yaml"
           fi
           # Handles both the steady state (already ghcr.io/.../demo-<service>:<old-sha>, bump the tag)
-          # and the one-time first run (still demo/<service>:local from before CI/CD existed) — either
-          # way, by the time this step runs the SHA-tagged image already exists in GHCR (build-and-push
-          # ran first), so ArgoCD never syncs a manifest pointing at an image that isn't pullable yet.
+          # and the one-time first run (still demo/<service>:<local tag> from before CI/CD existed,
+          # or from manual local iteration — e.g. demo/frontend:1.0.0 built straight from
+          # package.json's version, demo/order-service:1.0.3 from pom.xml's) — either way, by the
+          # time this step runs the SHA-tagged image already exists in GHCR (build-and-push ran
+          # first), so ArgoCD never syncs a manifest pointing at an image that isn't pullable yet.
+          # The local-tag pattern matches ANY tag under the demo/ prefix, not just a literal
+          # ":local" — the point is "this manifest still points at a locally-built image, not
+          # ghcr.io yet", regardless of what that local tag's value actually is.
           echo "$FILES" | while IFS= read -r f; do
             [ -f "$f" ] || continue
             sed -i -E "s#image: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/demo-([a-z-]+):[a-zA-Z0-9._-]+#image: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/demo-\1:${{ github.sha }}#g" "$f"
-            sed -i -E "s#image: demo/([a-z-]+):local#image: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/demo-\1:${{ github.sha }}#g" "$f"
+            sed -i -E "s#image: demo/([a-z-]+):[a-zA-Z0-9._-]+#image: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/demo-\1:${{ github.sha }}#g" "$f"
           done
       - name: Commit and push
         run: |

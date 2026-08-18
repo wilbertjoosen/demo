@@ -1,0 +1,152 @@
+# In-cluster Prometheus, in the "monitoring" namespace (k8s/loki.yaml already creates it). No
+# Prometheus Operator/CRDs, no Helm — same "plain YAML, native Kubernetes service discovery"
+# pattern k8s/promtail-daemonset.yaml already proved for Loki (kubernetes_sd_configs, not a
+# ServiceMonitor).
+#
+# 16 of the app-service manifests already carry a `monitored: "true"` label on their Service
+# (e.g. k8s/eureka-server.yaml, k8s/gateway-service.yaml) — pre-staged for exactly this and unused
+# until now. Discovery is scoped to the demo namespace and keeps only Services with that label and
+# a port named "http" (every one of those 16 Services already names its port "http"), then scrapes
+# /actuator/prometheus on it.
+#
+# docker-compose's own Prometheus (docker/prometheus/prometheus.yml) stays as-is for the
+# host-JVM/IDE dev flow — same "host copy kept for local dev" pattern as every other infra piece
+# already moved in-cluster.
+#
+# PVC-backed (not emptyDir): losing metrics history on every pod restart would be a real
+# regression, same reasoning as MySQL/Keycloak's PVCs.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: monitoring
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+    scrape_configs:
+      - job_name: kubernetes-services
+        kubernetes_sd_configs:
+          - role: service
+            namespaces: { names: [demo] }
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_service_label_monitored]
+            regex: "true"
+            action: keep
+          - source_labels: [__meta_kubernetes_service_port_name]
+            regex: http
+            action: keep
+          - source_labels: [__meta_kubernetes_namespace]
+            target_label: namespace
+          # docker/grafana/dashboards/services-overview.json filters on job=~".+-service|.+-server"
+          # the same way docker-compose's prometheus.yml sets one job_name per service — the static
+          # job_name above ("kubernetes-services") would never match that regex, so every panel
+          # would come back empty. Overwrite `job` with the k8s Service name instead (already
+          # exactly "eureka-server", "gateway-service", etc.) so the existing dashboard works
+          # unmodified.
+          - source_labels: [__meta_kubernetes_service_name]
+            target_label: job
+        metrics_path: /actuator/prometheus
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: prometheus
+rules:
+  - apiGroups: [""]
+    resources: ["services", "endpoints", "pods"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: prometheus
+  namespace: monitoring
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: prometheus
+subjects:
+  - kind: ServiceAccount
+    name: prometheus
+    namespace: monitoring
+roleRef:
+  kind: ClusterRole
+  name: prometheus
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  namespace: monitoring
+  labels: { app: prometheus }
+spec:
+  replicas: 1
+  strategy: { type: Recreate }
+  selector: { matchLabels: { app: prometheus } }
+  template:
+    metadata: { labels: { app: prometheus } }
+    spec:
+      serviceAccountName: prometheus
+      containers:
+        - name: prometheus
+          image: prom/prometheus:latest
+          args:
+            - --config.file=/etc/prometheus/prometheus.yml
+            - --storage.tsdb.path=/prometheus
+          ports: [{ containerPort: 9090 }]
+          volumeMounts:
+            - { name: config, mountPath: /etc/prometheus }
+            - { name: data, mountPath: /prometheus }
+          resources:
+            requests: { cpu: "200m", memory: "512Mi" }
+            limits: { cpu: "1", memory: "1Gi" }
+          readinessProbe:
+            httpGet: { path: /-/ready, port: 9090 }
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /-/healthy, port: 9090 }
+            initialDelaySeconds: 30
+            periodSeconds: 20
+      volumes:
+        - name: config
+          configMap: { name: prometheus-config }
+        - name: data
+          persistentVolumeClaim: { claimName: prometheus-data }
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: prometheus-data
+  namespace: monitoring
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests: { storage: 2Gi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+  namespace: monitoring
+spec:
+  selector: { app: prometheus }
+  ports: [{ port: 9090, targetPort: 9090 }]
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: prometheus-ingress
+  namespace: monitoring
+spec:
+  rules:
+    - host: prometheus.demo.localhost
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service: { name: prometheus, port: { number: 9090 } }

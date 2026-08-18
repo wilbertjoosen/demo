@@ -159,17 +159,46 @@ Everything (infra + all 19 backend services + frontend) runs in containers on on
 ### Option C — Kubernetes (k3d) + GitOps
 
 ```bash
-k3d cluster create demo --servers 1 --agents 2 -p "18090:80@loadbalancer" -p "18453:443@loadbalancer" -p "8081:8081@loadbalancer" --api-port 6550
+k3d cluster create demo --servers 1 --agents 2 -p "18090:80@loadbalancer" -p "18453:443@loadbalancer" -p "8081:8081@loadbalancer" -p "9080:9080@loadbalancer" -p "9443:9443@loadbalancer" --api-port 6550
 kubectl apply -f k8s/
 ```
+
+> If you already have a local `demo` cluster from before Rancher moved in-cluster, the two new
+> `9080`/`9443` port mappings can only be set at cluster creation — `k3d cluster delete demo` and
+> recreate with the command above (this re-seeds all in-cluster PVC data: MySQL, Mongo, Keycloak
+> users, etc.).
+
+**One-time secrets you have to create yourself after the first `kubectl apply -f k8s/`** — none of
+these are committed (same "imperative, not in git" pattern as every other credential in this repo),
+so every pod that needs one sits in `ImagePullBackOff`/`CreateContainerConfigError` until it exists.
+Easiest done through Rancher's own **Storage → Secrets** UI (see [Useful URLs](#useful-urls) for the
+login) once it's up, so the actual values never pass through a shell/AI session — or via `kubectl`
+directly if you'd rather:
+
+| Secret | Namespace | Type | Why | Details |
+|---|---|---|---|---|
+| `ghcr-pull-secret` | `demo` | Registry (`kubernetes.io/dockerconfigjson`) | all 17 app-service images are private `ghcr.io/wilbertjoosen/demo-*` packages | registry `ghcr.io`, your GitHub username, a PAT with `read:packages` scope as the password |
+| `mysql-credentials` | `infra` | Opaque | `k8s/mysql.yaml`'s StatefulSet | keys `MYSQL_ROOT_PASSWORD`/`MYSQL_USER`/`MYSQL_PASSWORD`/`MYSQL_DATABASE` — see `k8s/mysql.yaml`'s comment for the exact demo-scale values |
+| `grafana-admin` | `monitoring` | Opaque | `k8s/grafana.yaml`'s Deployment | keys `GF_SECURITY_ADMIN_USER`/`GF_SECURITY_ADMIN_PASSWORD` — see `k8s/grafana.yaml`'s comment |
+
+No pod restart is required after creating `mysql-credentials`/`grafana-admin` (those pods are just
+waiting to be scheduled). `ghcr-pull-secret` pods will retry on their own kubelet backoff schedule
+too, but `kubectl rollout restart deployment -n demo <name>` (or all of them at once via `kubectl
+get deployments -n demo -o name | xargs -I{} kubectl rollout restart {} -n demo`) picks it up
+immediately instead of waiting out the backoff.
 
 App: http://demo.localhost:18090 — Kafka, Redis, MySQL, Keycloak, Mailpit, MongoDB, and
 Elasticsearch all run in-cluster now (`k8s/kafka.yaml`, `k8s/redis.yaml`, `k8s/mysql.yaml`,
 `k8s/keycloak.yaml`, `k8s/mailpit.yaml`, `k8s/mongo.yaml`, `k8s/elasticsearch.yaml`, wired up via
 `k8s/configmap-common.yaml`) — the Docker Compose equivalents are still there for host-JVM/IDE dev
 flows and host-tool debugging (`kcat`, `redis-cli`, a mysql client), they're just no longer what
-the cluster itself depends on. Only Grafana and Kibana still run via Docker Compose on the host,
-reached through `host.k3d.internal`. The `-p
+the cluster itself depends on. All of this infra deploys into its own `infra` namespace
+(`k8s/namespace-infra.yaml`), separate from the `demo` namespace the app microservices/frontend run
+in — app services reach it via fully-qualified cross-namespace DNS
+(`<service>.infra.svc.cluster.local`, see `k8s/configmap-common.yaml`), same pattern already used
+to reach Loki in `monitoring` (below). Grafana, Prometheus, and Kibana now run in-cluster too
+(`k8s/grafana.yaml`, `k8s/prometheus.yaml`, `k8s/kibana.yaml`, all in `monitoring` alongside Loki)
+— nothing still depends on the Docker Compose host copies. The `-p
 "8081:8081@loadbalancer"` mapping is load-bearing, not optional: every service's
 `KEYCLOAK_ISSUER_URI` (and the frontend's) is hardcoded to `http://localhost:8081`, so in-cluster
 Keycloak has to keep answering there too — see `k8s/keycloak.yaml`'s comment for the full
@@ -181,16 +210,11 @@ Day-to-day cluster start/stop (the cluster plus the host infra it depends on) is
 `./k8s-local.sh {start|stop|restart|status}` — e.g. `./k8s-local.sh stop` runs `k3d cluster stop demo`
 then `docker compose stop`; `./k8s-local.sh start` runs `docker compose up -d` then
 `k3d cluster start demo` and tails `kubectl get pods -A -w` (pass `--no-watch` to skip the tail).
-`start`/`stop` only touch the infra pods actually need now (just Grafana and Kibana) — not
-docker-compose's own app containers (Option B, irrelevant when using k8s) and not the pieces that
-are dev-only now that Kafka, Redis, MySQL, Keycloak, Mailpit, MongoDB, and Elasticsearch all run
-in-cluster. docker-compose's own Loki is dev-only too — k8s has its own separate in-cluster one
-(`k8s/loki.yaml`), fed by `k8s/promtail-daemonset.yaml`. Prometheus is excluded from the k8s-only
-set too, but for a different reason: this branch has no in-cluster Prometheus at all (unlike
-main/testing's `k8s/prometheus.yaml`) — pod IPs on the k3d overlay network were never reachable
-from docker-compose's Prometheus anyway, so it was never actually scraping k8s pods here, just
-included for parity in case that gets added later. Pass `--with-dev` to also start/stop the
-dev-only set, e.g. if `start-local.sh`'s host-JVM services are running against the same
+`start`/`stop` only touch the infra pods actually need — which, now that Grafana, Prometheus, and
+Kibana joined Kafka, Redis, MySQL, Keycloak, Mailpit, MongoDB, Elasticsearch, and Loki in-cluster,
+is nothing at all (`K8S_INFRASTRUCTURE` in `local-infra.sh` is empty). Not docker-compose's own app
+containers either (Option B, irrelevant when using k8s). Pass `--with-dev` to also start/stop the
+full dev-only set, e.g. if `start-local.sh`'s host-JVM services are running against the same
 docker-compose stack at the same time.
 
 ## Default credentials
@@ -211,12 +235,15 @@ Realm: `demo`. Client: `demo-spa` (public, PKCE).
 | Frontend (k8s) | http://demo.localhost:18090 | — |
 | Keycloak admin | http://localhost:8081 | `admin` / `admin` (realm: **`demo`**, not `master` — see note below) |
 | Swagger UI (aggregated) | http://localhost:8080/swagger-ui.html | — |
-| Grafana | http://localhost:3000 | `admin` / `admin` |
-| Prometheus | http://localhost:9090 | — |
-| Kibana | http://localhost:5601 | — |
+| Grafana (dev, docker-compose) | http://localhost:3000 | `admin` / `admin` |
+| Grafana (k8s, in-cluster) | http://grafana.demo.localhost:18090 | `GF_SECURITY_ADMIN_USER`/`PASSWORD` from the `grafana-admin` Secret (create via Rancher's Secrets UI — see `k8s/grafana.yaml`'s comment) |
+| Prometheus (dev, docker-compose) | http://localhost:9090 | — |
+| Prometheus (k8s, in-cluster) | http://prometheus.demo.localhost:18090 | — |
+| Kibana (dev, docker-compose) | http://localhost:5601 | — |
+| Kibana (k8s, in-cluster) | http://kibana.demo.localhost:18090 | — |
 | Kafka UI | http://localhost:8095 | — |
 | Mailpit (SMTP inbox) | http://localhost:8025 | — |
-| Rancher (Docker container) | https://localhost:9443 | bootstrap password `rancherdemo123` (set via `CATTLE_BOOTSTRAP_PASSWORD` in `docker-compose.yml`) |
+| Rancher (k8s, in-cluster) | https://localhost:9443 | bootstrap password `rancherdemo123` (set via `CATTLE_BOOTSTRAP_PASSWORD` in `k8s-rancher/rancher.yaml`) |
 | ArgoCD | http://argocd.localhost:18090 (via `k8s-argocd/ingress.yaml`) | `admin` / `kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' \| base64 -d` |
 
 > **Keycloak gotcha:** the admin console defaults to the `master` realm, which only ever contains the
@@ -229,8 +256,9 @@ For connecting a DB client, `redis-cli`, `kcat`, etc. directly rather than throu
 these host ports back the Docker Compose containers used by the local JVM dev flow and host-tool
 debugging only — k8s pods reach their own **in-cluster** Kafka, Redis, MySQL, Keycloak, Mailpit,
 MongoDB, and Elasticsearch instead (`k8s/kafka.yaml`, `k8s/redis.yaml`, `k8s/mysql.yaml`,
-`k8s/keycloak.yaml`, `k8s/mailpit.yaml`, `k8s/mongo.yaml`, `k8s/elasticsearch.yaml`), addressed via
-`k8s/configmap-common.yaml`, not the ports below:
+`k8s/keycloak.yaml`, `k8s/mailpit.yaml`, `k8s/mongo.yaml`, `k8s/elasticsearch.yaml`, all in their own
+`infra` namespace, `k8s/namespace-infra.yaml`), addressed via `k8s/configmap-common.yaml`, not the
+ports below:
 
 | Service | Host:Port | Notes |
 |---|---|---|
@@ -241,50 +269,82 @@ MongoDB, and Elasticsearch instead (`k8s/kafka.yaml`, `k8s/redis.yaml`, `k8s/mys
 | Elasticsearch | `localhost:9200` | `audit-service`'s store; dev-only, see above |
 | Loki | `localhost:3100` | log storage; query via Grafana's Explore tab rather than the raw API; dev-only for k8s — k8s pods' logs go to the separate in-cluster Loki instead (`k8s/loki.yaml`, `http://loki.demo.localhost:18090`) |
 | Mailpit SMTP | `localhost:1025` | what `notification-service` actually sends to; `:8025` above is its web inbox; dev-only, see above |
-| Rancher (HTTP) | `http://localhost:9080` | redirects to the HTTPS UI at `:9443` |
 
 k3d cluster ports (`k3d cluster create`, see [Kubernetes / GitOps](#kubernetes--gitops)): `18090` →
-Traefik HTTP (frontend + ArgoCD ingress), `18453` → Traefik HTTPS, `8081` → in-cluster Keycloak
-specifically (load-bearing, not a convenience port — see `k8s/keycloak.yaml`'s comment), `6550` →
-the k8s API server (`kubectl` uses this automatically via your kubeconfig context, not something
-you visit directly).
+Traefik HTTP (frontend, ArgoCD, Loki, Grafana, Prometheus, and Kibana ingresses — all host-routed
+through this one port, no new port mapping needed per service), `18453` → Traefik HTTPS, `8081` → in-cluster Keycloak
+specifically (load-bearing, not a convenience port — see `k8s/keycloak.yaml`'s comment), `9080`/`9443`
+→ in-cluster Rancher specifically, same hostPort/nodeSelector reasoning as Keycloak's `8081` — see
+`k8s-rancher/rancher.yaml`'s comment, `6550` → the k8s API server (`kubectl` uses this automatically
+via your kubeconfig context, not something you visit directly).
 
 ## Kubernetes / GitOps
 
 `k8s/` holds every application manifest. ArgoCD itself is installed once into an `argocd` namespace
 (`kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml`),
 then `k8s-argocd/application.yaml` is applied to point it at this repo's `k8s/` path with auto-sync +
-self-heal enabled. From there ArgoCD watches `main` on its own. Loop once bootstrapped:
+self-heal enabled. From there ArgoCD watches `main` on its own. Rancher is bootstrapped the same
+manual, one-time way: `kubectl apply -f k8s-rancher/` brings up an in-cluster Rancher in the
+`cattle-system` namespace (see `k8s-rancher/rancher.yaml`'s comment for why it's plain YAML, not the
+Helm chart, and for the RBAC it needs to self-register the cluster it's running in as "local" —
+running in-cluster, it does this automatically on first boot, unlike the old docker-compose
+container which needed a manual "Import Existing" click). Like ArgoCD, it's deliberately kept
+outside ArgoCD's own sync path — a tool shouldn't be managed by the thing it manages — so it isn't
+part of the `k8s/` loop below. Loop once
+bootstrapped:
 
 1. Edit a manifest in `k8s/`, or push code that needs a new image
-2. If code changed: `docker build -f Dockerfile.service --build-arg SERVICE=<name> -t demo/<name>:local .`
-   then `k3d image import demo/<name>:local -c demo` (images aren't in a registry — this step doesn't
-   happen automatically)
-3. `git push` — ArgoCD picks up manifest changes on its own; a changed image still needs
+2. If code changed, build+import locally, tagged with that service's own real version number —
+   not a placeholder like `:local` — read from its `pom.xml` (backend) or `package.json`
+   (frontend), matching exactly what CI publishes as the semver tag alongside the SHA tag:
+   - Backend: `docker build -f Dockerfile.service --build-arg SERVICE=<name> -t demo/<name>:<version-from-pom.xml> .`
+     then `k3d image import demo/<name>:<version> -c demo`
+   - Frontend: `docker build --build-arg MODE=k8s -t demo/frontend:<version-from-package.json> frontend/`
+     then `k3d image import demo/frontend:<version> -c demo` — `MODE=k8s` matters here (see
+     `frontend/Dockerfile`'s comment): the default `production` mode bakes in `localhost:*` URLs
+     for the docker-compose/host-JVM dev flow, which don't work through the k8s Traefik ingress.
+   - Images aren't in a registry for local iteration — this import step doesn't happen automatically
+3. Update the manifest's `image:` field to match the tag you just imported
+4. `git push` — ArgoCD picks up manifest changes on its own; a changed image still needs
    `kubectl -n demo rollout restart deployment/<name>` to actually pick up the freshly-imported image
+   (the tag alone doesn't change just because the image content did)
 
 `Dockerfile.service` (repo root) is a single parameterized Dockerfile (`--build-arg SERVICE=<module>`) shared
 by every backend service — build context is the repo root so the multi-module Maven build can see
-sibling modules.
+sibling modules. `frontend/Dockerfile` is its own separate file (different toolchain, npm/Vite not
+Maven) — see its `MODE` build-arg comment for why the frontend specifically needs a build variant
+the backend services don't.
+
+CI's own bootstrap-correction step (`.github/workflows/ci-cd.yml`'s `update-manifests` job) rewrites
+any manifest still pointing at a local `demo/<name>:<tag>` image to the real `ghcr.io` SHA tag
+automatically, the first time that service's CI build succeeds after being deployed this way — no
+manual cleanup needed once a service's pipeline has run at least once post-bootstrap.
 
 ## Observability
 
-- **Metrics**: every service exposes `/actuator/prometheus`; Prometheus scrapes them; Grafana has a
-  pre-provisioned "Services Overview" dashboard (`docker/grafana/dashboards/`).
+- **Metrics**: every service exposes `/actuator/prometheus`. Two Prometheus instances scrape it —
+  the docker-compose one (`docker/prometheus/prometheus.yml`, static `host.docker.internal` targets,
+  host-JVM dev flow) and the in-cluster one (`k8s/prometheus.yaml`, native Kubernetes service
+  discovery — no Operator, no Helm — scraping every Service labeled `monitored: "true"`). Both feed
+  a Grafana with the same pre-provisioned "Services Overview" dashboard
+  (`docker/grafana/dashboards/services-overview.json`, reused verbatim by the in-cluster Grafana via
+  `k8s/grafana.yaml`).
 - **Logs**: services log to stdout; in Docker Compose that's `docker logs <container>`. In k8s,
-  Promtail (`k8s/promtail-daemonset.yaml`) ships every pod's logs to a separate in-cluster Loki
-  instead (`k8s/loki.yaml`, namespace `monitoring`) — query through Grafana's Explore tab against
-  the **Loki (k8s)** datasource; the plain **Loki** datasource is the host-JVM/docker-compose
-  flow's own instance.
+  Promtail (`k8s/promtail-daemonset.yaml`, namespace `infra`) ships every pod's logs to a separate
+  in-cluster Loki instead (`k8s/loki.yaml`, namespace `monitoring`) — query through either Grafana's
+  Explore tab (docker-compose one against the plain **Loki** datasource, in-cluster one against
+  **Loki (k8s)**) or directly at `http://grafana.demo.localhost:18090`.
 - **Audit trail**: every REST call across every service is captured (who, what, when, request/response
-  bodies with secrets redacted) and shipped to Elasticsearch (in-cluster, `k8s/elasticsearch.yaml`).
+  bodies with secrets redacted) and shipped to Elasticsearch (in-cluster, `k8s/elasticsearch.yaml`,
+  namespace `infra`).
   The admin UI's history icons (Users, Products, Media, Chat) show the full change timeline with
   before/after diffs per field, powered by `audit-service`'s `RecordHistoryService` — a Kibana
   dashboard (`docker/kibana/audit-trail-dashboard.ndjson`) covers the same data for ad-hoc
-  querying. **Kibana itself stays host-based** (`docker-compose.yml`), pointed at
-  `docker-compose.yml`'s own dev-only Elasticsearch, not the in-cluster one — same "host copy is
-  its own independent dev-flow instance" pattern as MySQL/Mongo/etc. now, not a live view into k8s
-  environment data.
+  querying. Both Kibana instances now point at the same in-cluster Elasticsearch instance
+  (`k8s/kibana.yaml`'s Kibana reaches it directly via `elasticsearch.infra.svc.cluster.local`; the
+  docker-compose one still uses its own separate dev-only Elasticsearch) — dashboard import handled
+  by `k8s/kibana.yaml`'s `kibana-dashboard-init` Job, same NDJSON as docker-compose's own
+  `kibana-dashboard-init` container.
 
 ## Repo layout
 

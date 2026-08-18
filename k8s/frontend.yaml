@@ -1,5 +1,23 @@
-# No runtime env vars — Vite bakes VITE_* into the build (frontend/.env.production), since the SPA
-# runs in the user's own browser on the host regardless of how the backend is deployed.
+# No runtime env vars — Vite bakes VITE_* into the build at image-build time, from
+# frontend/.env.k8s specifically (frontend/Dockerfile's MODE build arg), not .env.production —
+# the browser only has Keycloak's own hostPort to reach directly; everything else (API, WebSockets)
+# has to go through the Traefik ingress at the same origin the page loaded from, which needs
+# different baked-in URLs than the docker-compose build's .env.production does. See
+# frontend/Dockerfile's and frontend/.env.k8s's comments.
+#
+# image: demo/frontend:1.0.0 — local tag matches frontend/package.json's own version (same
+# convention every backend service's local tag uses against its own pom.xml, e.g.
+# demo/order-service:1.0.3), not a placeholder like ":local". The CI pipeline
+# (.github/workflows/ci-cd.yml's build-and-push-frontend job, now building with
+# --build-arg MODE=k8s) publishes the real ghcr.io-tagged image on every push to main;
+# update-manifests' own bootstrap-correction sed (`s#image: demo/([a-z-]+):[a-zA-Z0-9._-]+#...#`)
+# rewrites this line to the freshly-pushed SHA tag automatically the first time it runs, regardless
+# of which local tag value is here — same pattern every other service already uses before its own
+# first CI-driven deploy. Until then (or for local iteration), rebuild+reimport manually (bump the
+# tag to match package.json if the version changes):
+#   docker build --build-arg MODE=k8s -t demo/frontend:1.0.0 frontend/
+#   k3d image import demo/frontend:1.0.0 -c demo
+#   kubectl rollout restart deployment/frontend -n demo   # tag doesn't change, so this is required
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -12,11 +30,9 @@ spec:
   template:
     metadata: { labels: { app: frontend } }
     spec:
-      imagePullSecrets:
-        - name: ghcr-pull-secret
       containers:
         - name: frontend
-          image: ghcr.io/wilbertjoosen/demo-frontend:31a854c1d3857860b1085cf7a802be02cab0984f
+          image: demo/frontend:1.0.0
           imagePullPolicy: IfNotPresent
           ports: [{ containerPort: 80 }]
           resources:
