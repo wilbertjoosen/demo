@@ -1,25 +1,22 @@
 #!/usr/bin/env bash
 #
-# Starts/stops the local k3d cluster ("demo") together with the docker-compose infra it still
-# depends on (pods reach Grafana/Kibana via host.k3d.internal — see k8s/configmap-common.yaml
-# and docker-compose.yml). Wraps the manual sequence:
+# Starts/stops the local k3d cluster ("demo"). Wraps the manual sequence:
 #
 #   k3d cluster stop demo && docker compose stop
 #   docker compose up -d && k3d cluster start demo && kubectl get pods -A -w
 #
-# Only starts the infra k8s pods actually need, NOT docker-compose's app containers (Option B's
+# Only starts the infra k8s pods actually need — which, as of k8s/grafana.yaml, k8s/prometheus.yaml,
+# and k8s/kibana.yaml, is none of docker-compose's infra at all (K8S_INFRASTRUCTURE in
+# local-infra.sh is empty). NOT docker-compose's app containers either (Option B's
 # full-docker-compose-stack mode — irrelevant here, the cluster runs its own pods) and NOT the
 # dev-only pieces docker-compose also happens to host: Kafka, Redis, MySQL, Keycloak, Mailpit,
-# MongoDB, and Elasticsearch all now run in-cluster (k8s/kafka.yaml, k8s/redis.yaml,
-# k8s/mysql.yaml, k8s/keycloak.yaml, k8s/mailpit.yaml, k8s/mongo.yaml, k8s/elasticsearch.yaml);
-# kafka-ui only matters once kafka is reachable from the host; this compose file's own Loki is
-# the host-JVM/compose-flow instance specifically — k8s has its own separate in-cluster one
-# (k8s/loki.yaml); its own Promtail only ships logs to this file's own Loki (k8s pods get their
-# logs shipped by the in-cluster k8s/promtail-daemonset.yaml instead). Prometheus is dev-only for
-# a different reason: this branch has no in-cluster Prometheus at all — pod IPs on the k3d overlay
-# network were never reachable from docker-compose's Prometheus anyway, so it never actually
-# scraped k8s pods here. Pass --with-dev to also start/stop the dev-only set, e.g. if you're
-# running start-local.sh's host-JVM services against the cluster at the same time.
+# MongoDB, Elasticsearch, Loki, Promtail, Prometheus, Grafana, and Kibana all now run in-cluster
+# (k8s/kafka.yaml, k8s/redis.yaml, k8s/mysql.yaml, k8s/keycloak.yaml, k8s/mailpit.yaml,
+# k8s/mongo.yaml, k8s/elasticsearch.yaml, k8s/loki.yaml, k8s/promtail-daemonset.yaml,
+# k8s/prometheus.yaml, k8s/grafana.yaml, k8s/kibana.yaml) — the docker-compose versions all stay
+# for the host-JVM/compose-flow dev loop specifically, wired to host.docker.internal/localhost
+# targets, same as every dev-only piece. Pass --with-dev to also start/stop that dev-only set, e.g.
+# if you're running start-local.sh's host-JVM services against the cluster at the same time.
 #
 # See start-local.sh/stop-local.sh for the non-k8s (mvnw/npm) local dev flow instead.
 
@@ -139,7 +136,7 @@ do_start() {
     if ! cluster_exists; then
         echo "  → Cluster '$CLUSTER_NAME' does not exist yet."
         echo "    Create it first — see README.md's 'Kubernetes / GitOps' section:"
-        echo "    k3d cluster create $CLUSTER_NAME --servers 1 --agents 2 -p \"18090:80@loadbalancer\" -p \"18453:443@loadbalancer\" -p \"8081:8081@loadbalancer\" --api-port 6550"
+        echo "    k3d cluster create $CLUSTER_NAME --servers 1 --agents 2 -p \"18090:80@loadbalancer\" -p \"18453:443@loadbalancer\" -p \"8081:8081@loadbalancer\" -p \"9080:9080@loadbalancer\" -p \"9443:9443@loadbalancer\" --api-port 6550"
         exit 1
     fi
 

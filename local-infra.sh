@@ -24,18 +24,19 @@ INFRASTRUCTURE=(
     "kibana"
 )
 
-# Of the above, the ones k8s pods no longer depend on — Grafana and Kibana are the only pieces
-# still reached by pods via host.k3d.internal now (see k8s/configmap-common.yaml); everything else
-# moved in-cluster: Kafka, Redis, MySQL, Keycloak, Mailpit (k8s/kafka.yaml, k8s/redis.yaml,
-# k8s/mysql.yaml, k8s/keycloak.yaml, k8s/mailpit.yaml), and now MongoDB and Elasticsearch too
-# (k8s/mongo.yaml, k8s/elasticsearch.yaml). kafka-ui only makes sense once kafka itself is
-# reachable from the host; this compose file's own "loki" is the host-JVM/compose-flow instance
-# specifically — k8s has its own separate in-cluster one (k8s/loki.yaml); "promtail" only ships
+# Of the above, the ones k8s pods no longer depend on — as of k8s/grafana.yaml, k8s/prometheus.yaml,
+# and k8s/kibana.yaml, that's now everything: Grafana and Kibana were the last two pieces still
+# reached by pods via host.k3d.internal, and now have in-cluster equivalents of their own too, same
+# as Kafka, Redis, MySQL, Keycloak, Mailpit (k8s/kafka.yaml, k8s/redis.yaml, k8s/mysql.yaml,
+# k8s/keycloak.yaml, k8s/mailpit.yaml), MongoDB, and Elasticsearch (k8s/mongo.yaml,
+# k8s/elasticsearch.yaml). kafka-ui only makes sense once kafka itself is reachable from the host;
+# this compose file's own "loki"/"grafana"/"prometheus"/"kibana" are the host-JVM/compose-flow
+# instances specifically, wired to host.docker.internal/localhost targets
+# (docker/prometheus/prometheus.yml) — k8s has its own separate in-cluster ones instead
+# (k8s/loki.yaml, k8s/grafana.yaml, k8s/prometheus.yaml, k8s/kibana.yaml); "promtail" only ships
 # logs to this file's own "loki" (k8s pods get their own logs shipped by the in-cluster
 # k8s/promtail-daemonset.yaml instead, a resource applied directly rather than run through
-# docker-compose at all). "prometheus" is dev-only for a different reason: this branch has no
-# in-cluster Prometheus at all (pod IPs on the k3d overlay network were never reachable from
-# docker-compose's Prometheus anyway, so it never actually scraped k8s pods here).
+# docker-compose at all).
 DEV_ONLY_INFRASTRUCTURE=(
     "kafka"
     "kafka-ui"
@@ -48,6 +49,8 @@ DEV_ONLY_INFRASTRUCTURE=(
     "elasticsearch"
     "loki"
     "promtail"
+    "grafana"
+    "kibana"
 )
 
 # What a k8s-only workflow (k8s-local.sh's default) actually needs: INFRASTRUCTURE minus

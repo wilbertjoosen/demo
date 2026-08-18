@@ -1,12 +1,14 @@
-# In-cluster MySQL for the demo namespace. This branch has no demo-qa counterpart namespace (that
-# only exists on the testing/main branches — see their own k8s/mysql.yaml for the cross-namespace
-# sharing model used there), so this is just a single-namespace instance, no mysql-create-qa-db
-# Job needed.
+# In-cluster MySQL, in the infra namespace (k8s/namespace-infra.yaml) alongside the rest of the
+# datastores/brokers — see k8s/configmap-common.yaml's comment for why app services reach it via
+# the fully-qualified DB_HOST=mysql.infra.svc.cluster.local rather than a bare name. This branch
+# has no demo-qa counterpart namespace (that only exists on the testing/main branches — see their
+# own k8s/mysql.yaml for the cross-namespace sharing model used there), so this is just a
+# single-namespace instance, no mysql-create-qa-db Job needed.
 #
 # Credentials come from a Secret created imperatively, NOT committed here — same pattern as
 # ghcr-pull-secret and the vault-token Secret (see configmap-common.yaml's comment):
 #
-#   kubectl create secret generic mysql-credentials -n demo \
+#   kubectl create secret generic mysql-credentials -n infra \
 #     --from-literal=MYSQL_ROOT_PASSWORD=root \
 #     --from-literal=MYSQL_USER=demo \
 #     --from-literal=MYSQL_PASSWORD=demo \
@@ -21,7 +23,7 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: mysql
-  namespace: demo
+  namespace: infra
   labels: { app: mysql }
 spec:
   serviceName: mysql
@@ -65,7 +67,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: mysql
-  namespace: demo
+  namespace: infra
 spec:
   selector: { app: mysql }
   ports: [{ name: mysql, port: 3306, targetPort: 3306 }]

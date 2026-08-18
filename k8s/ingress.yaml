@@ -1,4 +1,13 @@
-# k3d ships Traefik as its default ingress controller — no separate install needed.
+# k3d ships Traefik as its default ingress controller — no separate install needed. Traefik proxies
+# WebSocket upgrades transparently, no special annotation required.
+#
+# /ws/notifications and /ws/conversations route straight to notification-service/chat-service,
+# bypassing gateway-service — same reasoning as /api going direct rather than through Eureka/the
+# gateway's own routing: these are long-lived upgraded connections, not regular REST calls. The
+# frontend's VITE_NOTIFICATIONS_WS_URL/VITE_CHAT_WS_BASE_URL (frontend/.env.k8s) point at this same
+# demo.localhost:18090 origin the page itself loads from — Keycloak is the only backend piece that
+# still needs its own separate hostPort (k8s/keycloak.yaml), everything else the browser talks to
+# goes through this one Ingress.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -13,6 +22,14 @@ spec:
             pathType: Prefix
             backend:
               service: { name: gateway-service, port: { number: 8080 } }
+          - path: /ws/notifications
+            pathType: Prefix
+            backend:
+              service: { name: notification-service, port: { number: 8085 } }
+          - path: /ws/conversations
+            pathType: Prefix
+            backend:
+              service: { name: chat-service, port: { number: 8094 } }
           - path: /
             pathType: Prefix
             backend:

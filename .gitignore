@@ -36,3 +36,7 @@ build/
 node_modules/
 dist/
 *.local
+
+###
+logs
+backups
