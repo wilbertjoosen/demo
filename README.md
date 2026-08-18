@@ -262,7 +262,13 @@ automatically via your kubeconfig context, not something you visit directly).
 
 ## CI/CD & versioning
 
-`.github/workflows/ci-cd.yml` runs on every push to `main` or `testing`:
+`.github/workflows/ci-cd.yml` is build-once, promote-many: pushing to `testing` builds and deploys
+QA; pushing to `main` never rebuilds from source — it promotes whichever images `testing` is already
+running (already validated in QA) into production. A genuine hotfix committed directly to `main`
+with no corresponding tested build on `testing` has nothing to promote from — use `workflow_dispatch`
+against `main` for that case instead.
+
+On a push to `testing`:
 
 1. **Test** — full Maven reactor `verify` (unit + Testcontainers-backed integration tests, Checkstyle,
    SpotBugs) and the frontend's `lint` + typecheck + build. Nothing downstream runs if this fails.
@@ -275,16 +281,25 @@ automatically via your kubeconfig context, not something you visit directly).
    workflow") skips the filter and rebuilds everything — useful after a change that doesn't touch any
    single service's own path but every service still needs picking up.
 3. **Build & push** — each changed service's image goes to GHCR (`ghcr.io/<owner>/demo-<service>`),
-   tagged with both the commit SHA and that service's own `pom.xml`/`package.json` version (each
+   tagged three ways: the commit SHA, the service's own `pom.xml`/`package.json` version (each
    service versions independently, starting at `1.0.0` — bump it by hand when you want to mark a
-   release). Images are `linux/arm64` only, matching this k3d cluster's nodes.
-4. **Update manifests** — bumps the changed services' `image:` lines in `k8s/*.yaml` to the new commit
-   SHA tag and commits straight back to whichever branch triggered the run, gated behind the images
-   already existing in GHCR — ArgoCD's `selfHeal` never sees a manifest pointing at an unpullable
-   image. Deploying by the immutable SHA (not the semver tag) means every commit that touches a
-   service produces a genuinely new tag and a real manifest diff, so a rollout always happens —
-   nothing depends on remembering to bump that service's version. The semver tag still rides along on
-   the same image purely for human-readable release tracking.
+   release), and `<version>-<short-sha>` (e.g. `1.0.3-a1b2c3d`). Images are `linux/arm64` only,
+   matching this k3d cluster's nodes.
+4. **Update manifests** — bumps the changed services' `image:` lines in `k8s/*.yaml` to the
+   `<version>-<short-sha>` tag and commits straight back to `testing`, gated behind the images already
+   existing in GHCR — ArgoCD's `selfHeal` never sees a manifest pointing at an unpullable image.
+   Deploying by this combined tag (not the bare version, and not the bare SHA) means every commit
+   that touches a service produces a genuinely new tag and a real manifest diff, so a rollout always
+   happens, while the tag itself still shows the app version at a glance. This was briefly
+   version-only (`46984c2`): a commit that forgot to bump the version left that service's running pod
+   silently stale, which actually happened more than once (`user-service`, `payment-service`,
+   `reporting-service`, the frontend) — the short-sha suffix removes that failure mode structurally.
+
+Pushing to `main` runs one job instead: **promote** copies each service's exact `image:` line
+straight from `testing`'s current `k8s/*.yaml` into `main`'s (manifests that only exist on `main` —
+`prometheus.yaml`, the namespace/secret files — are left untouched), then commits. Production
+therefore always runs the identical, already-QA-validated artifact, never a fresh rebuild of the
+same source.
 
 GHCR packages are private, so every Deployment references `imagePullSecrets: ghcr-pull-secret` — a
 `kubernetes.io/dockerconfigjson` Secret created directly in each namespace (`demo`, `demo-qa`) via
