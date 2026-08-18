@@ -11,6 +11,8 @@ export const useAuthStore = defineStore('auth', {
     isProductManager: keycloak.hasRealmRole('product_manager'),
     isShippingManager: keycloak.hasRealmRole('shipping_manager'),
     isInventoryManager: keycloak.hasRealmRole('inventory_manager'),
+    isWarehouse: keycloak.hasRealmRole('warehouse'),
+    isDeliveryAgent: keycloak.hasRealmRole('delivery_agent'),
     /** Present only on a token issued via admin impersonation — see api/impersonation.ts. */
     impersonatorUsername: (keycloak.tokenParsed as { impersonator?: { username?: string } } | undefined)
       ?.impersonator?.username ?? null,

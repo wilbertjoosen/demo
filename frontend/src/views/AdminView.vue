@@ -19,6 +19,10 @@ import StockDialog from '../components/admin/StockDialog.vue'
 import RecordHistoryDialog from '../components/admin/RecordHistoryDialog.vue'
 import AdminMediaDialog from '../components/admin/AdminMediaDialog.vue'
 import AdminChatHistoryDialog from '../components/admin/AdminChatHistoryDialog.vue'
+import OrdersRevenueReportPanel from '../components/admin/reports/OrdersRevenueReportPanel.vue'
+import SagaHealthReportPanel from '../components/admin/reports/SagaHealthReportPanel.vue'
+import TopProductsReportPanel from '../components/admin/reports/TopProductsReportPanel.vue'
+import UserGrowthReportPanel from '../components/admin/reports/UserGrowthReportPanel.vue'
 import type { Address, Product, User } from '../models'
 
 const { t } = useI18n()
@@ -198,7 +202,6 @@ async function addStock(payload: { warehouseId: string; quantity: number }) {
 
 onMounted(() => {
   users.load()
-  products.load()
 })
 </script>
 
@@ -222,8 +225,8 @@ onMounted(() => {
         />
       </el-tab-pane>
 
-      <el-tab-pane :label="t('admin.products')">
-        <div class="mb-3">
+      <el-tab-pane :label="t('admin.products')" lazy>
+        <div class="mb-3" @vue:mounted="products.load()">
           <el-button type="primary" @click="openProductCreate">{{ t('admin.newProduct') }}</el-button>
         </div>
         <AdminProductTable
@@ -237,6 +240,18 @@ onMounted(() => {
           @media="openProductMedia"
           @chat="openProductChatHistory"
         />
+      </el-tab-pane>
+
+      <el-tab-pane :label="t('admin.reports')" lazy>
+        <div class="flex flex-col gap-8">
+          <OrdersRevenueReportPanel />
+          <el-divider />
+          <SagaHealthReportPanel />
+          <el-divider />
+          <TopProductsReportPanel />
+          <el-divider />
+          <UserGrowthReportPanel />
+        </div>
       </el-tab-pane>
     </el-tabs>
 

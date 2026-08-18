@@ -11,10 +11,15 @@ import java.util.Map;
 
 /**
  * Denormalized read model for one order, folded entirely from order-events (ORDER_CREATED,
- * ORDER_STATUS_CHANGED) by the Kafka Streams KTable aggregator in ReportingTopology — no
- * synchronous call into order-service. {@code failureStage} is filled in separately, via a
- * table-table left join against a KTable built from payment/shipping/delivery-events, so a
- * cancelled order can be attributed to the saga step that actually failed.
+ * ORDER_CANCELLED) by the Kafka Streams KTable aggregator in ReportingTopology — no synchronous
+ * call into order-service. {@code failureStage} is filled in separately, via a table-table left
+ * join against a KTable built from payment/shipping/delivery-events, so a cancelled order can be
+ * attributed to the saga step that actually failed.
+ *
+ * <p>{@code confirmedAt} stays null on this branch — unlike main, order-service here has no
+ * generic status-advance event for a successful confirmation, only ORDER_CREATED and
+ * ORDER_CANCELLED, so there's no signal to derive it from. The field is kept (rather than removed)
+ * so the report models/frontend panels ported from main don't need their own shape change.
  *
  * <p>Mutated and returned in place by both the aggregator and the join (rather than rebuilt each
  * time) — safe here because Kafka Streams serializes the returned value to the state store
@@ -50,13 +55,9 @@ public class OrderMetric {
             this.shippingCarrier = (String) payload.get("shippingCarrier");
             this.status = "PENDING_PAYMENT";
             this.orderCreatedAt = event.timestamp();
-        } else if (EventTypes.ORDER_STATUS_CHANGED.equals(event.eventType())) {
-            this.status = (String) payload.get("status");
-            if ("CONFIRMED".equals(status)) {
-                this.confirmedAt = event.timestamp();
-            } else if ("CANCELLED".equals(status)) {
-                this.cancelledAt = event.timestamp();
-            }
+        } else if (EventTypes.ORDER_CANCELLED.equals(event.eventType())) {
+            this.status = "CANCELLED";
+            this.cancelledAt = event.timestamp();
         }
         return this;
     }
