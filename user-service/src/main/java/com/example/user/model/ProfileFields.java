@@ -10,4 +10,27 @@ import java.util.Map;
  */
 public record ProfileFields(Address shippingAddress, String nationalId, String phone,
                              Map<String, String> customAttributes) {
+
+    public ProfileFields {
+        shippingAddress = blankToNull(shippingAddress);
+    }
+
+    /** The frontend's optional-address forms submit an all-blank object rather than omitting the field. */
+    private static Address blankToNull(Address address) {
+        if (address == null) {
+            return null;
+        }
+
+        boolean allBlank =
+                isBlank(address.getStreet())
+                        && isBlank(address.getCity())
+                        && isBlank(address.getPostalCode())
+                        && isBlank(address.getCountry());
+
+        return allBlank ? null : address;
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.isBlank();
+    }
 }
