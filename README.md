@@ -1,14 +1,30 @@
 # Demo — Microservices Architecture Playground
 
-A from-scratch rebuild of a single Spring Boot monolith into a full microservices system, built as a
-hands-on reference for *why* you'd reach for a given distributed-systems pattern, not just *how* to
-wire it up. Every pattern below exists because a concrete problem in this domain needed it — see
-[Patterns demonstrated](#patterns-demonstrated) for the reasoning behind each one.
+This project illustrates a complete, end-to-end software workflow—spanning feature development on the develop branch, 
+automated CI/CD validation in the testing/staging environment, and automated continuous delivery to the production 
+Kubernetes cluster via ArgoCD GitOps. Beyond the workflow, it serves as a from-scratch rebuild of a single Spring Boot 
+monolith into a full microservices system, built as a hands-on reference for why you'd reach for a given 
+distributed-systems pattern, not just how to wire it up. Every pattern below exists because a concrete problem in this domain needed it — 
+see [Patterns demonstrated](#patterns-demonstrated) for the reasoning behind each one.
 
-**Stack:** Spring Boot 4 / Java 26 backend (19 modules), Vue 3 + TypeScript + Element Plus frontend,
-MySQL + MongoDB + Kafka + Redis + Elasticsearch, Keycloak (OAuth2/OIDC), Eureka + Spring Cloud Gateway,
-Prometheus + Grafana + Loki + Kibana, Docker Compose for local infra, k3d + ArgoCD for a local
-Kubernetes/GitOps loop.
+**Stack:** 
+- Spring Boot 4 / Java 26 backend (19 modules) 
+- Vue 3 + TypeScript + Element Plus frontend
+- MySQL
+- MongoDB
+- Kafka
+- Redis
+- Elasticsearch
+- Keycloak (OAuth2/OIDC)
+- Eureka + Spring Cloud Gateway,
+- Prometheus
+- Grafana
+- Loki
+- Kibana, 
+- Docker Compose for local infra
+- Kubernetes/GitOps loop
+- Mailpit (mock mail)
+- Rancher
 
 ## Architecture
 
@@ -317,6 +333,98 @@ CI's own bootstrap-correction step (`.github/workflows/ci-cd.yml`'s `update-mani
 any manifest still pointing at a local `demo/<name>:<tag>` image to the real `ghcr.io` SHA tag
 automatically, the first time that service's CI build succeeds after being deployed this way — no
 manual cleanup needed once a service's pipeline has run at least once post-bootstrap.
+
+## QA / testing environment
+
+A second, fully independent deploy target — same cluster, same shared stateful infra, separate
+namespace and separate ArgoCD Application from production:
+
+```mermaid
+flowchart LR
+    subgraph GIT["GitHub"]
+        MAIN["main branch"]
+        TEST["testing branch"]
+    end
+
+    subgraph K8S["k3d cluster"]
+        subgraph DEMO["namespace: demo (prod app tier only)"]
+            APPS_PROD["17 services\n+ frontend"]
+        end
+        subgraph DEMOQA["namespace: demo-qa (QA)"]
+            APPS_QA["17 services\n+ frontend"]
+            KAFKA_QA["Kafka"]
+            REDIS_QA["Redis"]
+            MAILPIT_QA["Mailpit"]
+        end
+        subgraph INFRA["namespace: infra"]
+            MYSQL[("MySQL\ndb: demo / demo_qa")]
+            MONGO[("MongoDB (3-node rs)\ndb: <svc> / <svc>_qa")]
+            ES[("Elasticsearch\nindex: audit-log / audit-log-qa")]
+            KC["Keycloak\nrealm: demo / demo-qa"]
+            VAULT["Vault"]
+            KAFKA_PROD["Kafka (prod-only)"]
+            REDIS_PROD["Redis (prod-only)"]
+            MAILPIT_PROD["Mailpit (prod-only)"]
+        end
+        subgraph MON["namespace: monitoring — cluster-wide, shared by both"]
+            PROM_K8S["Prometheus (k8s)"]
+            LOKI_K8S["Loki (k8s)"]
+            KIBANA_K8S["Kibana (k8s)"]
+        end
+        ARGO_PROD["ArgoCD app: demo"]
+        ARGO_QA["ArgoCD app: demo-qa"]
+    end
+
+    MAIN -- "CI/CD: build, push, bump k8s/" --> ARGO_PROD
+    TEST -- "CI/CD: build, push, bump k8s/" --> ARGO_QA
+    ARGO_PROD --> APPS_PROD
+    ARGO_QA --> APPS_QA
+
+    APPS_PROD --> MYSQL & MONGO & ES & KC & VAULT & KAFKA_PROD & REDIS_PROD & MAILPIT_PROD
+    APPS_QA --> KAFKA_QA & REDIS_QA & MAILPIT_QA
+    APPS_QA -. "cross-namespace Service DNS" .-> MYSQL & MONGO & ES & KC & VAULT
+```
+
+- **Branch model**: `main` is production (bugfixes branch from here); `develop` is where feature
+  branches merge; `testing` is the QA environment itself — merging `develop` → `testing` and pushing
+  deploys to QA the same way pushing to `main` deploys to prod.
+- **k8s**: namespace `demo-qa`, ArgoCD Application `demo-qa` (tracks the `testing` branch's own
+  `k8s/` path), ingress at `qa.demo.localhost` — same port (`18090`) as prod, routed by hostname.
+- **Infra**: MySQL, MongoDB, Elasticsearch, Keycloak, and Vault run **in-cluster in their own `infra`
+  namespace** (`k8s/namespace-infra.yaml`; `k8s/mysql.yaml`, `k8s/mongo.yaml`,
+  `k8s/elasticsearch.yaml`, `k8s/keycloak.yaml`, `k8s/vault.yaml`) — QA reaches them
+  **cross-namespace** (`mysql.infra.svc.cluster.local` etc. — k8s Services are reachable across
+  namespaces by default, no NetworkPolicy restricting it here) instead of getting duplicate
+  containers, same "one shared instance, environment-scoped by name" reasoning as before (QA gets
+  its own `demo_qa` database / `<service>_qa` Mongo databases / `audit-log-qa` index / `demo-qa`
+  Keycloak realm). Kafka, Redis, and Mailpit run **in-cluster and genuinely separate per
+  environment** — prod's own copies also live in `infra` now (`k8s/kafka.yaml`, `k8s/redis.yaml`,
+  `k8s/mailpit.yaml`), while QA's stay in `demo-qa` itself, matching how they were never
+  meant to be shared in the first place: Kafka/Redis because shared topics would mean QA test
+  traffic triggering production's saga, Mailpit because it was always a separate instance per
+  environment even on the host — `infra` is just where MySQL/Mongo/ES/Keycloak/Vault's genuine
+  cross-environment sharing pulled everything else along with it. Prometheus, Loki, and Kibana run
+  **in-cluster in their own `monitoring` namespace**, shared by both `demo` and `demo-qa`
+  (`k8s/namespace-monitoring.yaml`; `k8s/prometheus.yaml`, `k8s/loki.yaml`, `k8s/kibana.yaml`) — see
+  [Observability](#observability). Every one of these has a host-based equivalent in
+  `docker-compose.yml`/`docker-compose.qa.yml` still, kept purely for host-JVM debugging (`kcat`,
+  `redis-cli`, a mysql client, a local IDE run) — the k8s namespaces themselves don't depend on any
+  of them anymore.
+- **One frontend image, two Keycloak realms**: Vite bakes `VITE_KEYCLOAK_REALM` in at build time, but
+  the same built image is deployed to both `demo` and `demo-qa` — a build-time value can't vary per
+  environment. `frontend/src/auth/keycloak.ts` instead resolves the realm at runtime from the
+  hostname (`qa.` prefix → `demo-qa`, anything else → the build-time default), matching the
+  `demo.localhost` / `qa.demo.localhost` ingress split above.
+- **`demo_qa` database creation** on the shared in-cluster MySQL is handled automatically by a Job
+  (`mysql-create-qa-db` in `k8s/mysql.yaml`) rather than a manual step. MongoDB and Elasticsearch
+  need no equivalent step — both auto-create on first write.
+- **Excluded from QA on purpose**: `promtail-daemonset.yaml`, `prometheus.yaml`, `loki.yaml`, and
+  `kibana.yaml` are cluster-wide, single-shared-instance resources (see
+  [Observability](#observability)) — duplicating them per environment would just make the `demo`
+  and `demo-qa` Applications fight over the same ClusterRole/ClusterRoleBinding names
+  (`promtail-daemonset.yaml`, `prometheus.yaml`) or the same `infra`/`monitoring` Namespace objects
+  (`namespace-infra.yaml`, `namespace-monitoring.yaml`).
+
 
 ## Observability
 
