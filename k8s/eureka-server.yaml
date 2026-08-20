@@ -14,7 +14,7 @@ spec:
         - name: ghcr-pull-secret
       containers:
         - name: eureka-server
-          image: ghcr.io/wilbertjoosen/demo-eureka-server:1.0.1-25e472f
+          image: ghcr.io/wilbertjoosen/demo-eureka-server:1.0.1-5949d11
           imagePullPolicy: Always
           ports: [{ containerPort: 8761 }]
           resources:
