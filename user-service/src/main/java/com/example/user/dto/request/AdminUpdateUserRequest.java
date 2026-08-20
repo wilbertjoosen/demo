@@ -11,7 +11,7 @@ public record AdminUpdateUserRequest(Address shippingAddress, String nationalId,
                                      Map<String, String> customAttributes, String username,
                                      @Email String email, String firstName, String lastName) {
     public ProfileFields toFields() {
-        return new ProfileFields(blankToNull(shippingAddress), nationalId, phone, customAttributes);
+        return new ProfileFields(shippingAddress, nationalId, phone, customAttributes);
     }
 
     public IdentityFields toIdentity() {
@@ -19,23 +19,5 @@ public record AdminUpdateUserRequest(Address shippingAddress, String nationalId,
             return null;
         }
         return new IdentityFields(username, email, firstName, lastName);
-    }
-
-    private static Address blankToNull(Address address) {
-        if (address == null) {
-            return null;
-        }
-
-        boolean allBlank =
-                isBlank(address.getStreet())
-                        && isBlank(address.getCity())
-                        && isBlank(address.getPostalCode())
-                        && isBlank(address.getCountry());
-
-        return allBlank ? null : address;
-    }
-
-    private static boolean isBlank(String value) {
-        return value == null || value.isBlank();
     }
 }
