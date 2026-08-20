@@ -5,6 +5,7 @@ import type { Address, DirectoryEntry, User } from '../models'
 export interface ProfileUpdate {
   shippingAddress?: Address
   nationalId?: string
+  nationalIdCountry?: string
   phone?: string
   customAttributes?: Record<string, string>
 }
