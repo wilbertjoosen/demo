@@ -67,6 +67,10 @@ spring:
               uri: lb://reporting-service
               predicates:
                 - Path=/api/reports/**
+            - id: common-service
+              uri: lb://common-service
+              predicates:
+                - Path=/api/common/**
             # Proxies each service's own /v3/api-docs under /docs/<service>/v3/api-docs so one
             # Swagger UI (this gateway's own) can aggregate all of them — see springdoc.swagger-ui.urls
             # below. notification-service is excluded: it has no REST controllers (WebSocket-only).
@@ -148,6 +152,12 @@ spring:
                 - Path=/docs/reporting-service/v3/api-docs
               filters:
                 - SetPath=/v3/api-docs
+            - id: common-service-docs
+              uri: lb://common-service
+              predicates:
+                - Path=/docs/common-service/v3/api-docs
+              filters:
+                - SetPath=/v3/api-docs
     # Failover: if a route resolves to a service with 2+ instances registered in Eureka and one is
     # down/erroring, the LoadBalancer retries against a *different* instance automatically (enabled
     # by default; retry-on-all-operations is off by default since retrying a POST/PUT across
@@ -184,6 +194,7 @@ springdoc:
       - { name: product-review-service, url: /docs/product-review-service/v3/api-docs }
       - { name: chat-service, url: /docs/chat-service/v3/api-docs }
       - { name: reporting-service, url: /docs/reporting-service/v3/api-docs }
+      - { name: common-service, url: /docs/common-service/v3/api-docs }
 
 cors:
   # localhost:5173 is the Vite dev server; demo.localhost:18090 is the k3d ingress the built SPA is
