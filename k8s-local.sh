@@ -124,7 +124,12 @@ do_start() {
 
     if $WITH_DEV; then
         (cd "$ROOT_DIR" && docker compose up -d "${INFRASTRUCTURE[@]}")
-    else
+    elif [ ${#K8S_INFRASTRUCTURE[@]} -gt 0 ]; then
+        # "${K8S_INFRASTRUCTURE[@]}" directly would be an unbound-variable error under `set -u` on
+        # bash 3.2 (macOS's stock /bin/bash) if this array is ever empty — bash <4.4 treats
+        # "${arr[@]}" as unbound under `set -u` even when the array is declared, just empty (fixed
+        # upstream in 4.4+). Not empty today (grafana/tempo/kibana), but guard defensively rather
+        # than expand blind.
         (cd "$ROOT_DIR" && docker compose up -d "${K8S_INFRASTRUCTURE[@]}")
     fi
 
