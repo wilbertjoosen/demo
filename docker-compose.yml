@@ -1,14 +1,14 @@
 # Shared by every containerized app service below — addresses use in-network service names
 # (mongodb, kafka:29092, keycloak's internal port) rather than the localhost:* defaults each
 # service's application.yaml falls back to for the `mvn spring-boot:run` host-JVM dev flow.
-# KEYCLOAK_ISSUER_URI stays external (localhost:8081): it must match the `iss` claim of tokens
+# KEYCLOAK_ISSUER_URI stays external (localhost:8181): it must match the `iss` claim of tokens
 # issued to the browser-based SPA, regardless of where the validating service itself runs.
 x-app-env: &app-env
   CONFIG_SERVER_URI: http://config-server:8888
   EUREKA_URI: http://eureka-server:8761/eureka
   KAFKA_BOOTSTRAP_SERVERS: kafka:29092
-  KEYCLOAK_ISSUER_URI: http://localhost:8081/realms/demo
-  KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/demo/protocol/openid-connect/certs
+  KEYCLOAK_ISSUER_URI: http://localhost:8181/realms/demo
+  KEYCLOAK_JWK_SET_URI: http://keycloak:8180/realms/demo/protocol/openid-connect/certs
   MONGO_HOST: mongodb
   REDIS_HOST: redis
 
@@ -101,13 +101,13 @@ services:
       KEYCLOAK_ADMIN_PASSWORD: admin
       # Without a fixed hostname, Keycloak's dev mode derives each token's `iss` claim from
       # whatever Host header the request used to reach it — fine for browser logins (always
-      # localhost:8081), but order-service's server-to-server client_credentials call goes through
-      # host.k3d.internal:8081 when running in the k3d cluster, which would mint a token with a
+      # localhost:8181), but order-service's server-to-server client_credentials call goes through
+      # host.k3d.internal:8181 when running in the k3d cluster, which would mint a token with a
       # DIFFERENT issuer than what every service's fixed KEYCLOAK_ISSUER_URI expects, and the
       # receiving service's JwtIssuerValidator rejects it with 401.
-      KC_HOSTNAME: http://localhost:8081
+      KC_HOSTNAME: http://localhost:8181
     ports:
-      - "8081:8080"
+      - "8181:8080"
     volumes:
       - ./docker/keycloak:/opt/keycloak/data/import
 
