@@ -2,9 +2,9 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { FormItemRule } from 'element-plus'
-import type { Address } from '../models'
+import type { Address, Country } from '../models'
 
-const props = withDefaults(defineProps<{ modelValue: Address; propPrefix: string; required?: boolean }>(), {
+const props = withDefaults(defineProps<{ modelValue: Address; propPrefix: string; required?: boolean, countries: Country[] | null, }>(), {
   required: true,
 })
 defineEmits<{ 'update:modelValue': [value: Address] }>()
@@ -29,6 +29,16 @@ const rules = computed<FormItemRule[]>(() => (props.required ? [{ required: true
     <el-input :model-value="modelValue.postalCode" @update:model-value="$emit('update:modelValue', { ...modelValue, postalCode: $event })" />
   </el-form-item>
   <el-form-item :label="t('address.country')" :prop="fieldProp('country')" :rules="rules">
-    <el-input :model-value="modelValue.country" @update:model-value="$emit('update:modelValue', { ...modelValue, country: $event })" />
+    <el-select
+        :model-value="modelValue.country"
+        @update:model-value="$emit('update:modelValue', { ...modelValue, country: $event })"
+    >
+      <el-option
+          v-for="country in (props.countries ?? [])"
+          :key="country.code"
+          :value="country.code"
+          :label="country.name"
+      />
+    </el-select>
   </el-form-item>
 </template>

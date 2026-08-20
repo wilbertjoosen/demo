@@ -1,12 +1,13 @@
 import { defineStore } from 'pinia'
 import { usersApi, type CreateUserPayload, type ProfileUpdate } from '../api/users'
-import type { User } from '../models'
+import type { User, Country } from '../models'
 
 export const useUsersStore = defineStore('users', {
   state: () => ({
     items: [] as User[],
     loading: false,
     me: null as User | null,
+    countries: [] as Country[] | null,
   }),
   actions: {
     async load() {
@@ -34,6 +35,9 @@ export const useUsersStore = defineStore('users', {
     async remove(id: string) {
       await usersApi.remove(id)
       await this.load()
+    },
+    async loadCountries() {
+      this.countries = await usersApi.countries()
     },
   },
 })

@@ -1,10 +1,11 @@
 import { http } from './http'
 import { unwrapCollection } from './hal'
-import type { Address, DirectoryEntry, User } from '../models'
+import type {Address, DirectoryEntry, User, Country} from '../models'
 
 export interface ProfileUpdate {
   shippingAddress?: Address
   nationalId?: string
+  nationalIdCountry?: string
   phone?: string
   customAttributes?: Record<string, string>
 }
@@ -49,5 +50,9 @@ export const usersApi = {
   },
   async remove(id: string): Promise<void> {
     await http.delete(`/api/users/${id}`)
+  },
+  async countries(): Promise<Country[]> {
+    const { data } = await http.get(`/api/users/countries`);
+    return unwrapCollection<Country>(data)
   },
 }
