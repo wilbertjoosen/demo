@@ -3,6 +3,7 @@ import { reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { FormInstance } from 'element-plus'
 import AddressForm from '../AddressForm.vue'
+import { useCommonStore } from '../../stores/common'
 import { paymentsApi } from '../../api/payments'
 import { shipmentsApi } from '../../api/shipments'
 import type { Address, PaymentMethod, PaymentMethodAvailability, Product, ShippingCarrier } from '../../models'
@@ -18,6 +19,7 @@ const emit = defineEmits<{
   submit: [{ quantity: number; address: Address; paymentMethod: PaymentMethod; shippingCarrier: ShippingCarrier }]
 }>()
 const { t } = useI18n()
+const common = useCommonStore()
 
 const paymentMethods: PaymentMethod[] = ['CREDIT_CARD', 'DEBIT_CARD', 'PAYPAL', 'PIX', 'BOLETO', 'BANK_TRANSFER', 'CASH']
 const shippingCarriers: ShippingCarrier[] = ['UPS', 'DHL']
@@ -50,6 +52,7 @@ watch(
   () => props.modelValue,
   async (open) => {
     if (!open) return
+    if (common.countries.length === 0) common.loadCountries()
     form.quantity = 1
     form.address = props.initialAddress ? { ...props.initialAddress } : { street: '', city: '', postalCode: '', country: '' }
     form.paymentMethod = 'CREDIT_CARD'
@@ -86,7 +89,7 @@ async function submit() {
       <el-form-item :label="t('products.quantity')">
         <el-input-number v-model="form.quantity" :min="1" />
       </el-form-item>
-      <AddressForm v-model="form.address" prop-prefix="address" />
+      <AddressForm v-model="form.address" :countries="common.countries" prop-prefix="address" />
       <el-form-item :label="t('products.paymentMethod')">
         <el-select v-model="form.paymentMethod" class="w-full">
           <el-option

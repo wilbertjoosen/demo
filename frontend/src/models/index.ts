@@ -1,4 +1,5 @@
 export type { Address } from './address'
+export type { Country } from './country'
 export type { Product } from './product'
 export type { OrderStatus, OrderView } from './order'
 export type { User } from './user'
