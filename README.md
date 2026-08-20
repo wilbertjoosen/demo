@@ -1,26 +1,35 @@
 # Demo — Microservices Architecture Playground
 
-This project illustrates a complete, end-to-end software workflow—spanning feature development on the develop branch, 
-automated CI/CD validation in the testing/staging environment, and automated continuous delivery to the production 
-Kubernetes cluster via ArgoCD GitOps. Beyond the workflow, it serves as a from-scratch rebuild of a single Spring Boot 
-monolith into a full microservices system, built as a hands-on reference for why you'd reach for a given 
-distributed-systems pattern, not just how to wire it up. Every pattern below exists because a concrete problem in this domain needed it — 
-see [Patterns demonstrated](#patterns-demonstrated) for the reasoning behind each one.
+This project illustrates a software workflow spanning feature development on the `develop` branch,
+automated CI/CD validation in the `testing`/QA environment, and automated continuous delivery to the
+production Kubernetes cluster via ArgoCD GitOps — see [Release workflow: local → testing →
+production](#release-workflow-local--testing--production) for exactly which of those hops are
+automated today and which aren't (`develop` itself isn't wired to any deployed environment yet — see
+that section for the honest version). Beyond the workflow, it serves as a from-scratch rebuild of a
+single Spring Boot monolith into a full microservices system, built as a hands-on reference for why
+you'd reach for a given distributed-systems pattern, not just how to wire it up. Every pattern below
+exists because a concrete problem in this domain needed it — see [Patterns
+demonstrated](#patterns-demonstrated) for the reasoning behind each one.
 
-**Stack:** 
-- Spring Boot 4 / Java 26 backend (19 modules) 
-- Vue 3 + TypeScript + Element Plus frontend
+**Stack:**
+- Spring Boot 4 / Java 26 backend (21 modules)
+- Vue 3 + TypeScript + Element Plus frontend, Pinia (state), Vue Router, vue-i18n, axios, ECharts
+  (`vue-echarts`, the reporting dashboard's charts), Tailwind CSS, ESLint + `vue-tsc`, Vite
 - MySQL
 - MongoDB
-- Kafka
+- Kafka (plus Kafka Streams for `reporting-service`'s materialized views)
 - Redis
 - Elasticsearch
-- Keycloak (OAuth2/OIDC)
-- Eureka + Spring Cloud Gateway,
+- Keycloak (OAuth2/OIDC) — `keycloak-js` adapter on the frontend
+- Eureka + Spring Cloud Gateway
+- springdoc-openapi (per-service Swagger UI, aggregated at the gateway)
+- Micrometer + Prometheus registry (every service), AspectJ (`common-audit`'s cross-cutting request
+  audit)
+- spring-cloud-aws (S3 + Secrets Manager — `product-media-service`'s file storage)
 - Prometheus
 - Grafana
 - Loki
-- Kibana, 
+- Kibana
 - Docker Compose for local infra
 - Kubernetes/GitOps loop
 - Mailpit (mock mail)
@@ -50,6 +59,8 @@ Deployment.
 | `product-comment-service` | 8091 | MongoDB | Product comments, ownership-enforced editing |
 | `product-media-service` | 8092 | MongoDB + local disk | Product photos/videos/documents, file upload |
 | `product-review-service` | 8093 | MongoDB | Product ratings/reviews |
+| `common-service` | 8097 | MongoDB | Deployed reference-data service (countries today) shared by other services over REST — not to be confused with the `common-*` compile-time library modules below |
+| `reporting-service` | 8096 | Kafka Streams (materialized state stores) | Consumes every domain event and maintains live aggregates (top products, order revenue, user growth, saga health) for the frontend's reporting dashboard. **Not fully wired into this branch's tooling yet**: absent from `docker-compose.yml` (unreachable via the full-stack Option B), absent from `.github/workflows/ci-cd.yml`'s path-filter/build matrix (never auto-built/deployed here), and its `k8s/reporting-service.yaml` still points at a hand-pushed `demo/reporting-service:1.0.2` image rather than the `ghcr.io`/commit-SHA pattern every other service uses. Runs fine via `./mvnw -pl reporting-service spring-boot:run` (Option A) against the same Kafka/Eureka/config-server as everything else. |
 | `common-security` | — | — | Shared JWT resource-server config, reused by every service |
 | `common-audit` | — | — | Shared aspect that captures every REST call's request/response for the audit trail |
 | `common-model` | — | — | Shared DTOs (e.g. `Address`) |
@@ -87,12 +98,16 @@ is a partial or pragmatic fit rather than textbook.
 
 **Design patterns**
 
-- **Repository** — every persistence-facing interface (16 `*Repository` interfaces across the reactor)
+- **Repository** — every persistence-facing interface (17 `*Repository` interfaces across the reactor)
   is a Spring Data abstraction over MongoDB or JPA; service code never touches a driver or
   `EntityManager` directly.
-- **Adapter** — one `*ModelAssembler` per service (`UserModelAssembler`, `OrderViewModelAssembler`, 11
-  in total) converts a persistence/domain object into its HATEOAS-linked API representation, keeping
-  wire format decoupled from storage format.
+- **Adapter** — one `*ModelAssembler` per resource (`UserModelAssembler`, `OrderViewModelAssembler`, 12
+  in total, including `common-service`'s `CountryModelAssembler`) converts a persistence/domain object
+  into its HATEOAS-linked API representation, keeping wire format decoupled from storage format.
+- **Strategy** — `user-service`'s national-ID validation (`NationalIdStrategy`): one `@Component` per
+  country (`BrazilianCpfStrategy`, `DutchBsnStrategy`, `GermanNationalIdStrategy`), collected by Spring
+  into a `Map<countryCode, strategy>` and dispatched by `NationalIdValidationService`. Adding a country
+  means adding a class, not editing the dispatcher — a genuine OCP win, see below.
 - **Template Method** — `ChatWebSocketHandler`, `DirectMessageWebSocketHandler`, and
   `NotificationWebSocketHandler` all extend Spring's `TextWebSocketHandler`, overriding only the
   lifecycle hooks each one needs (`afterConnectionEstablished`, `handleTextMessage`); the
@@ -115,9 +130,10 @@ is a partial or pragmatic fit rather than textbook.
   without touching any caller.
 - **ISP** — those service interfaces stay narrow and use-case-shaped rather than one god interface per
   service — `ConversationService` is 7 methods, all conversation-lifecycle operations, nothing else.
-- **OCP is the weakest fit here, honestly** — extension mostly happens by adding an enum constant plus
+- **OCP is a mixed fit here, honestly** — most extension still happens by adding an enum constant plus
   an `if`/`switch` (`PaymentMethod`, `MediaType`) rather than a polymorphic strategy class per variant.
-  Worth knowing as a limitation of this codebase, not a pattern to go looking for.
+  The clean counter-example is `user-service`'s `NationalIdStrategy` (see Strategy, above): don't
+  assume the rest of the codebase follows that shape just because one corner of it does.
 
 **Domain-Driven Design**
 
@@ -147,7 +163,7 @@ Bring up infra only, then run services directly:
 
 ```bash
 docker compose up -d mysql mongodb kafka keycloak mailpit elasticsearch redis
-./mvnw -pl user-service,product-service,order-service,payment-service,shipping-service,delivery-service,inventory-service,notification-service,gateway-service,eureka-server,config-server,audit-service,chat-service,product-comment-service,product-media-service,product-review-service -am install -DskipTests
+./mvnw -pl user-service,product-service,order-service,payment-service,shipping-service,delivery-service,inventory-service,notification-service,gateway-service,eureka-server,config-server,audit-service,chat-service,product-comment-service,product-media-service,product-review-service,common-service -am install -DskipTests
 # then in separate terminals, per service:
 ./mvnw -pl <service> spring-boot:run
 cd frontend && npm install && npm run dev
@@ -235,6 +251,44 @@ containers either (Option B, irrelevant when using k8s). Pass `--with-dev` to al
 full dev-only set, e.g. if `start-local.sh`'s host-JVM services are running against the same
 docker-compose stack at the same time.
 
+## Release workflow: local → testing → production
+
+The honest, step-by-step version of what happens to a change, since the mechanics live scattered
+across [CI/CD & versioning](#cicd--versioning) and [QA / testing environment](#qa--testing-environment)
+below and don't read as one story on their own:
+
+1. **Local dev** — Quick Start Options A/B/C above, entirely on your machine.
+2. **Feature branch → `develop`** — genuinely undocumented, and not just here: there's no
+   `CONTRIBUTING.md` or PR template anywhere in this repo. In practice this is "open a PR, get it
+   merged," with no enforced process behind that.
+3. **`develop` → `testing`** — also undocumented, and unlike step 2 this isn't just a missing-docs
+   gap: `develop` isn't wired to any deployed environment at all. `main`'s own
+   `.github/workflows/ci-cd.yml` says so directly, in its own comment: *"develop/feature branches
+   aren't wired to any environment yet."* Work reaches `testing` by some manual/ad-hoc path (its git
+   history shows no `develop`-merge commits — just a linear history plus CI's own auto-committed
+   manifest bumps), not a repeatable, documented one. If you're picking this project back up, this is
+   the actual gap to close, not a wording fix.
+4. **Push to `testing` → build once, deploy to QA** — `testing`'s copy of `.github/workflows/ci-cd.yml`
+   (a different file than the one on `develop` — see the note in
+   [CI/CD & versioning](#cicd--versioning)) runs the real pipeline: test, detect changed services,
+   build + push images to GHCR, bump `testing`'s own `k8s/*.yaml`, ArgoCD syncs the `demo-qa`
+   namespace. This is the **only** branch that ever builds an image from source.
+5. **`testing` → `main` (production)** — a push to `main` never rebuilds. Verified straight from
+   `main`'s workflow file: a dedicated `promote-to-production` job instead copies the exact image
+   tags `testing` is already running straight into `main`'s own `k8s/*.yaml` and commits — so
+   whatever ships to production is bit-for-bit what was already validated in QA, never a fresh build
+   of the same source. `workflow_dispatch` is the one deliberate escape hatch that still builds
+   directly from `main` (a genuine hotfix with nothing on `testing` to promote from, or a rebuild that
+   doesn't touch any single service's own path).
+6. **ArgoCD takes it from there** — ArgoCD's own `selfHeal`/`automated` sync (see [Kubernetes /
+   GitOps](#kubernetes--gitops)) picks up the manifest commit from step 4 or 5 and reconciles the
+   cluster; nothing further is manual once a commit lands on `testing` or `main`.
+
+`develop` (this branch) sits entirely outside that automated chain — its own `ci-cd.yml` (see
+[CI/CD & versioning](#cicd--versioning)) only tests and, on push to `main`, builds — a leftover from
+before `testing`/`main` grew the promotion pipeline above, not something `develop` itself deploys
+anywhere.
+
 ## Default credentials
 
 | User | Password | Realm role |
@@ -244,6 +298,17 @@ docker-compose stack at the same time.
 | `manager` | `manager` | `finance`, `product_manager`, `shipping_manager`, `inventory_manager` |
 
 Realm: `demo`. Client: `demo-spa` (public, PKCE).
+
+> **Two separate Keycloak instances, deliberately different hostnames:** docker-compose's own
+> Keycloak (used by both local-dev flows — Option A host-JVM and Option B full-compose) answers on
+> `http://keycloak.localhost:8181`, while the k3d/k8s cluster's Keycloak answers on
+> `http://localhost:8081`. They used to both be bare `localhost`, differing only by port — but
+> browser cookies are scoped by domain, not port, so the two instances shared one cookie jar and
+> stomped on each other's `KC_RESTART`/session cookies the moment you used both in the same browser
+> (reproducible: log into one, and the other's in-flight login breaks with "Restart login cookie not
+> found"). `keycloak.localhost` resolves to loopback with zero setup — same `*.localhost` mechanism
+> `demo.localhost` already relies on — so this isolates the two instances' cookies for free and lets
+> you run both environments in the same browser at once.
 
 ## Useful URLs
 
@@ -291,6 +356,38 @@ specifically (load-bearing, not a convenience port — see `k8s/keycloak.yaml`'s
 → in-cluster Rancher specifically, same hostPort/nodeSelector reasoning as Keycloak's `8081` — see
 `k8s-rancher/rancher.yaml`'s comment, `6550` → the k8s API server (`kubectl` uses this automatically
 via your kubeconfig context, not something you visit directly).
+
+## CI/CD & versioning
+
+`.github/workflows/ci-cd.yml` on **this branch** is single-environment, build-on-push:  a push to
+`main` runs the full pipeline straight from source — there's no `testing` → `main` promotion step
+here (that more mature build-once/promote-many model, where `main` deploys whichever images
+`testing` already validated in QA instead of rebuilding, exists on the `main`/`testing` branches'
+own `ci-cd.yml` — see [QA / testing environment](#qa--testing-environment) for that branch model).
+`develop` hasn't picked that pipeline up yet; treat this section as "what actually runs if you push
+this branch's own workflow file," not as a description of `main`'s.
+
+On a push to `main` (or a PR against it, test-only — nothing downstream runs for a PR):
+
+1. **Test** — full Maven reactor `verify` (Checkstyle, SpotBugs, and any Testcontainers-backed
+   integration tests) and the frontend's `lint` + typecheck + build. Nothing downstream runs if this
+   fails.
+2. **Detect changed services** — path-filters the diff against the previous commit on `main` (needs
+   real history, `fetch-depth: 0`) so only services whose own directory changed get rebuilt; a shared
+   module, the root `pom.xml`/`mvnw`, or `Dockerfile.service` changing forces a full rebuild instead,
+   since every image build is `mvnw -pl <service> -am`.
+3. **Build & push** — each changed service's image goes to GHCR (`ghcr.io/<owner>/demo-<service>`),
+   tagged two ways: the commit SHA (what the k8s manifests actually deploy by — immutable, guarantees
+   a rollout even if the version wasn't bumped) and the service's own `pom.xml`/`package.json` version
+   (each service versions independently, for human-readable release tracking). Images are
+   `linux/arm64` only, matching this k3d cluster's nodes.
+4. **Update manifests** — bumps the changed services' `image:` lines in `k8s/*.yaml` to the SHA tag
+   and commits straight back to `main` (`[skip ci]`), gated behind the build job(s) having actually
+   succeeded, so ArgoCD's `selfHeal` never syncs a manifest pointing at an unpullable image.
+
+GHCR packages are private, so every Deployment references `imagePullSecrets: ghcr-pull-secret` — a
+`kubernetes.io/dockerconfigjson` Secret created directly in the `demo` namespace via `kubectl create
+secret docker-registry`, never committed to git (see [Kubernetes / GitOps](#kubernetes--gitops)).
 
 ## Kubernetes / GitOps
 
@@ -461,7 +558,8 @@ demo/
 ├── user-service/, product-service/, order-service/, payment-service/,
 │   shipping-service/, delivery-service/, inventory-service/,
 │   notification-service/, audit-service/, chat-service/,
-│   product-comment-service/, product-media-service/, product-review-service/
+│   product-comment-service/, product-media-service/, product-review-service/,
+│   common-service/
 ├── frontend/                # Vue 3 SPA
 ├── docker/                  # Keycloak realm, Grafana/Kibana/Prometheus provisioning
 ├── k8s/                     # Kubernetes manifests (ArgoCD-synced), incl. kafka.yaml/redis.yaml
