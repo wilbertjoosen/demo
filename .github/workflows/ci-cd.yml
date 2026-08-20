@@ -94,6 +94,7 @@ jobs:
             product-review-service: [ 'product-review-service/**' ]
             chat-service: [ 'chat-service/**' ]
             reporting-service: [ 'reporting-service/**' ]
+            common-service: [ 'common-service/**' ]
       - name: Build service matrix
         id: matrix
         # A shared module (or the root pom/Dockerfile) changing can affect every service, since
@@ -108,7 +109,7 @@ jobs:
         # paths like k8s/**, docker/**, *.md, .github/** that no filter above matches) — that's the
         # actual "don't run tests when we're not changing code" case.
         run: |
-          ALL_SERVICES='["eureka-server","config-server","gateway-service","inventory-service","audit-service","user-service","product-service","order-service","payment-service","shipping-service","delivery-service","notification-service","product-comment-service","product-media-service","product-review-service","chat-service","reporting-service"]'
+          ALL_SERVICES='["eureka-server","config-server","gateway-service","inventory-service","audit-service","user-service","product-service","order-service","payment-service","shipping-service","delivery-service","notification-service","product-comment-service","product-media-service","product-review-service","chat-service","reporting-service","common-service"]'
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "${{ steps.filter.outputs.shared }}" = "true" ]; then
             SERVICES="$ALL_SERVICES"
             FRONTEND=true

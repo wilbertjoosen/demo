@@ -3,6 +3,7 @@ import { computed, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { FormInstance, FormRules } from 'element-plus'
 import AddressForm from '../AddressForm.vue'
+import { useCommonStore } from '../../stores/common'
 import type { Address, User } from '../../models'
 
 const props = defineProps<{ modelValue: boolean; user: User | null }>()
@@ -22,6 +23,7 @@ const emit = defineEmits<{
   ]
 }>()
 const { t } = useI18n()
+const common = useCommonStore()
 
 const isCreate = computed(() => !props.user)
 
@@ -53,6 +55,7 @@ watch(
   () => props.modelValue,
   (open) => {
     if (!open) return
+    if (common.countries.length === 0) common.loadCountries()
     form.username = props.user?.username ?? ''
     form.email = props.user?.email ?? ''
     form.firstName = props.user?.firstName ?? ''
@@ -111,7 +114,7 @@ async function submit() {
       <el-form-item :label="t('profile.phone')">
         <el-input v-model="form.phone" />
       </el-form-item>
-      <AddressForm v-model="form.shippingAddress" prop-prefix="shippingAddress" :required="false" />
+      <AddressForm v-model="form.shippingAddress" :countries="common.countries" prop-prefix="shippingAddress" :required="false" />
     </el-form>
     <template #footer>
       <el-button @click="emit('update:modelValue', false)">{{ t('common.cancel') }}</el-button>

@@ -3,12 +3,14 @@ import { onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import { useUsersStore } from '../stores/users'
+import { useCommonStore } from '../stores/common'
 import { showApiError } from '../composables/useApiError'
 import AddressForm from '../components/AddressForm.vue'
 import type { Address } from '../models'
 
 const { t } = useI18n()
 const users = useUsersStore()
+const common = useCommonStore()
 const loading = ref(false)
 const saving = ref(false)
 
@@ -32,6 +34,7 @@ async function load() {
   loading.value = true
   try {
     await users.loadMe()
+    await common.loadCountries()
   } finally {
     loading.value = false
   }
@@ -41,6 +44,7 @@ async function save() {
   saving.value = true
   try {
     await users.updateMe({
+      nationalIdCountry: form.address.country,
       phone: form.phone,
       nationalId: form.nationalId,
       shippingAddress: form.address,
@@ -74,7 +78,7 @@ onMounted(load)
         <el-input v-model="form.nationalId" />
       </el-form-item>
       <el-divider>{{ t('profile.shippingAddress') }}</el-divider>
-      <AddressForm v-model="form.address" prop-prefix="address" :required="false" />
+      <AddressForm v-model="form.address" :countries="common.countries" prop-prefix="address" :required="false" />
       <el-button type="primary" :loading="saving" @click="save">{{ t('common.save') }}</el-button>
     </el-form>
   </div>
