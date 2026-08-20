@@ -31,7 +31,8 @@ watch(
 async function load() {
   loading.value = true
   try {
-    await users.loadMe()
+    await users.loadMe();
+    await users.loadCountries();
   } finally {
     loading.value = false
   }
@@ -41,6 +42,7 @@ async function save() {
   saving.value = true
   try {
     await users.updateMe({
+      nationalIdCountry: form.address.country,
       phone: form.phone,
       nationalId: form.nationalId,
       shippingAddress: form.address,
@@ -74,7 +76,7 @@ onMounted(load)
         <el-input v-model="form.nationalId" />
       </el-form-item>
       <el-divider>{{ t('profile.shippingAddress') }}</el-divider>
-      <AddressForm v-model="form.address" prop-prefix="address" :required="false" />
+      <AddressForm v-model="form.address" :countries="users.countries" prop-prefix="address" :required="false " />
       <el-button type="primary" :loading="saving" @click="save">{{ t('common.save') }}</el-button>
     </el-form>
   </div>
