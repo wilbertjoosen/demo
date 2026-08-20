@@ -28,6 +28,7 @@ SERVICES=(
     "product-comment-service"
     "product-media-service"
     "product-review-service"
+    "common-service"
     "gateway-service"
     "reporting-service"
 )
@@ -257,7 +258,8 @@ for service in \
     product-comment-service \
     product-media-service \
     user-service \
-    product-review-service
+    product-review-service \
+    common-service
 do
     start_service "$service"
 done

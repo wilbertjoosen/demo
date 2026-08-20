@@ -95,6 +95,7 @@ jobs:
             product-media-service: [ 'product-media-service/**' ]
             product-review-service: [ 'product-review-service/**' ]
             chat-service: [ 'chat-service/**' ]
+            common-service: [ 'common-service/**' ]
       - name: Build service matrix
         id: matrix
         # A shared module (or the root pom/Dockerfile) changing can affect every service, since
@@ -102,7 +103,7 @@ jobs:
         # only the services whose own directory changed go into the matrix.
         run: |
           if [ "${{ steps.filter.outputs.shared }}" = "true" ]; then
-            SERVICES='["eureka-server","config-server","gateway-service","inventory-service","audit-service","user-service","product-service","order-service","payment-service","shipping-service","delivery-service","notification-service","product-comment-service","product-media-service","product-review-service","chat-service"]'
+            SERVICES='["eureka-server","config-server","gateway-service","inventory-service","audit-service","user-service","product-service","order-service","payment-service","shipping-service","delivery-service","notification-service","product-comment-service","product-media-service","product-review-service","chat-service","common-service"]'
           else
             SERVICES=$(echo '${{ steps.filter.outputs.changes }}' | jq -c '[.[] | select(. != "frontend")]')
           fi

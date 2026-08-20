@@ -1,7 +1,7 @@
-package com.example.user.config;
+package com.example.reference.config;
 
-import com.example.user.model.Country;
-import com.example.user.repository.CountryRepository;
+import com.example.reference.model.Country;
+import com.example.reference.repository.CountryRepository;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -18,7 +18,7 @@ public class DatabaseInitializer {
                 countryRepository.saveAll(List.of(
                         new Country("BR", "Brazil"),
                         new Country("NL", "Nederland"),
-                        new Country("GE", "Germany")
+                        new Country("DE", "Germany")
                 ));
             }
         };
