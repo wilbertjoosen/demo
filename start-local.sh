@@ -318,7 +318,7 @@ if $DO_SERVICES; then
 fi
 
 if $DO_INFRA; then
-    echo "Keycloak:       http://localhost:8081"
+    echo "Keycloak:       http://keycloak.localhost:8081"
     echo "Mailpit:        http://localhost:8025"
     echo "Kafka UI:       http://localhost:8099"
     echo "Elasticsearch:  http://localhost:9200"

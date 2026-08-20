@@ -1,8 +1,21 @@
 # Shared by every containerized app service below — addresses use in-network service names
 # (kafka:29092, keycloak's internal port) rather than the localhost:* defaults each service's
 # application.yaml falls back to for the `mvn spring-boot:run` host-JVM dev flow.
-# KEYCLOAK_ISSUER_URI stays external (localhost:8081): it must match the `iss` claim of tokens
+# KEYCLOAK_ISSUER_URI stays external (keycloak.localhost:8081): it must match the `iss` claim of tokens
 # issued to the browser-based SPA, regardless of where the validating service itself runs.
+#
+# The hostname is `keycloak.localhost`, not bare `localhost` — deliberately: this container and the
+# k3d/k8s cluster's own in-cluster Keycloak (main's k8s/keycloak.yaml, shared cross-namespace by
+# `demo`/`demo-qa` — see k8s/configmap-common.yaml) both used to answer on literal `localhost:8081`,
+# the exact same port, not just the same domain on different ports. Browser cookies are scoped by
+# domain, not port, so the two instances shared one cookie jar and stomped on each other's
+# `KC_RESTART`/session cookies whenever both were used in the same browser at once — same failure
+# reproduced and fixed this same way on `develop` (there the ports genuinely differed, 8181 vs 8081,
+# but cookie scoping doesn't care). `*.localhost` resolves to loopback with no /etc/hosts entry
+# needed. Scoped to this container only — the k8s-facing Keycloak (k8s/keycloak.yaml,
+# k8s/configmap-common.yaml, and this README's admin-console docs) deliberately keeps answering on
+# plain `localhost:8081`; that's real, load-bearing, deployed-cluster identity, not something to
+# rename as a side effect of fixing local dev's cookie collision.
 #
 # MONGO_HOST/MONGO_REPLICA_SET_PARAM (task #74, HA for stateful stores): every consumer — this
 # compose network, k8s pods, and any other Docker Desktop container — reaches the 3-node replica
@@ -18,7 +31,7 @@ x-app-env: &app-env
   CONFIG_SERVER_URI: http://config-server:8888
   EUREKA_URI: http://eureka-server:8761/eureka
   KAFKA_BOOTSTRAP_SERVERS: kafka:29092
-  KEYCLOAK_ISSUER_URI: http://localhost:8081/realms/demo
+  KEYCLOAK_ISSUER_URI: http://keycloak.localhost:8081/realms/demo
   KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/demo/protocol/openid-connect/certs
   MONGO_HOST: host.docker.internal:27017,host.docker.internal:27018,host.docker.internal:27019
   MONGO_REPLICA_SET_PARAM: "?replicaSet=rs0"
@@ -191,11 +204,11 @@ services:
       KEYCLOAK_ADMIN_PASSWORD: admin
       # Without a fixed hostname, Keycloak's dev mode derives each token's `iss` claim from
       # whatever Host header the request used to reach it — fine for browser logins (always
-      # localhost:8081), but order-service's server-to-server client_credentials call goes through
+      # keycloak.localhost:8081), but order-service's server-to-server client_credentials call goes through
       # host.k3d.internal:8081 when running in the k3d cluster, which would mint a token with a
       # DIFFERENT issuer than what every service's fixed KEYCLOAK_ISSUER_URI expects, and the
       # receiving service's JwtIssuerValidator rejects it with 401.
-      KC_HOSTNAME: http://localhost:8081
+      KC_HOSTNAME: http://keycloak.localhost:8081
     ports:
       - "8081:8080"
     volumes:
