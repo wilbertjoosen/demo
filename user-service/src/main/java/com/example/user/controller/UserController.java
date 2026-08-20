@@ -5,7 +5,6 @@ import com.example.user.dto.request.UpdateProfileRequest;
 import com.example.user.dto.request.CreateUserRequest;
 import com.example.user.model.*;
 import com.example.user.service.UserService;
-import com.example.user.service.CountryService;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -26,9 +25,7 @@ import java.util.List;
 public class UserController {
 
     private final UserService userService;
-    private final CountryService countryService;
     private final UserModelAssembler userAssembler;
-    private final CountryModelAssembler countryAssembler;
 
     @GetMapping("/me")
     public EntityModel<UserProfileView> me(@AuthenticationPrincipal Jwt jwt) {
@@ -87,15 +84,5 @@ public class UserController {
     public ResponseEntity<Void> delete(@AuthenticationPrincipal Jwt jwt, @PathVariable String id) {
         userService.delete(id, jwt.getSubject());
         return ResponseEntity.noContent().build();
-    }
-
-    @GetMapping("countries")
-    public CollectionModel<EntityModel<Country>> countries() {
-        return countryAssembler.toCollectionModel(countryService.list());
-    }
-
-    @GetMapping("countries/{country}")
-    public EntityModel<Country> countriesByCode(@PathVariable String country) {
-        return countryAssembler.toModel(countryService.getByCode(country));
     }
 }

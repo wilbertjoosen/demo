@@ -3,6 +3,7 @@ import { reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { FormInstance } from 'element-plus'
 import AddressForm from '../AddressForm.vue'
+import { useCommonStore } from '../../stores/common'
 import type { Address } from '../../models'
 
 const props = defineProps<{
@@ -12,6 +13,7 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{ 'update:modelValue': [value: boolean]; submit: [Address] }>()
 const { t } = useI18n()
+const common = useCommonStore()
 
 const formRef = ref<FormInstance>()
 const form = reactive<{ address: Address }>({ address: { street: '', city: '', postalCode: '', country: '' } })
@@ -20,6 +22,7 @@ watch(
   () => props.modelValue,
   (open) => {
     if (!open) return
+    if (common.countries.length === 0) common.loadCountries()
     Object.assign(form.address, props.initialAddress ?? { street: '', city: '', postalCode: '', country: '' })
     formRef.value?.clearValidate()
   },
@@ -36,7 +39,7 @@ async function submit() {
   <el-dialog :model-value="modelValue" :title="t('orders.updateAddressTitle')" width="420"
     @update:model-value="emit('update:modelValue', $event)">
     <el-form ref="formRef" :model="form" label-position="top">
-      <AddressForm :model-value="form.address" prop-prefix="address" @update:model-value="Object.assign(form.address, $event)" />
+      <AddressForm :model-value="form.address" :countries="common.countries" prop-prefix="address" @update:model-value="Object.assign(form.address, $event)" />
     </el-form>
     <template #footer>
       <el-button @click="emit('update:modelValue', false)">{{ t('common.cancel') }}</el-button>

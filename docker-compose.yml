@@ -386,6 +386,27 @@ services:
       - kafka
       - keycloak
 
+  common-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+      args:
+        SERVICE: common-service
+    container_name: demo-common-service
+    restart: unless-stopped
+    environment:
+      <<: *app-env
+      EUREKA_INSTANCE_HOSTNAME: common-service
+      MONGO_DB: reference
+    ports:
+      - "8097:8097"
+    depends_on:
+      - eureka-server
+      - config-server
+      - mongodb
+      - kafka
+      - keycloak
+
   product-media-service:
     build:
       context: .

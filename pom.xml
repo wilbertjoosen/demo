@@ -43,6 +43,7 @@
         <module>product-review-service</module>
         <module>chat-service</module>
         <module>reporting-service</module>
+        <module>common-service</module>
     </modules>
 
     <dependencyManagement>

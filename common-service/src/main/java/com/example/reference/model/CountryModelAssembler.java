@@ -1,6 +1,6 @@
-package com.example.user.model;
+package com.example.reference.model;
 
-import com.example.user.controller.UserController;
+import com.example.reference.controller.CountryController;
 
 import org.springframework.hateoas.CollectionModel;
 import org.springframework.hateoas.EntityModel;
@@ -16,12 +16,12 @@ public class CountryModelAssembler implements RepresentationModelAssembler<Count
     @Override
     public EntityModel<Country> toModel(Country country) {
         return EntityModel.of(country,
-                linkTo(methodOn(UserController.class).getById(country.getCode())).withSelfRel());
+                linkTo(methodOn(CountryController.class).getByCode(country.getCode())).withSelfRel());
     }
 
     @Override
-    public CollectionModel<EntityModel<Country>> toCollectionModel(Iterable<? extends Country> contries) {
-        CollectionModel<EntityModel<Country>> model = RepresentationModelAssembler.super.toCollectionModel(contries);
-        return model.add(linkTo(methodOn(UserController.class).list()).withSelfRel());
+    public CollectionModel<EntityModel<Country>> toCollectionModel(Iterable<? extends Country> countries) {
+        CollectionModel<EntityModel<Country>> model = RepresentationModelAssembler.super.toCollectionModel(countries);
+        return model.add(linkTo(methodOn(CountryController.class).list()).withSelfRel());
     }
 }
