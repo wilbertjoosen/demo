@@ -125,7 +125,10 @@ do_start() {
 
     if $WITH_DEV; then
         (cd "$ROOT_DIR" && docker compose up -d "${INFRASTRUCTURE[@]}")
-    else
+    elif [ ${#K8S_INFRASTRUCTURE[@]} -gt 0 ]; then
+        # "${K8S_INFRASTRUCTURE[@]}" directly would be an unbound-variable error under `set -u` on
+        # bash 3.2 (macOS's stock /bin/bash) when the array is empty, as it currently is — see
+        # local-infra.sh's comment on why. Guard with a length check instead of expanding it blind.
         (cd "$ROOT_DIR" && docker compose up -d "${K8S_INFRASTRUCTURE[@]}")
     fi
 
