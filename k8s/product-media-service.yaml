@@ -14,7 +14,7 @@ spec:
         - name: ghcr-pull-secret
       containers:
         - name: product-media-service
-          image: ghcr.io/wilbertjoosen/demo-product-media-service:1.1.0-f556497
+          image: ghcr.io/wilbertjoosen/demo-product-media-service:1.1.0-0d519ad
           imagePullPolicy: Always
           ports: [{ containerPort: 8092 }]
           envFrom:
