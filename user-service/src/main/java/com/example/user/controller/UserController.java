@@ -1,15 +1,12 @@
 package com.example.user.controller;
-import com.example.user.model.IdentityFields;
-import com.example.user.model.ProfileFields;
-import com.example.user.model.UserDirectoryEntry;
-import com.example.user.model.UserModelAssembler;
-import com.example.user.model.UserProfileView;
+
+import com.example.user.dto.request.AdminUpdateUserRequest;
+import com.example.user.dto.request.UpdateProfileRequest;
+import com.example.user.dto.request.CreateUserRequest;
+import com.example.user.model.*;
 import com.example.user.service.UserService;
 
-import com.example.common.model.Address;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import org.springframework.hateoas.CollectionModel;
 import org.springframework.hateoas.EntityModel;
@@ -21,7 +18,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/users")
@@ -34,13 +30,6 @@ public class UserController {
     @GetMapping("/me")
     public EntityModel<UserProfileView> me(@AuthenticationPrincipal Jwt jwt) {
         return assembler.toModel(userService.getOrRegister(jwt));
-    }
-
-    public record UpdateProfileRequest(Address shippingAddress, String nationalId, String phone,
-                                        Map<String, String> customAttributes) {
-        ProfileFields toFields() {
-            return new ProfileFields(blankToNull(shippingAddress), nationalId, phone, customAttributes);
-        }
     }
 
     @PutMapping("/me")
@@ -69,48 +58,11 @@ public class UserController {
         return assembler.toModel(userService.getById(id));
     }
 
-    public record AdminUpdateUserRequest(Address shippingAddress, String nationalId, String phone,
-                                          Map<String, String> customAttributes, String username,
-                                          @Email String email, String firstName, String lastName) {
-        ProfileFields toFields() {
-            return new ProfileFields(blankToNull(shippingAddress), nationalId, phone, customAttributes);
-        }
-
-        IdentityFields toIdentity() {
-            if (username == null && email == null && firstName == null && lastName == null) {
-                return null;
-            }
-            return new IdentityFields(username, email, firstName, lastName);
-        }
-    }
-
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public EntityModel<UserProfileView> updateUser(@PathVariable String id, @Valid @RequestBody AdminUpdateUserRequest request) {
         UserProfileView updated = userService.updateUser(id, request.toFields(), request.toIdentity());
         return assembler.toModel(updated);
-    }
-
-    public record CreateUserRequest(@NotBlank String username, @NotBlank @Email String email, @NotBlank String firstName,
-                                     @NotBlank String lastName, @NotBlank String password, Address shippingAddress,
-                                     String nationalId, String phone, Map<String, String> customAttributes) {
-        ProfileFields toFields() {
-            return new ProfileFields(blankToNull(shippingAddress), nationalId, phone, customAttributes);
-        }
-    }
-
-    /** The frontend's optional-address forms submit an all-blank object rather than omitting the field. */
-    private static Address blankToNull(Address address) {
-        if (address == null) {
-            return null;
-        }
-        boolean allBlank = isBlank(address.getStreet()) && isBlank(address.getCity())
-                && isBlank(address.getPostalCode()) && isBlank(address.getCountry());
-        return allBlank ? null : address;
-    }
-
-    private static boolean isBlank(String value) {
-        return value == null || value.isBlank();
     }
 
     @PostMapping
