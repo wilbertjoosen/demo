@@ -21,6 +21,7 @@ const activeConversation = computed(() => inbox.conversations.find((c) => c.id =
 const messages = ref<DirectMessage[]>([])
 const messagesLoading = ref(false)
 const draft = ref('')
+const sending = ref(false)
 const threadEl = ref<HTMLElement | null>(null)
 const otherTyping = ref(false)
 
@@ -70,6 +71,7 @@ async function selectConversation(id: string) {
   if (activeId.value === id) return
   activeId.value = id
   closeSocket()
+  sending.value = false
   messages.value = []
   messagesLoading.value = true
   try {
@@ -103,7 +105,9 @@ function connectSocket(conversationId: string) {
       messages.value.push(message)
       scrollToBottom()
       updateInboxPreview(message)
-      if (message.senderId !== auth.keycloakId) {
+      if (message.senderId === auth.keycloakId) {
+        sending.value = false
+      } else {
         clearTypingIndicator()
         if (activeId.value === message.conversationId) {
           sendReadReceipt(ws)
@@ -131,6 +135,7 @@ function connectSocket(conversationId: string) {
 
   ws.onclose = () => {
     if (socket === ws) socket = null
+    sending.value = false
   }
   socket = ws
 }
@@ -159,6 +164,7 @@ async function scrollToBottom() {
 function send() {
   const body = draft.value.trim()
   if (!body || !socket || socket.readyState !== WebSocket.OPEN) return
+  sending.value = true
   socket.send(JSON.stringify({ type: 'MESSAGE', body }))
   draft.value = ''
 }
@@ -304,10 +310,11 @@ watch(
             <el-input
               v-model="draft"
               :placeholder="t('messages.placeholder')"
+              :disabled="sending"
               @input="onDraftInput"
               @keyup.enter="send"
             />
-            <el-button type="primary" @click="send">{{ t('messages.send') }}</el-button>
+            <el-button type="primary" :loading="sending" @click="send">{{ t('messages.send') }}</el-button>
           </div>
         </template>
       </el-card>

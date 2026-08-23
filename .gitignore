@@ -1,5 +1,7 @@
 HELP.md
 target/
+logs/
+.local-pids
 .mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
@@ -36,3 +38,6 @@ build/
 node_modules/
 dist/
 *.local
+
+### Local data backups (mysqldump etc.) — may contain real local data, never committed ###
+backups/

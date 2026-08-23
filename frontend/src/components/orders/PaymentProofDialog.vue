@@ -14,14 +14,33 @@ const payment = ref<Payment | null>(null)
 const loading = ref(false)
 const uploading = ref(false)
 const notFound = ref(false)
+const paymentProof = ref<string | null>(null)
+const isProofImage = ref(false)
+
+async function loadProof(proofUrl: string) {
+  try {
+    const blob = await paymentsApi.getProof(proofUrl)
+    paymentProof.value = URL.createObjectURL(blob)
+    // Check if the blob type is an image (e.g. image/jpeg, image/png, etc.)
+    isProofImage.value = blob.type.startsWith('image/')
+  } catch {
+    paymentProof.value = null
+    isProofImage.value = false
+  }
+}
 
 async function load() {
   if (!props.orderId) return
   payment.value = null
   notFound.value = false
   loading.value = true
+  paymentProof.value = null
+  isProofImage.value = false
   try {
     payment.value = await paymentsApi.getByOrderId(props.orderId)
+    if (payment.value.proofOfPaymentUrl) {
+      await loadProof(payment.value.proofOfPaymentUrl)
+    }
   } catch {
     notFound.value = true
   } finally {
@@ -30,10 +49,10 @@ async function load() {
 }
 
 watch(
-  () => [props.modelValue, props.orderId],
-  ([open]) => {
-    if (open) load()
-  },
+    () => [props.modelValue, props.orderId],
+    ([open]) => {
+      if (open) load()
+    },
 )
 
 async function uploadFile(rawFile: File) {
@@ -41,6 +60,9 @@ async function uploadFile(rawFile: File) {
   uploading.value = true
   try {
     payment.value = await paymentsApi.uploadProof(payment.value.id, rawFile)
+    if (payment.value.proofOfPaymentUrl) {
+      await loadProof(payment.value.proofOfPaymentUrl)
+    }
     ElMessage.success(t('payment.proofUploaded'))
   } catch (error) {
     showApiError(error, t('payment.proofUploadError'), t('common.serviceUnavailable'))
@@ -49,28 +71,24 @@ async function uploadFile(rawFile: File) {
   }
   return false
 }
-
-function isImage(url: string) {
-  return /\.(jpg|jpeg|png|webp)$/i.test(url)
-}
 </script>
 
 <template>
   <el-dialog :model-value="modelValue" :title="t('payment.proofDialogTitle', { id: orderId })" width="440"
-    @update:model-value="emit('update:modelValue', $event)">
+             @update:model-value="emit('update:modelValue', $event)">
     <div v-loading="loading">
       <template v-if="payment">
         <p class="mb-3 text-sm text-gray-500">
           {{ t('payment.methods.' + payment.method) }} — {{ t('payment.status.' + payment.status) }}
         </p>
-        <div v-if="payment.proofOfPaymentUrl" class="mb-4">
+        <div v-if="paymentProof" class="mb-4">
           <el-image
-            v-if="isImage(payment.proofOfPaymentUrl)"
-            :src="payment.proofOfPaymentUrl"
-            fit="contain"
-            class="max-h-60 w-full rounded border"
+              v-if="isProofImage"
+              :src="paymentProof"
+              fit="contain"
+              class="max-h-60 w-full rounded border"
           />
-          <a v-else :href="payment.proofOfPaymentUrl" target="_blank" rel="noopener" class="text-blue-600 underline">
+          <a v-else :href="paymentProof" target="_blank" rel="noopener" class="text-blue-600 underline">
             {{ t('payment.viewProofFile') }}
           </a>
         </div>

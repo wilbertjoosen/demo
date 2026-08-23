@@ -23,7 +23,7 @@ public final class PaymentProofStorageService {
 
     private final Path uploadDir;
 
-    PaymentProofStorageService(@Value("${payment.proof-upload-dir}") String uploadDir) {
+    public PaymentProofStorageService(@Value("${payment.proof-upload-dir}") String uploadDir) {
         this.uploadDir = Paths.get(uploadDir);
         try {
             Files.createDirectories(this.uploadDir);

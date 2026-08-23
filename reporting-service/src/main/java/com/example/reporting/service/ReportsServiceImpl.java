@@ -1,4 +1,5 @@
 package com.example.reporting.service;
+
 import com.example.reporting.config.ReportingTopology;
 import com.example.reporting.model.DailyCount;
 import com.example.reporting.model.OrderDrillDownItem;
@@ -10,7 +11,6 @@ import com.example.reporting.model.TopProductsReport;
 import com.example.reporting.model.UserDrillDownItem;
 import com.example.reporting.model.UserGrowthReport;
 import com.example.reporting.model.UserRegistration;
-
 import lombok.RequiredArgsConstructor;
 import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.state.KeyValueIterator;
@@ -41,7 +41,7 @@ import java.util.stream.Stream;
  */
 @Service
 @RequiredArgsConstructor
-public class ReportsServiceImpl implements ReportsService {
+class ReportsServiceImpl implements ReportsService {
 
     private static final String USER_CANCELLED_BEFORE_PAYMENT = "USER_CANCELLED_BEFORE_PAYMENT";
 

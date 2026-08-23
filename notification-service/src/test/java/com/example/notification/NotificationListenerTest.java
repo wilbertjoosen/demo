@@ -74,6 +74,33 @@ class NotificationListenerTest {
     }
 
     @Test
+    void onEvent_paymentInstructionsRequiredBankTransfer_sendsBankDetailsEmail() {
+        DomainEvent event = DomainEvent.of(EventTypes.PAYMENT_INSTRUCTIONS_REQUIRED, "order-1",
+                Map.of("email", "buyer@example.com", "method", "BANK_TRANSFER", "paymentId", "pay-1"));
+
+        notificationListener.onEvent(event);
+
+        ArgumentCaptor<SimpleMailMessage> captor = ArgumentCaptor.forClass(SimpleMailMessage.class);
+        verify(mailSender).send(captor.capture());
+        SimpleMailMessage message = captor.getValue();
+        assertThat(message.getTo()).containsExactly("buyer@example.com");
+        assertThat(message.getSubject()).contains("Payment instructions").contains("order-1");
+        assertThat(message.getText()).contains("bank transfer").contains("IBAN").contains("order-1");
+    }
+
+    @Test
+    void onEvent_paymentInstructionsRequiredCash_sendsCashDropOffEmail() {
+        DomainEvent event = DomainEvent.of(EventTypes.PAYMENT_INSTRUCTIONS_REQUIRED, "order-2",
+                Map.of("email", "buyer@example.com", "method", "CASH", "paymentId", "pay-2"));
+
+        notificationListener.onEvent(event);
+
+        ArgumentCaptor<SimpleMailMessage> captor = ArgumentCaptor.forClass(SimpleMailMessage.class);
+        verify(mailSender).send(captor.capture());
+        assertThat(captor.getValue().getText()).contains("in cash").contains("order-2");
+    }
+
+    @Test
     void onEvent_broadcastsSerializedEventJson() {
         DomainEvent event = DomainEvent.of(EventTypes.ORDER_CREATED, "order-1", Map.of("email", "buyer@example.com"));
 

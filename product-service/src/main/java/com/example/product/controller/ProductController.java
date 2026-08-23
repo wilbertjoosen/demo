@@ -1,9 +1,8 @@
 package com.example.product.controller;
+
 import com.example.product.model.Product;
 import com.example.product.model.ProductModelAssembler;
 import com.example.product.service.ProductService;
-import com.example.product.service.ProductServiceImpl;
-
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;

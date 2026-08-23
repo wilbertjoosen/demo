@@ -1,13 +1,13 @@
 package com.example.payment.service;
-import com.example.payment.enums.PaymentStatus;
-import com.example.payment.model.Payment;
-import com.example.payment.repository.PaymentRepository;
 
 import com.example.common.events.DomainEvent;
 import com.example.common.events.EventTypes;
 import com.example.common.events.Topics;
 import com.example.common.model.PaymentMethod;
 import com.example.common.model.ShippingCarrier;
+import com.example.payment.enums.PaymentStatus;
+import com.example.payment.model.Payment;
+import com.example.payment.repository.PaymentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -54,6 +54,8 @@ public class PaymentServiceImpl implements PaymentService {
                     quantity, keycloakUserId, shippingCarrier));
             log.info("Payment {} for order {} ({}) is PENDING — resolves after the mock processing delay",
                     payment.getId(), orderId, method);
+            kafkaTemplate.send(Topics.PAYMENT_EVENTS, DomainEvent.of(EventTypes.PAYMENT_INSTRUCTIONS_REQUIRED, orderId,
+                    Map.of("paymentId", payment.getId(), "email", email == null ? "" : email, "method", method.name())));
             return;
         }
 
