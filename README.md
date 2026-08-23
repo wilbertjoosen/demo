@@ -193,6 +193,23 @@ Promtail, `k8s/promtail-daemonset.yaml`, all cluster-wide shared resources). Pas
 also start/stop those, e.g. if `start-local.sh`'s host-JVM services are running against the same
 docker-compose stack at the same time.
 
+## Config profiles: local / testing / production
+
+Every service's bundled `application.yaml` carries only its **local** defaults (single-instance
+Mongo, `keycloak.localhost:8181`) — the values that make the host-JVM dev flow work with zero env
+vars set. Each service also ships `application-testing.yaml` and `application-production.yaml`
+next to it, holding the QA/prod-shaped defaults (3-node replica-set Mongo URI, `localhost:8081`
+Keycloak) that used to live baked directly into this branch's own copy of `application.yaml` — the
+exact values a hand-merge against `develop` had to reconcile line-by-line every time.
+
+**This does not change anything about how QA or production actually run today.** Both
+`k8s/configmap-common.yaml` (per namespace) already inject `MONGO_HOST`, `MONGO_REPLICA_SET_PARAM`,
+`KEYCLOAK_ISSUER_URI`, etc. directly as env vars on every Deployment, and an explicit env var always
+wins over a YAML default regardless of which profile is active — so `SPRING_PROFILES_ACTIVE` is
+never set anywhere in `k8s/`, and doesn't need to be. The profile files exist so this branch and
+`develop` can carry one identical `application.yaml`, with the environment-specific values isolated
+somewhere a merge never has to touch.
+
 ## Default credentials
 
 | User | Password | Realm role |
