@@ -1,7 +1,6 @@
 package com.example.media.model;
 
 import com.example.media.enums.MediaType;
-
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedBy;

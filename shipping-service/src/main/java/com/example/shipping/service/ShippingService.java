@@ -1,7 +1,7 @@
 package com.example.shipping.service;
-import com.example.shipping.model.Shipment;
 
 import com.example.common.model.ShippingCarrier;
+import com.example.shipping.model.Shipment;
 
 import java.math.BigDecimal;
 import java.util.List;

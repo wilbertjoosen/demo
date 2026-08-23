@@ -1,7 +1,6 @@
 package com.example.order.service;
 
 import com.example.order.config.Resilience4jConfig;
-
 import io.github.resilience4j.bulkhead.annotation.Bulkhead;
 import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
 import io.github.resilience4j.retry.annotation.Retry;

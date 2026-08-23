@@ -4,7 +4,6 @@ import com.example.media.dto.CreateMediaRequest;
 import com.example.media.model.MediaAsset;
 import com.example.media.model.MediaModelAssembler;
 import com.example.media.service.MediaService;
-
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.hateoas.CollectionModel;

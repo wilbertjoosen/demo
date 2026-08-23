@@ -1,10 +1,9 @@
 package com.example.order.model;
 
-import com.example.order.enums.OrderStatus;
-
 import com.example.common.model.Address;
 import com.example.common.model.PaymentMethod;
 import com.example.common.model.ShippingCarrier;
+import com.example.order.enums.OrderStatus;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 

@@ -1,6 +1,5 @@
 package com.example.inventory.model;
 
-
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedBy;

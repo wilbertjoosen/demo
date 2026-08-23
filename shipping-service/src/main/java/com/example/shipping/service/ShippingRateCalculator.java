@@ -8,7 +8,7 @@ import java.math.RoundingMode;
 
 /**
  * Mock carrier rate card — stands in for a real UPS/DHL rating API call, same "in-process
- * simulator" approach {@link PaymentGatewaySimulatorController} uses for the payment gateway.
+ * simulator" approach PaymentGatewaySimulatorController uses for the payment gateway.
  * Flat base fee + per-item fee, carrier rates deliberately differ so the choice at checkout
  * is meaningful (DHL costs more per item but has a lower base fee here).
  */

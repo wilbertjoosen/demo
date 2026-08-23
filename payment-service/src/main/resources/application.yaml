@@ -19,6 +19,11 @@ spring:
       properties:
         spring.json.trusted.packages: "*"
 
+  servlet:
+    multipart:
+      max-file-size: 25MB
+      max-request-size: 25MB
+
 eureka:
   client:
     service-url:

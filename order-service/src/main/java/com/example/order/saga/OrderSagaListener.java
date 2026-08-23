@@ -1,11 +1,10 @@
 package com.example.order.saga;
 
-import com.example.order.enums.OrderStatus;
-import com.example.order.service.OrderService;
-
 import com.example.common.events.DomainEvent;
 import com.example.common.events.EventTypes;
 import com.example.common.events.Topics;
+import com.example.order.enums.OrderStatus;
+import com.example.order.service.OrderService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;

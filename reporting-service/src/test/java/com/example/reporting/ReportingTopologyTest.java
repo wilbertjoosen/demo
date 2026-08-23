@@ -1,13 +1,13 @@
 package com.example.reporting;
-import com.example.reporting.config.ReportingTopology;
-import com.example.reporting.model.OrderMetric;
-import com.example.reporting.model.ProductRef;
-import com.example.reporting.model.UserRegistration;
 
 import com.example.common.events.DomainEvent;
 import com.example.common.events.EventContracts;
 import com.example.common.events.EventTypes;
 import com.example.common.events.Topics;
+import com.example.reporting.config.ReportingTopology;
+import com.example.reporting.model.OrderMetric;
+import com.example.reporting.model.ProductRef;
+import com.example.reporting.model.UserRegistration;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.StreamsConfig;
@@ -71,20 +71,20 @@ class ReportingTopologyTest {
     }
 
     @Test
-    void orderCreated_buildsMetricWithNoConfirmedAt() {
-        // Unlike main, this branch's order-service has no generic status-advance event for a
-        // successful confirmation — only ORDER_CREATED and ORDER_CANCELLED — so confirmedAt has no
-        // event to derive from and stays null for the metric's whole lifetime.
+    void orderCreatedThenPaidThenConfirmed_buildsFullMetricWithConfirmedAt() {
         orderEvents.pipeInput(null, DomainEvent.of(EventTypes.ORDER_CREATED, "1", Map.of(
                 "userId", "user-1", "email", "a@b.com", "productId", "p1", "quantity", 2,
                 "paymentMethod", "CREDIT_CARD", "shippingCarrier", "UPS")));
+        orderEvents.pipeInput(null, DomainEvent.of(EventTypes.ORDER_STATUS_CHANGED, "1", Map.of("status", "PAID", "email", "a@b.com")));
+        orderEvents.pipeInput(null, DomainEvent.of(
+                EventTypes.ORDER_STATUS_CHANGED, "1", Map.of("status", "CONFIRMED", "email", "a@b.com")));
 
         OrderMetric metric = orderMetricsStore().get("1");
         assertThat(metric).isNotNull();
-        assertThat(metric.getStatus()).isEqualTo("PENDING_PAYMENT");
+        assertThat(metric.getStatus()).isEqualTo("CONFIRMED");
         assertThat(metric.getProductId()).isEqualTo("p1");
         assertThat(metric.getQuantity()).isEqualTo(2);
-        assertThat(metric.getConfirmedAt()).isNull();
+        assertThat(metric.getConfirmedAt()).isNotNull();
         assertThat(metric.getCancelledAt()).isNull();
         assertThat(metric.getFailureStage()).isNull();
     }
@@ -95,7 +95,8 @@ class ReportingTopologyTest {
                 "userId", "user-2", "email", "c@d.com", "productId", "p1", "quantity", 1,
                 "paymentMethod", "CREDIT_CARD", "shippingCarrier", "UPS")));
         paymentEvents.pipeInput(null, DomainEvent.of(EventTypes.PAYMENT_FAILED, "2", Map.of("email", "c@d.com")));
-        orderEvents.pipeInput(null, DomainEvent.of(EventTypes.ORDER_CANCELLED, "2", Map.of("email", "c@d.com")));
+        orderEvents.pipeInput(null, DomainEvent.of(
+                EventTypes.ORDER_STATUS_CHANGED, "2", Map.of("status", "CANCELLED", "email", "c@d.com")));
 
         OrderMetric metric = orderMetricsStore().get("2");
         assertThat(metric).isNotNull();
@@ -109,7 +110,8 @@ class ReportingTopologyTest {
         orderEvents.pipeInput(null, DomainEvent.of(EventTypes.ORDER_CREATED, "3", Map.of(
                 "userId", "user-3", "email", "e@f.com", "productId", "p1", "quantity", 1,
                 "paymentMethod", "CREDIT_CARD", "shippingCarrier", "UPS")));
-        orderEvents.pipeInput(null, DomainEvent.of(EventTypes.ORDER_CANCELLED, "3", Map.of("email", "e@f.com")));
+        orderEvents.pipeInput(null, DomainEvent.of(
+                EventTypes.ORDER_STATUS_CHANGED, "3", Map.of("status", "CANCELLED", "email", "e@f.com")));
 
         OrderMetric metric = orderMetricsStore().get("3");
         assertThat(metric).isNotNull();
@@ -147,8 +149,8 @@ class ReportingTopologyTest {
         assertThat(EventContracts.missingFields(EventTypes.ORDER_CREATED, Map.of(
                 "userId", "user-1", "email", "a@b.com", "productId", "p1", "quantity", 2,
                 "paymentMethod", "CREDIT_CARD", "shippingCarrier", "UPS"))).isEmpty();
-        assertThat(EventContracts.missingFields(EventTypes.ORDER_CANCELLED,
-                Map.of("email", "a@b.com"))).isEmpty();
+        assertThat(EventContracts.missingFields(EventTypes.ORDER_STATUS_CHANGED,
+                Map.of("status", "CONFIRMED", "email", "a@b.com"))).isEmpty();
         assertThat(EventContracts.missingFields(EventTypes.PRODUCT_CREATED, Map.of(
                 "productId", "p1", "name", "Widget", "sku", "SKU-1", "price", new BigDecimal("9.99")))).isEmpty();
         assertThat(EventContracts.missingFields(EventTypes.PRODUCT_DELETED, Map.of("productId", "p1"))).isEmpty();

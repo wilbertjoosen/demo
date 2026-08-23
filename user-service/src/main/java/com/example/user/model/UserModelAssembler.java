@@ -1,7 +1,6 @@
 package com.example.user.model;
 
 import com.example.user.controller.UserController;
-
 import org.springframework.hateoas.CollectionModel;
 import org.springframework.hateoas.EntityModel;
 import org.springframework.hateoas.server.RepresentationModelAssembler;

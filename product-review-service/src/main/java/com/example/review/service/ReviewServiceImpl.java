@@ -3,7 +3,6 @@ package com.example.review.service;
 import com.example.review.model.Review;
 import com.example.review.model.ReviewSummary;
 import com.example.review.repository.ReviewRepository;
-
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;

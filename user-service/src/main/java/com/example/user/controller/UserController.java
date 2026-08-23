@@ -25,28 +25,23 @@ import java.util.List;
 public class UserController {
 
     private final UserService userService;
-    private final UserModelAssembler userAssembler;
+    private final UserModelAssembler assembler;
 
     @GetMapping("/me")
     public EntityModel<UserProfileView> me(@AuthenticationPrincipal Jwt jwt) {
-        return userAssembler.toModel(userService.getOrRegister(jwt));
+        return assembler.toModel(userService.getOrRegister(jwt));
     }
 
     @PutMapping("/me")
-    public EntityModel<UserProfileView> updateMe(
-            @AuthenticationPrincipal Jwt jwt,
-            @Valid @RequestBody UpdateProfileRequest request) {
-
-        UserProfileView updated =
-                userService.updateProfile(jwt, request.toFields());
-
-        return userAssembler.toModel(updated);
+    public EntityModel<UserProfileView> updateMe(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody UpdateProfileRequest request) {
+        UserProfileView updated = userService.updateProfile(jwt, request.toFields());
+        return assembler.toModel(updated);
     }
 
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
     public CollectionModel<EntityModel<UserProfileView>> list() {
-        return userAssembler.toCollectionModel(userService.list());
+        return assembler.toCollectionModel(userService.list());
     }
 
     /** Any authenticated user — a minimal, PII-free directory for picking someone to message. */
@@ -60,14 +55,14 @@ public class UserController {
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public EntityModel<UserProfileView> getById(@PathVariable String id) {
-        return userAssembler.toModel(userService.getById(id));
+        return assembler.toModel(userService.getById(id));
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public EntityModel<UserProfileView> updateUser(@PathVariable String id, @Valid @RequestBody AdminUpdateUserRequest request) {
         UserProfileView updated = userService.updateUser(id, request.toFields(), request.toIdentity());
-        return userAssembler.toModel(updated);
+        return assembler.toModel(updated);
     }
 
     @PostMapping
@@ -75,7 +70,7 @@ public class UserController {
     public ResponseEntity<EntityModel<UserProfileView>> createUser(@Valid @RequestBody CreateUserRequest request) {
         UserProfileView created = userService.createUser(request.username(), request.email(), request.firstName(),
                 request.lastName(), request.password(), request.toFields());
-        EntityModel<UserProfileView> model = userAssembler.toModel(created);
+        EntityModel<UserProfileView> model = assembler.toModel(created);
         return ResponseEntity.created(URI.create(model.getRequiredLink("self").getHref())).body(model);
     }
 

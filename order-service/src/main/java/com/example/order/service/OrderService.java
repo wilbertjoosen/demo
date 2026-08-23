@@ -1,12 +1,11 @@
 package com.example.order.service;
 
-import com.example.order.enums.OrderStatus;
-import com.example.order.model.Order;
-import com.example.order.model.OrderView;
-
 import com.example.common.model.Address;
 import com.example.common.model.PaymentMethod;
 import com.example.common.model.ShippingCarrier;
+import com.example.order.model.Order;
+import com.example.order.enums.OrderStatus;
+import com.example.order.model.OrderView;
 
 import java.util.List;
 
@@ -21,7 +20,7 @@ public interface OrderService {
      * and shipping-service can act on the customer's choice without calling back to order-service.
      */
     Order placeOrder(String keycloakUserId, String email, String productId, int quantity, Address shippingAddress,
-                      PaymentMethod paymentMethod, ShippingCarrier shippingCarrier);
+                     PaymentMethod paymentMethod, ShippingCarrier shippingCarrier);
 
     /** Query side (CQRS): served from the Mongo read model, not MySQL. */
     List<OrderView> listOrders(String keycloakUserId);

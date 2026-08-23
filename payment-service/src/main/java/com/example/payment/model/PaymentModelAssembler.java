@@ -1,6 +1,6 @@
 package com.example.payment.model;
-import com.example.payment.controller.PaymentController;
 
+import com.example.payment.controller.PaymentController;
 import org.springframework.hateoas.CollectionModel;
 import org.springframework.hateoas.EntityModel;
 import org.springframework.hateoas.server.RepresentationModelAssembler;

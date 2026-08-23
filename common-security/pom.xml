@@ -29,6 +29,23 @@
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
             <version>3.1.0</version>
         </dependency>
+        <dependency>
+            <!-- Same reasoning as springdoc above: every consuming service already has
+                 spring-boot-starter-actuator on its own classpath, so this alone is enough for Boot
+                 to auto-configure a Tracer/ObservationRegistry and export spans via OTLP — no
+                 per-service config beyond the OTLP endpoint (set once, centrally, in config-server's
+                 config-repo/application.yml). This isn't the more obvious micrometer-tracing-bridge-otel
+                 + opentelemetry-exporter-otlp pairing — in Spring Boot 4.x those are just the
+                 underlying libraries; the actual autoconfiguration classes that wire them together
+                 live specifically in this artifact (verified against the resolved classpath —
+                 neither of the two "obvious" deps alone registers any autoconfiguration). -->
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-micrometer-tracing-opentelemetry</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-devtools</artifactId>
+            <optional>true</optional>
+        </dependency>
     </dependencies>
-
 </project>

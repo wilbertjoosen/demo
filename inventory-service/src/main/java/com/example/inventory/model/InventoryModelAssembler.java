@@ -1,7 +1,6 @@
 package com.example.inventory.model;
 
 import com.example.inventory.controller.InventoryController;
-
 import org.springframework.hateoas.CollectionModel;
 import org.springframework.hateoas.EntityModel;
 import org.springframework.hateoas.server.RepresentationModelAssembler;

@@ -1,9 +1,9 @@
 package com.example.shipping.controller;
+
+import com.example.common.model.ShippingCarrier;
 import com.example.shipping.model.Shipment;
 import com.example.shipping.model.ShipmentModelAssembler;
 import com.example.shipping.service.ShippingService;
-
-import com.example.common.model.ShippingCarrier;
 import lombok.RequiredArgsConstructor;
 import org.springframework.hateoas.CollectionModel;
 import org.springframework.hateoas.EntityModel;

@@ -1,8 +1,8 @@
 package com.example.shipping.model;
-import com.example.shipping.enums.ShipmentStatus;
-import com.example.shipping.enums.TrackingStatus;
 
 import com.example.common.model.ShippingCarrier;
+import com.example.shipping.enums.ShipmentStatus;
+import com.example.shipping.enums.TrackingStatus;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedBy;

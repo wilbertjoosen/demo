@@ -3,7 +3,6 @@ package com.example.inventory.controller;
 import com.example.inventory.model.InventoryItem;
 import com.example.inventory.model.InventoryModelAssembler;
 import com.example.inventory.service.InventoryService;
-
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;

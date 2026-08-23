@@ -1,16 +1,16 @@
 package com.example.shipping;
-import com.example.shipping.enums.ShipmentStatus;
-import com.example.shipping.enums.TrackingStatus;
-import com.example.shipping.model.Shipment;
-import com.example.shipping.repository.ShipmentRepository;
-import com.example.shipping.service.ShippingRateCalculator;
-import com.example.shipping.service.ShippingServiceImpl;
 
 import com.example.common.events.DomainEvent;
 import com.example.common.events.EventContracts;
 import com.example.common.events.EventTypes;
 import com.example.common.events.Topics;
 import com.example.common.model.ShippingCarrier;
+import com.example.shipping.enums.ShipmentStatus;
+import com.example.shipping.enums.TrackingStatus;
+import com.example.shipping.model.Shipment;
+import com.example.shipping.repository.ShipmentRepository;
+import com.example.shipping.service.ShippingRateCalculator;
+import com.example.shipping.service.ShippingServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

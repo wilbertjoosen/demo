@@ -57,6 +57,28 @@
             <artifactId>micrometer-registry-prometheus</artifactId>
         </dependency>
         <dependency>
+            <!-- The gateway is every request's first hop, so it's the natural place for a trace to
+                 start — same tracing setup common-security gives the 13 services behind it, added
+                 directly here since gateway-service doesn't depend on common-security. -->
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-micrometer-tracing-opentelemetry</artifactId>
+        </dependency>
+        <dependency>
+            <!-- Marked <optional> by spring-cloud-gateway-server-webmvc itself, so it isn't pulled in
+                 transitively — needed explicitly for per-client rate limiting (RateLimitFilter). -->
+            <groupId>com.bucket4j</groupId>
+            <artifactId>bucket4j_jdk17-core</artifactId>
+            <!-- Not covered by spring-cloud-dependencies' BOM (only spring-cloud-gateway-server-webmvc's
+                 own pom references it, as <optional>) — pinned here to the exact version that gateway
+                 module already compiles against, to avoid any binary-compatibility drift. -->
+            <version>8.15.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-devtools</artifactId>
             <optional>true</optional>

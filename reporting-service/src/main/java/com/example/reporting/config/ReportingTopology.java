@@ -1,11 +1,11 @@
 package com.example.reporting.config;
-import com.example.reporting.model.OrderMetric;
-import com.example.reporting.model.ProductRef;
-import com.example.reporting.model.UserRegistration;
 
 import com.example.common.events.DomainEvent;
 import com.example.common.events.EventTypes;
 import com.example.common.events.Topics;
+import com.example.reporting.model.OrderMetric;
+import com.example.reporting.model.ProductRef;
+import com.example.reporting.model.UserRegistration;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.common.utils.Bytes;
 import org.apache.kafka.streams.KeyValue;
@@ -38,7 +38,7 @@ public class ReportingTopology {
     public static final String PRODUCT_REFS_STORE = "product-refs-store";
     public static final String USER_REGISTRATIONS_STORE = "user-registrations-store";
 
-    private static final Set<String> ORDER_EVENT_TYPES = Set.of(EventTypes.ORDER_CREATED, EventTypes.ORDER_CANCELLED);
+    private static final Set<String> ORDER_EVENT_TYPES = Set.of(EventTypes.ORDER_CREATED, EventTypes.ORDER_STATUS_CHANGED);
     private static final Set<String> PRODUCT_EVENT_TYPES =
             Set.of(EventTypes.PRODUCT_CREATED, EventTypes.PRODUCT_UPDATED, EventTypes.PRODUCT_DELETED);
 

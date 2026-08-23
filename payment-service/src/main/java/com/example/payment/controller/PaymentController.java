@@ -1,10 +1,10 @@
 package com.example.payment.controller;
+
+import com.example.common.model.PaymentMethod;
 import com.example.payment.model.Payment;
 import com.example.payment.model.PaymentModelAssembler;
 import com.example.payment.service.PaymentProofStorageService;
 import com.example.payment.service.PaymentService;
-
-import com.example.common.model.PaymentMethod;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;

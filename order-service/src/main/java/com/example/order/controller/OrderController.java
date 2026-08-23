@@ -1,13 +1,12 @@
 package com.example.order.controller;
 
-import com.example.order.model.Order;
-import com.example.order.model.OrderView;
-import com.example.order.model.OrderViewModelAssembler;
-import com.example.order.service.OrderService;
-
 import com.example.common.model.Address;
 import com.example.common.model.PaymentMethod;
 import com.example.common.model.ShippingCarrier;
+import com.example.order.model.Order;
+import com.example.order.service.OrderService;
+import com.example.order.model.OrderView;
+import com.example.order.model.OrderViewModelAssembler;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -41,7 +40,7 @@ public class OrderController {
 
     @PostMapping
     public ResponseEntity<EntityModel<OrderView>> placeOrder(@AuthenticationPrincipal Jwt jwt,
-                                                               @Valid @RequestBody PlaceOrderRequest request) {
+                                                             @Valid @RequestBody PlaceOrderRequest request) {
         Order order = orderService.placeOrder(jwt.getSubject(), jwt.getClaimAsString("email"),
                 request.productId(), request.quantity(), request.shippingAddress(),
                 request.paymentMethod(), request.shippingCarrier());

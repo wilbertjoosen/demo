@@ -1,6 +1,6 @@
 package com.example.delivery.model;
-import com.example.delivery.controller.DeliveryController;
 
+import com.example.delivery.controller.DeliveryController;
 import org.springframework.hateoas.CollectionModel;
 import org.springframework.hateoas.EntityModel;
 import org.springframework.hateoas.server.RepresentationModelAssembler;

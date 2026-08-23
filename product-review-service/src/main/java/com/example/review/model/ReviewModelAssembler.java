@@ -1,7 +1,6 @@
 package com.example.review.model;
 
 import com.example.review.controller.ReviewController;
-
 import org.springframework.hateoas.CollectionModel;
 import org.springframework.hateoas.EntityModel;
 import org.springframework.hateoas.server.RepresentationModelAssembler;

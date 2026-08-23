@@ -1,11 +1,10 @@
 package com.example.product.service;
 
-import com.example.product.model.Product;
-import com.example.product.repository.ProductRepository;
-
 import com.example.common.events.DomainEvent;
 import com.example.common.events.EventTypes;
 import com.example.common.events.Topics;
+import com.example.product.model.Product;
+import com.example.product.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
@@ -56,7 +55,8 @@ public class ProductServiceImpl implements ProductService {
         kafkaTemplate.send(Topics.PRODUCT_EVENTS, DomainEvent.of(EventTypes.PRODUCT_CREATED, null, Map.of(
                 "productId", saved.getId(),
                 "name", saved.getName(),
-                "sku", saved.getSku()
+                "sku", saved.getSku(),
+                "price", saved.getPrice()
         )));
         return saved;
     }
@@ -87,6 +87,12 @@ public class ProductServiceImpl implements ProductService {
         if (updated == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
+        kafkaTemplate.send(Topics.PRODUCT_EVENTS, DomainEvent.of(EventTypes.PRODUCT_UPDATED, null, Map.of(
+                "productId", updated.getId(),
+                "name", updated.getName(),
+                "sku", updated.getSku(),
+                "price", updated.getPrice()
+        )));
         return updated;
     }
 
@@ -100,5 +106,8 @@ public class ProductServiceImpl implements ProductService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         product.markDeleted();
         productRepository.save(product);
+        kafkaTemplate.send(Topics.PRODUCT_EVENTS, DomainEvent.of(EventTypes.PRODUCT_DELETED, null, Map.of(
+                "productId", id
+        )));
     }
 }

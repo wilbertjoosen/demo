@@ -2,7 +2,6 @@ package com.example.comment.service;
 
 import com.example.comment.model.Comment;
 import com.example.comment.repository.CommentRepository;
-
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;

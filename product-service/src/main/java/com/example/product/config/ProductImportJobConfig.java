@@ -1,11 +1,10 @@
 package com.example.product.config;
 
-import com.example.product.model.Product;
-import com.example.product.model.ProductCsvRow;
-
 import com.example.common.events.DomainEvent;
 import com.example.common.events.EventTypes;
 import com.example.common.events.Topics;
+import com.example.product.model.Product;
+import com.example.product.model.ProductCsvRow;
 import org.springframework.batch.core.job.Job;
 import org.springframework.batch.core.job.builder.JobBuilder;
 import org.springframework.batch.core.repository.JobRepository;
@@ -59,7 +58,8 @@ public class ProductImportJobConfig {
                 kafkaTemplate.send(Topics.PRODUCT_EVENTS, DomainEvent.of(EventTypes.PRODUCT_CREATED, null, Map.of(
                         "productId", saved.getId(),
                         "name", saved.getName(),
-                        "sku", saved.getSku()
+                        "sku", saved.getSku(),
+                        "price", saved.getPrice()
                 )));
             }
         };
