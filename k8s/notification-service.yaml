@@ -14,7 +14,7 @@ spec:
         - name: ghcr-pull-secret
       containers:
         - name: notification-service
-          image: ghcr.io/wilbertjoosen/demo-notification-service:1.0.1-5949d11
+          image: ghcr.io/wilbertjoosen/demo-notification-service:1.0.1-e20ccd4
           imagePullPolicy: Always
           ports: [{ containerPort: 8085 }]
           envFrom:
