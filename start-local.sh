@@ -260,7 +260,8 @@ for service in \
     reporting-service \
     user-service \
     product-review-service \
-    common-service
+    common-service \
+    reporting-service
 do
     start_service "$service"
 done
