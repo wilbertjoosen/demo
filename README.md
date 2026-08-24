@@ -5,7 +5,7 @@ hands-on reference for *why* you'd reach for a given distributed-systems pattern
 wire it up. Every pattern below exists because a concrete problem in this domain needed it — see
 [Patterns demonstrated](#patterns-demonstrated) for the reasoning behind each one.
 
-**Stack:** Spring Boot 4 / Java 26 backend (19 modules), Vue 3 + TypeScript + Element Plus frontend,
+**Stack:** Spring Boot 4 / Java 26 backend (21 modules), Vue 3 + TypeScript + Element Plus frontend,
 MySQL + MongoDB + Kafka + Redis + Elasticsearch, Keycloak (OAuth2/OIDC), Eureka + Spring Cloud Gateway,
 Prometheus + Grafana + Loki + Kibana, Docker Compose for local infra, k3d + ArgoCD for a local
 Kubernetes/GitOps loop, GitHub Actions → GHCR for CI/CD across a production and a QA environment.
@@ -31,10 +31,11 @@ Deployment.
 | `notification-service`    | 8085       | — | Kafka consumer on every topic → WebSocket broadcast (`/ws/notifications`) + email via Mailpit                                                                                                 |
 | `audit-service`           | 8090       | Elasticsearch | Consumes the audit trail every service emits; reconstructs field-level diffs and full record history                                                                                          |
 | `chat-service`            | 8094       | MongoDB | Public per-product chat rooms **and** private user-to-user direct messages (JWT-authenticated WebSocket, delivery/read receipts, typing indicators)                                           |
-| `reporting-service`       | 8095       | MongoDB | Reporting (JWT-authenticated WebSocket, delivery/read receipts, typing indicators)                                                                                                            |
+| `reporting-service`       | 8095       | Kafka Streams (materialized state stores) | Consumes every domain event and maintains live aggregates (top products, order revenue, user growth, saga health) for the frontend's reporting dashboard |
 | `product-comment-service` | 8091       | MongoDB | Product comments, ownership-enforced editing                                                                                                                                                  |
 | `product-media-service`   | 8092       | MongoDB + local disk | Product photos/videos/documents, file upload                                                                                                                                                  |
 | `product-review-service`  | 8093       | MongoDB | Product ratings/reviews                                                                                                                                                                       |
+| `common-service`          | 8096       | MongoDB | Deployed reference-data service (countries today) shared by other services over REST — not to be confused with the `common-*` compile-time library modules below                             |
 | `common-security`         | —          | — | Shared JWT resource-server config, reused by every service                                                                                                                                    |
 | `common-audit`            | —          | — | Shared aspect that captures every REST call's request/response for the audit trail                                                                                                            |
 | `common-model`            | —          | — | Shared DTOs (e.g. `Address`)                                                                                                                                                                  |
@@ -72,10 +73,10 @@ is a partial or pragmatic fit rather than textbook.
 
 **Design patterns**
 
-- **Repository** — every persistence-facing interface (16 `*Repository` interfaces across the reactor)
+- **Repository** — every persistence-facing interface (17 `*Repository` interfaces across the reactor)
   is a Spring Data abstraction over MongoDB or JPA; service code never touches a driver or
   `EntityManager` directly.
-- **Adapter** — one `*ModelAssembler` per service (`UserModelAssembler`, `OrderViewModelAssembler`, 11
+- **Adapter** — one `*ModelAssembler` per service (`UserModelAssembler`, `OrderViewModelAssembler`, 12
   in total) converts a persistence/domain object into its HATEOAS-linked API representation, keeping
   wire format decoupled from storage format.
 - **Template Method** — `ChatWebSocketHandler`, `DirectMessageWebSocketHandler`, and
