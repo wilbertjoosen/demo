@@ -45,7 +45,7 @@ public class DutchBsnStrategy implements NationalIdStrategy {
         }
 
         // Avoid obvious dummy test sequences (e.g., all zeros)
-        return !id.equals("000000000");
+        return !"000000000".equals(id);
     }
 
     /**
