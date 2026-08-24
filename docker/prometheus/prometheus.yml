@@ -91,7 +91,11 @@ scrape_configs:
   - job_name: reporting-service
     metrics_path: /actuator/prometheus
     static_configs:
-      - targets: [ "host.docker.internal:8095" ]
+      # 8096, not 8095: this branch's reporting-service/application.yaml deliberately keeps its own
+      # bundled default at 8096 (k8s/reporting-service.yaml overrides to 8095 in-cluster only, to
+      # avoid colliding with kafka-ui's host port in this branch's own docker-compose.yml) — see
+      # that file's comment for the full reasoning.
+      - targets: [ "host.docker.internal:8096" ]
 
 # k8s-deployed services (both demo and demo-qa namespaces) are scraped by a SEPARATE Prometheus
 # running inside the cluster instead — see k8s/prometheus.yaml. Pod IPs on the k3d overlay network
