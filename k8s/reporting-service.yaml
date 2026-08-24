@@ -6,16 +6,17 @@
 # manifest surgery. Still pinned to replicas: 1 today — see the note on the headless Service below
 # for what's still missing before a real multi-replica rollout.
 #
-# containerPort/probes/Services are 8095, NOT reporting-service/application.yaml's own 8096 on
+# containerPort/probes/Services are 8095, NOT reporting-service/application.yaml's own 8097 on
 # this branch: the CI/CD "Promote testing's images to production" job deploys prod on whatever
 # image testing already built and tested, not a fresh build from main's own source (see
 # .github/workflows/ci-cd.yml) — so the container actually running here is testing branch's build,
-# which listens on 8095 (its own local port-conflict fix). main's application.yaml staying at 8096
+# which listens on 8095 (its own local port-conflict fix). main's application.yaml staying off 8095
 # is deliberate too, just for a different reason: it avoids colliding with kafka-ui's host port on
 # *this* branch's docker-compose.yml for anyone running reporting-service directly via mvnw on a
-# main checkout — that value never actually reaches this Deployment either way. If the promotion
-# mechanism ever changes to build main independently, this file needs to go back to matching
-# application.yaml's own port instead.
+# main checkout (8097, not 8096, since 8096 is common-service's own bundled default) — that value
+# never actually reaches this Deployment either way. If the promotion mechanism ever changes to
+# build main independently, this file needs to go back to matching application.yaml's own port
+# instead.
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
