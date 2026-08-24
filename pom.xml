@@ -49,6 +49,13 @@
     <dependencyManagement>
         <dependencies>
             <dependency>
+                <!-- eureka-client pulls in 4.5.3, vulnerable to CVE-2020-13956 (malformed
+                     authority component mishandling); pin to the fixed 4.5.14 line -->
+                <groupId>org.apache.httpcomponents</groupId>
+                <artifactId>httpclient</artifactId>
+                <version>4.5.14</version>
+            </dependency>
+            <dependency>
                 <groupId>io.awspring.cloud</groupId>
                 <artifactId>spring-cloud-aws-dependencies</artifactId>
                 <version>${spring-cloud-aws.version}</version>
