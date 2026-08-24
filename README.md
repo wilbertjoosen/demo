@@ -5,7 +5,7 @@ hands-on reference for *why* you'd reach for a given distributed-systems pattern
 wire it up. Every pattern below exists because a concrete problem in this domain needed it — see
 [Patterns demonstrated](#patterns-demonstrated) for the reasoning behind each one.
 
-**Stack:** Spring Boot 4 / Java 26 backend (19 modules), Vue 3 + TypeScript + Element Plus frontend,
+**Stack:** Spring Boot 4 / Java 26 backend (21 modules), Vue 3 + TypeScript + Element Plus frontend,
 MySQL + MongoDB + Kafka + Redis + Elasticsearch, Keycloak (OAuth2/OIDC), Eureka + Spring Cloud Gateway,
 Prometheus + Grafana + Loki + Kibana, Docker Compose for local infra, k3d + ArgoCD for a local
 Kubernetes/GitOps loop, GitHub Actions → GHCR for CI/CD across a production and a QA environment.
@@ -34,6 +34,8 @@ Deployment.
 | `product-comment-service` | 8091 | MongoDB | Product comments, ownership-enforced editing |
 | `product-media-service` | 8092 | MongoDB + local disk | Product photos/videos/documents, file upload |
 | `product-review-service` | 8093 | MongoDB | Product ratings/reviews |
+| `reporting-service` | 8095 | Kafka Streams (materialized state stores) | Consumes every domain event and maintains live aggregates (top products, order revenue, user growth, saga health) for the frontend's reporting dashboard |
+| `common-service` | 8096 | MongoDB | Deployed reference-data service (countries today) shared by other services over REST — not to be confused with the `common-*` compile-time library modules below |
 | `common-security` | — | — | Shared JWT resource-server config, reused by every service |
 | `common-audit` | — | — | Shared aspect that captures every REST call's request/response for the audit trail |
 | `common-model` | — | — | Shared DTOs (e.g. `Address`) |
@@ -71,10 +73,10 @@ is a partial or pragmatic fit rather than textbook.
 
 **Design patterns**
 
-- **Repository** — every persistence-facing interface (16 `*Repository` interfaces across the reactor)
+- **Repository** — every persistence-facing interface (17 `*Repository` interfaces across the reactor)
   is a Spring Data abstraction over MongoDB or JPA; service code never touches a driver or
   `EntityManager` directly.
-- **Adapter** — one `*ModelAssembler` per service (`UserModelAssembler`, `OrderViewModelAssembler`, 11
+- **Adapter** — one `*ModelAssembler` per service (`UserModelAssembler`, `OrderViewModelAssembler`, 12
   in total) converts a persistence/domain object into its HATEOAS-linked API representation, keeping
   wire format decoupled from storage format.
 - **Template Method** — `ChatWebSocketHandler`, `DirectMessageWebSocketHandler`, and
@@ -195,6 +197,23 @@ Prometheus and Loki, `k8s/prometheus.yaml`/`k8s/loki.yaml`, and its own Promtail
 `k8s/promtail-daemonset.yaml`). Pass `--with-dev` to also start/stop those, e.g. if
 `start-local.sh`'s host-JVM services are running against the same docker-compose stack at the same
 time.
+
+## Config profiles: local / testing / production
+
+Every service's bundled `application.yaml` carries this branch's own real defaults — production's
+`MONGO_HOST`/`MONGO_PORT`/`KEYCLOAK_ISSUER_URI` values are already what's baked in, unlike
+`develop`'s bundled defaults, which are shaped for a bare host-JVM run against local docker-compose
+infra. Each service also ships `application-testing.yaml` and `application-production.yaml` next to
+it — currently identical to the base file's own values, since this branch's defaults already are
+the QA/prod-shaped ones — so that a future consolidation of `develop`/`testing`/`main` onto one
+shared `application.yaml` has somewhere to move the environment-specific values without
+reintroducing the hand-reconciliation these branches used to need on every merge.
+
+**This does not change anything about how QA or production actually run today.**
+`k8s/configmap-common.yaml` (per namespace) already injects `MONGO_HOST`, `KEYCLOAK_ISSUER_URI`,
+etc. directly as env vars on every Deployment, and an explicit env var always wins over a YAML
+default regardless of which profile is active — so `SPRING_PROFILES_ACTIVE` is never set anywhere
+in `k8s/`, and doesn't need to be.
 
 ## Default credentials
 
