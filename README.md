@@ -211,6 +211,26 @@ never set anywhere in `k8s/`, and doesn't need to be. The profile files exist so
 `develop` can carry one identical `application.yaml`, with the environment-specific values isolated
 somewhere a merge never has to touch.
 
+## Config profiles: local / testing / production
+
+Every service's bundled `application.yaml` carries only its **local** defaults (single-instance
+Mongo, `keycloak.localhost:8181`) — the values that make Option A/B host-JVM dev work with zero
+env vars set. Each service also ships `application-testing.yaml` and `application-production.yaml`
+next to it, holding the QA/prod-shaped defaults (3-node replica-set Mongo URI, `localhost:8081`
+Keycloak) that used to live baked directly into the `testing`/`main` branches' own copies of
+`application.yaml` — the exact values a hand-merge between branches had to reconcile line-by-line
+every time.
+
+**This does not change anything about how QA or production actually run today.** Both
+`k8s/configmap-common.yaml` (per namespace) already inject `MONGO_HOST`, `MONGO_REPLICA_SET_PARAM`,
+`KEYCLOAK_ISSUER_URI`, etc. directly as env vars on every Deployment, and an explicit env var always
+wins over a YAML default regardless of which profile is active — so `SPRING_PROFILES_ACTIVE` is
+never set anywhere in `k8s/`, and doesn't need to be. The profile files exist so the three branches
+can carry one identical `application.yaml`, with the environment-specific values isolated
+somewhere a merge never has to touch — and so `SPRING_PROFILES_ACTIVE=testing` is available if you
+ever want to run a service host-JVM style against QA-shaped defaults (there's no `docker-compose`
+QA-flavored Mongo today, so this is currently a documented capability more than a used one).
+
 ## Default credentials
 
 | User | Password | Realm role |
