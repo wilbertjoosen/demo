@@ -2,9 +2,9 @@ name: CI/CD
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
   pull_request:
-    branches: [main]
+    branches: [main, develop]
 
 # Explicit rather than relying on repo-level defaults — GITHUB_TOKEN needs package-write to push
 # images to GHCR, and contents-write for the deploy job's auto-commit back to k8s/.
