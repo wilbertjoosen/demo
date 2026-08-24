@@ -14,7 +14,7 @@ spec:
         - name: ghcr-pull-secret
       containers:
         - name: common-service
-          image: ghcr.io/wilbertjoosen/demo-common-service:1.0.0-5a37a24
+          image: ghcr.io/wilbertjoosen/demo-common-service:1.0.0-522bf29
           imagePullPolicy: Always
           ports: [{ containerPort: 8096 }]
           envFrom:
