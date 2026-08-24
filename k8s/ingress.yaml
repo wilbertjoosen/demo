@@ -3,10 +3,10 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: demo-ingress
-  namespace: demo-qa
+  namespace: demo
 spec:
   rules:
-    - host: qa.demo.localhost
+    - host: demo.localhost
       http:
         paths:
           - path: /api
