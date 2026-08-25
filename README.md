@@ -23,48 +23,6 @@ See [Branch model & release flow](#branch-model--release-flow) for how a change 
 
 ---
 
-## Who this README is for
-
-<table>
-<tr>
-<td width="25%" valign="top">
-
-### 🧑‍💻 Developers
-Clone it, run it, break it. [Quick start](#quick-start) gets you a working stack in three different
-ways depending on how much of the infrastructure you want to touch. Every pattern links to the exact
-file that implements it — [Patterns, explained three ways](#patterns-explained-three-ways).
-
-</td>
-<td width="25%" valign="top">
-
-### 🏗️ Architects
-The interesting decisions are the tradeoffs, not the tech logos. [Why this stack](#the-stack--and-why-each-piece-is-here)
-and [The path to production](#the-path-to-production-every-gate-explained) explain the *reasoning*
-behind build-once/promote-many CI/CD, choreographed sagas over orchestration, and a shared
-observability stack across two environments.
-
-</td>
-<td width="25%" valign="top">
-
-### 🎯 Recruiters / hiring managers
-This repo is the portfolio piece: a working system spanning backend, frontend, data, security,
-CI/CD, GitOps, and observability — not a tutorial clone. The [tech stack table](#the-stack--and-why-each-piece-is-here)
-doubles as a skills list; every row links to real, running code.
-
-</td>
-<td width="25%" valign="top">
-
-### 📚 New to distributed systems?
-Start with [Glossary — jargon, decoded](#glossary--jargon-decoded) for plain-English definitions of
-every term used below, then [Patterns, explained three ways](#patterns-explained-three-ways) for the
-"why would anyone do this" behind each pattern.
-
-</td>
-</tr>
-</table>
-
----
-
 ## Table of contents
 
 - [The big picture](#the-big-picture)
