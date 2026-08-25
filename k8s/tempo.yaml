@@ -110,9 +110,14 @@ spec:
           volumeMounts:
             - { name: config, mountPath: /etc/tempo }
             - { name: data, mountPath: /var/tempo }
+          # Bumped from 256Mi/512Mi (2026-08-25) — a burst of trace ingestion from ~18 services
+          # restarting repeatedly during an unrelated incident (Pyroscope agent crash-looping) drove
+          # Tempo well past the old 512Mi limit, OOMKilling it every ~15-20s (exit code 137) and
+          # breaking Grafana's Traces Drilldown ("connection refused") for everyone, not just the
+          # services that were actually restarting.
           resources:
-            requests: { cpu: "100m", memory: "256Mi" }
-            limits: { cpu: "500m", memory: "512Mi" }
+            requests: { cpu: "100m", memory: "384Mi" }
+            limits: { cpu: "500m", memory: "1536Mi" }
           readinessProbe:
             httpGet: { path: /ready, port: 3200 }
             initialDelaySeconds: 10
