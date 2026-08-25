@@ -4,6 +4,12 @@
 # service pushes spans here directly over OTLP, so it needs Tempo's address the same way it needs
 # Kafka's or MySQL's — see k8s/configmap-common.yaml's OTLP_ENDPOINT (now pointing in-cluster
 # instead of at docker-compose's Tempo, which this replaces for both branches).
+#
+# Image pinned to 2.7.1, not :latest — confirmed live: v3 restructured storage config around a new
+# backend-scheduler/backend-worker split and dropped the top-level `ingester`/`compactor` blocks
+# this single-binary, local-storage config below is written against (same incompatibility
+# docker-compose.yml's own former Tempo container already had a comment about, for the exact same
+# reason) — 2.7.1 is the last 2.x release and matches this config's schema.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -46,7 +52,7 @@ spec:
     spec:
       containers:
         - name: tempo
-          image: grafana/tempo:latest
+          image: grafana/tempo:2.7.1
           args:
             - -config.file=/etc/tempo/tempo.yaml
           ports:
