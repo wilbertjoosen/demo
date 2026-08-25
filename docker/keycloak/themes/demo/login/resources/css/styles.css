@@ -1,0 +1,39 @@
+/*
+ * "demo" login theme — reuses the frontend's brand palette (frontend/public/favicon.svg:
+ * #7e14ff / #863bff purple, #ede6ff lavender, #47bfff blue) so the Keycloak login page doesn't
+ * look like a stock IdP screen when a user is bounced here from the app. Overrides only the
+ * CSS custom properties the base "keycloak.v2" theme and PatternFly v5 already expose for
+ * exactly this purpose, rather than restyling individual selectors — keeps this theme
+ * forward-compatible with Keycloak version bumps as long as those variable names hold.
+ *
+ * theme.properties' `styles=` REPLACES (not merges with) the parent's own stylesheet list, so
+ * keycloak.v2's real layout rules (login card grid-template, responsive header breakpoint,
+ * tooltip/recovery-codes/dark-mode rules) would otherwise silently disappear — confirmed by
+ * diffing the rendered page's <link> tags locally before adding this @import. Pulling it in
+ * directly keeps this theme purely additive.
+ */
+@import url("../../keycloak.v2/css/styles.css");
+
+:root {
+    --pf-v5-global--primary-color--100: #7e14ff;
+    --pf-v5-global--primary-color--200: #6100d9;
+    --pf-v5-global--link--Color: #7e14ff;
+    --pf-v5-global--link--Color--hover: #6100d9;
+    --keycloak-card-top-color: #7e14ff;
+}
+
+body.login-pf {
+    background: linear-gradient(160deg, #ede6ff 0%, #ffffff 55%);
+}
+
+/* The realm sets a plain "displayName" ("Demo"), not "displayNameHtml" — the base template
+   renders that directly into #kc-header-wrapper as text (class pf-v5-c-brand), NOT wrapped in
+   the .kc-logo-text/<span> markup the Keycloak-branded fallback uses. Confirmed by diffing the
+   actual rendered markup between the master realm (no displayName -> kc-logo-text/"Keycloak"
+   logo image) and the demo realm (displayName set -> plain text) locally before writing this. */
+#kc-header-wrapper.pf-v5-c-brand {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: #7e14ff;
+    letter-spacing: -0.02em;
+}
