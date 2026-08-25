@@ -18,6 +18,12 @@
 # looked correctly wired (routes to the pod's real IP), so every service's span export just got a
 # silent "connection refused" cluster-wide — no traces ever reached storage despite everything else
 # (config, DNS, DNS resolution, the endpoint value itself) being correct.
+#
+# metrics_generator powers Grafana's Traces Drilldown "Span rate"/service-graph panels (TraceQL
+# metrics queries like rate()/histogram_over_time()) — without it those panels 500 with "error
+# finding generators in Querier.queryRangeRecent: empty ring", since nothing ever registers as a
+# generator instance. Pushes to the in-cluster Prometheus over remote_write, which needs
+# --web.enable-remote-write-receiver (k8s/prometheus.yaml) to actually accept it — off by default.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -47,6 +53,38 @@ data:
           path: /var/tempo/traces
         wal:
           path: /var/tempo/wal
+    metrics_generator:
+      ring:
+        # Unlike the ingester ring above (which defaults to an in-memory KV store and auto-joins on
+        # its own in single-binary mode), the metrics-generator ring's own lifecycler needs this
+        # explicit — without it nothing ever registers, so the querier's TraceQL metrics queries
+        # (rate()/histogram_over_time(), the "Span rate" Traces Drilldown panel) permanently 500
+        # with "error finding generators in Querier.queryRangeRecent: empty ring", even once the
+        # module itself starts cleanly with no other error.
+        kvstore:
+          store: inmemory
+      registry:
+        collection_interval: 15s
+        external_labels:
+          source: tempo
+      storage:
+        path: /var/tempo/generator/wal
+        remote_write:
+          - url: http://prometheus.monitoring.svc.cluster.local:9090/api/v1/write
+            send_exemplars: true
+      # Trimmed at first, on the (wrong) assumption it was only needed for local-blocks specifically
+      # and we weren't enabling that processor — turns out Grafana's Traces Drilldown app itself
+      # requires local-blocks to be enabled for its own TraceQL metrics queries ("localblocks
+      # processor not found" once the ring issue above was fixed and this became the next error).
+      traces_storage:
+        path: /var/tempo/generator/traces
+    overrides:
+      defaults:
+        metrics_generator:
+          # local-blocks specifically required by Grafana's Traces Drilldown app for its own
+          # TraceQL metrics queries — confirmed live via "localblocks processor not found" once
+          # the ring config above was fixed and this became the next (and last) blocking error.
+          processors: [service-graphs, span-metrics, local-blocks]
 ---
 apiVersion: apps/v1
 kind: Deployment
