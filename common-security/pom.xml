@@ -69,5 +69,27 @@
             <artifactId>spring-boot-devtools</artifactId>
             <optional>true</optional>
         </dependency>
+        <dependency>
+            <!-- EndUserIdTracingFilter (an OncePerRequestFilter) needs jakarta.servlet types to
+                 compile — common-security has no spring-boot-starter-web dependency of its own, only
+                 spring-security-web (transitively, via spring-boot-starter-security), which doesn't
+                 expose the servlet API at this module's own compile time. `provided` scope: every
+                 consuming service already supplies the real servlet container via its own
+                 spring-boot-starter-web, so this isn't bundled into the runtime jar, just needed here
+                 for common-security to compile against the types at all. Version comes from Spring
+                 Boot's own dependency management (spring-boot-starter-parent), same as every other
+                 dependency in this file. -->
+            <groupId>jakarta.servlet</groupId>
+            <artifactId>jakarta.servlet-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <!-- common-security had no test dependencies at all before EndUserIdTracingFilter —
+                 added specifically to cover it (a filter running on every authenticated request
+                 across all 9 services is worth a regression test). -->
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 </project>
