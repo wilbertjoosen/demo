@@ -28,9 +28,12 @@ spec:
           env:
             - { name: PYROSCOPE_PROFILER_TYPE, value: JFR }
           ports: [{ containerPort: 8761 }]
+          # Memory bumped 384Mi -> 512Mi (2026-08-25) — the Pyroscope JFR agent's recording buffer
+          # adds enough overhead during JVM startup to occasionally OOMKill this service at the old
+          # limit (confirmed live in demo: exit 137, Reason: OOMKilled, twice before stabilizing).
           resources:
             requests: { cpu: "100m", memory: "256Mi" }
-            limits: { cpu: "500m", memory: "384Mi" }
+            limits: { cpu: "500m", memory: "512Mi" }
           readinessProbe:
             httpGet: { path: /actuator/health/readiness, port: 8761 }
             initialDelaySeconds: 15
