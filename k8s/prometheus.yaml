@@ -89,6 +89,9 @@ spec:
           args:
             - --config.file=/etc/prometheus/prometheus.yml
             - --storage.tsdb.path=/prometheus
+            # Off by default — Tempo's metrics-generator (k8s/tempo.yaml) pushes span-metrics and
+            # service-graph metrics here via remote_write, so this needs to actually accept them.
+            - --web.enable-remote-write-receiver
           ports: [{ containerPort: 9090 }]
           volumeMounts:
             - { name: config, mountPath: /etc/prometheus }

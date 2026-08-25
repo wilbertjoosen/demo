@@ -1,0 +1,100 @@
+# In-cluster Pyroscope, single shared instance for both demo (prod) and demo-qa — same reasoning
+# as k8s/prometheus.yaml/k8s/tempo.yaml: one instance, not one per environment, so demo-qa's ArgoCD
+# Application never fights demo's over the same objects. Continuous profiling is push-based (every
+# service's Java agent sends profiles here directly), so it needs Pyroscope's address the same way
+# Tempo does — see k8s/configmap-common.yaml's PYROSCOPE_SERVER_ADDRESS.
+#
+# Monolithic (single-binary) mode — no separate ingester/querier/distributor components, matching
+# the same "no Operator, no Helm" pattern already used for Loki/Tempo/Prometheus. PVC-backed, not
+# emptyDir: profile history is closer to metrics than to traces — something worth querying over
+# days, not just "what just happened" — same reasoning as Prometheus/Grafana's PVCs.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pyroscope-config
+  namespace: monitoring
+data:
+  pyroscope.yaml: |
+    server:
+      http_listen_port: 4040
+    self_profiling:
+      disable_push: true
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pyroscope
+  namespace: monitoring
+  labels: { app: pyroscope }
+spec:
+  replicas: 1
+  strategy: { type: Recreate }
+  selector: { matchLabels: { app: pyroscope } }
+  template:
+    metadata: { labels: { app: pyroscope } }
+    spec:
+      containers:
+        - name: pyroscope
+          image: grafana/pyroscope:2.3.0
+          args:
+            - -config.file=/etc/pyroscope/pyroscope.yaml
+          ports: [{ containerPort: 4040 }]
+          volumeMounts:
+            - { name: config, mountPath: /etc/pyroscope }
+            - { name: data, mountPath: /data/pyroscope }
+          resources:
+            requests: { cpu: "100m", memory: "256Mi" }
+            limits: { cpu: "500m", memory: "512Mi" }
+          readinessProbe:
+            httpGet: { path: /ready, port: 4040 }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          # initialDelaySeconds/failureThreshold are generous — confirmed live that a cold start
+          # takes 30-45s+ (sequential internal grace periods: "Metastore not ready: 15s before
+          # reporting readiness" then "Ingester not ready: waiting for 15s after being ready", on
+          # top of actual startup + single-node Raft leader election) — Tempo/Loki's much shorter
+          # defaults killed this pod mid-startup 3 times before it ever got a chance to become ready.
+          livenessProbe:
+            httpGet: { path: /ready, port: 4040 }
+            initialDelaySeconds: 45
+            periodSeconds: 15
+            failureThreshold: 6
+      volumes:
+        - name: config
+          configMap: { name: pyroscope-config }
+        - name: data
+          persistentVolumeClaim: { claimName: pyroscope-data }
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pyroscope-data
+  namespace: monitoring
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests: { storage: 2Gi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pyroscope
+  namespace: monitoring
+spec:
+  selector: { app: pyroscope }
+  ports: [{ port: 4040, targetPort: 4040 }]
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: pyroscope-ingress
+  namespace: monitoring
+spec:
+  rules:
+    - host: pyroscope.demo.localhost
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service: { name: pyroscope, port: { number: 4040 } }
