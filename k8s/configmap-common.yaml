@@ -51,5 +51,10 @@ data:
   MAIL_HOST: mailpit.infra.svc.cluster.local
   MAIL_PORT: "1025"
   OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: http://tempo.monitoring.svc.cluster.local:4318/v1/traces
+  # Pyroscope continuous-profiling server, same shared single-instance reasoning as Tempo above
+  # (one cluster-wide monitoring-namespace resource, not per-environment) — picked up by
+  # Dockerfile.service's entrypoint wrapper via the io.pyroscope agent's PYROSCOPE_SERVER_ADDRESS
+  # env var.
+  PYROSCOPE_SERVER_ADDRESS: http://pyroscope.monitoring.svc.cluster.local:4040
   INVENTORY_SERVICE_URI: http://inventory-service:8089
   CORS_ALLOWED_ORIGINS: http://localhost:5173,http://demo.localhost:18090

@@ -10,9 +10,25 @@ WORKDIR /build
 COPY . .
 RUN --mount=type=cache,target=/root/.m2 \
     ./mvnw -q -pl ${SERVICE} -am -DskipTests package
+# Pyroscope's Java agent — a javaagent, not a library any app code calls, so it isn't a project
+# dependency in any pom.xml. Pinned (not :latest — see k8s/tempo.yaml's comment for why that burned
+# us once already) and fetched via mvn dependency:copy so it shares the same ~/.m2 cache mount
+# rather than needing its own network round-trip on every build.
+RUN --mount=type=cache,target=/root/.m2 \
+    mvn -q dependency:copy -Dartifact=io.pyroscope:agent:2.1.2:jar -DoutputDirectory=/build -Dmdep.stripVersion=true
 
 FROM eclipse-temurin:26-jre
 ARG SERVICE
 WORKDIR /app
 COPY --from=build /build/${SERVICE}/target/*.jar app.jar
-ENTRYPOINT ["java", "-jar", "/app/app.jar"]
+COPY --from=build /build/agent.jar pyroscope.jar
+# PYROSCOPE_APPLICATION_NAME is derived from $HOSTNAME rather than set per-manifest — k8s sets it
+# to the pod name, which is always <owner-name> plus either "-<hash>-<5-char-suffix>" (Deployments,
+# Rollouts — e.g. order-service-5dfb54556c-874j6) or "-<ordinal>" (StatefulSets — e.g.
+# reporting-service-0). Stripping whichever suffix shape matches leaves exactly the owner's own
+# name, correct for all three controller types without editing all 18 k8s/*.yaml individually.
+ENTRYPOINT ["sh", "-c", "\
+    name=$(echo \"$HOSTNAME\" | sed -E 's/-[a-z0-9]+-[a-z0-9]{5}$//'); \
+    if [ \"$name\" = \"$HOSTNAME\" ]; then name=$(echo \"$HOSTNAME\" | sed -E 's/-[0-9]+$//'); fi; \
+    export PYROSCOPE_APPLICATION_NAME=\"$name\"; \
+    exec java -javaagent:/app/pyroscope.jar -jar /app/app.jar"]
