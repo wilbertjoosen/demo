@@ -19,6 +19,7 @@ spec:
           ports: [{ containerPort: 8092 }]
           envFrom:
             - configMapRef: { name: demo-common-config }
+            - secretRef: { name: pyroscope-agent }
             # Same aws-credentials Secret shape as main's k8s/product-media-service.yaml (created
             # via Rancher's Secrets UI, never committed) — QA gets its own Secret with the same
             # keys, same "shared instance, environment-scoped by name" reasoning as MySQL/Mongo/ES
