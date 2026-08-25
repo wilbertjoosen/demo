@@ -4,9 +4,8 @@
 # Unlike main/testing, k8s's own Promtail DaemonSet (k8s/promtail-daemonset.yaml) already pushed
 # to the HOST Loki successfully before this (push-direction traffic works fine across the
 # host/cluster boundary) — this split is a deliberate choice for consistency with main/testing's
-# architecture, not a fix for a reachability problem. Tradeoff: Tempo's trace-to-logs jump would
-# only find logs in one fixed Loki, but this branch has no Tempo at all, so that tradeoff doesn't
-# apply here.
+# architecture, not a fix for a reachability problem. k8s/tempo.yaml's Tempo now lives in this same
+# namespace, so its trace-to-logs jump in Grafana finds this one Loki, not a second host-side copy.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
