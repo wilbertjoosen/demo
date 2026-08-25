@@ -64,6 +64,13 @@
             <artifactId>spring-boot-micrometer-tracing-opentelemetry</artifactId>
         </dependency>
         <dependency>
+            <!-- Required alongside the above — see common-security/pom.xml's comment.
+                 OtlpTracingAutoConfiguration is @ConditionalOnClass on OtlpHttpSpanExporter, which
+                 doesn't ship with spring-boot-micrometer-tracing-opentelemetry itself. -->
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-exporter-otlp</artifactId>
+        </dependency>
+        <dependency>
             <!-- Marked <optional> by spring-cloud-gateway-server-webmvc itself, so it isn't pulled in
                  transitively — needed explicitly for per-client rate limiting (RateLimitFilter). -->
             <groupId>com.bucket4j</groupId>
