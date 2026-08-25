@@ -14,7 +14,7 @@ spec:
         - name: ghcr-pull-secret
       containers:
         - name: delivery-service
-          image: ghcr.io/wilbertjoosen/demo-delivery-service:1.0.1-7e68f28
+          image: ghcr.io/wilbertjoosen/demo-delivery-service:1.0.1-d013bc7
           imagePullPolicy: Always
           ports: [{ containerPort: 8087 }]
           envFrom:
