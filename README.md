@@ -241,6 +241,12 @@ QA-flavored Mongo today, so this is currently a documented capability more than 
 
 Realm: `demo` (prod) / `demo-qa` (QA) — same users/passwords in both. Client: `demo-spa` (public, PKCE).
 
+The login page itself uses a custom "demo" theme (`docker/keycloak/themes/demo`) instead of stock
+Keycloak branding — purple accent/button matching the frontend's own palette, realm `displayName`
+("Demo" / "Demo QA") shown in place of the Keycloak wordmark. See the theme's own `styles.css`
+comment for why it extends `keycloak.v2` via `@import` rather than the more obvious-looking
+`styles=` override (the latter silently drops the base theme's layout rules).
+
 ## Useful URLs
 
 | Tool | URL                                                           | Credentials |
@@ -451,7 +457,17 @@ flowchart LR
   default datasource, plus two pre-provisioned dashboards (embedded directly in the manifest):
   "Services Overview" and **"Kubernetes Overview (prod vs QA)"** — the latter has a `namespace`
   filter variable and puts prod/QA side by side in the top row (Services Up/Down for each), so
-  environment health is a single glance, not two separate dashboards.
+  environment health is a single glance, not two separate dashboards. The same shared instance also
+  runs **alerting** (three rules: instance-down, high-5xx-rate, pvc-disk-pressure — delivered by
+  email through Mailpit), scrapes **cluster-level metrics** (`kube-state-metrics`, `node-exporter`),
+  and receives every service's **continuous-profiling** data (Pyroscope — toggle per-namespace via
+  the `PYROSCOPE_AGENT_ENABLED` key in that namespace's `pyroscope-agent` Secret) — all `main`
+  branch manifests, since this is one shared `monitoring` namespace for both environments; see
+  main's own README for the details.
+- **Load testing**: a k6 smoke-test script exists as a suspended `CronJob` template
+  (`k8s/k6.yaml`, main branch, shared `monitoring` namespace) — trigger on demand with
+  `kubectl create job --from=cronjob/k6-load-test <name> -n monitoring`, results push to the
+  shared Prometheus.
 - **Logs**: services log to stdout; in k8s, Promtail (`k8s/promtail-daemonset.yaml`, one shared
   instance, not per-environment) ships every pod's logs — from both namespaces — to the in-cluster
   Loki (`k8s/loki.yaml`, namespace `monitoring`), labeled by `namespace`. Query through Grafana's
@@ -460,7 +476,14 @@ flowchart LR
   namespace, same single-shared-instance pattern) — Spring Boot auto-adds `[traceId,spanId]` to
   every log line once `micrometer-tracing` is on the classpath, and since Grafana, Loki, and Tempo
   are all the same in-cluster instances for both environments, a trace's `tracesToLogsV2` jump
-  always resolves against the exact Loki that received its originating service's logs.
+  always resolves against the exact Loki that received its originating service's logs. Every
+  JWT-authenticated request's span is also tagged with the OTel semantic convention `enduser.id`
+  (the Keycloak user's subject claim, `common-security`'s `EndUserIdTracingFilter`, **this branch
+  only** — not yet ported to `main`/`develop`) — filter Tempo search with
+  `{ span.enduser.id = "<user-id>" }` to pull every trace for one user across every service.
+  Keycloak's own OTel tracing (`KC_TRACING_ENABLED`, `main` branch's `k8s/keycloak.yaml`) covers
+  the same shared instance both realms use, so `demo-qa` logins are traced too even though that
+  config lives on `main`.
 - **Audit trail**: every REST call across every service is captured (who, what, when, request/response
   bodies with secrets redacted) and shipped to Elasticsearch — index `audit-log` for prod, `audit-log-qa`
   for QA (same shared in-cluster ES instance, `k8s/elasticsearch.yaml`, see
