@@ -411,10 +411,10 @@ data:
 ---
 # Grafana-managed (unified) alerting, provisioned the same file-based way as datasources/
 # dashboards above — see https://grafana.com/docs/grafana/latest/alerting/set-up/provision-alerting-resources/.
-# Two rules for now (P1): instance-down and a 5xx-error-rate threshold, both backed by metrics
-# Prometheus already scrapes today. A third rule (PVC disk pressure) is deliberately not here yet —
-# it needs kubelet/cAdvisor or kube-state-metrics data that doesn't exist until P2's node-exporter/
-# kube-state-metrics work lands; a rule with no matching series would just silently never fire.
+# Three rules: instance-down and a 5xx-error-rate threshold (both P1), plus PVC disk pressure
+# (added once P2's kubernetes-nodes scrape job — k8s/prometheus.yaml — started exposing
+# kubelet_volume_stats_available_bytes/capacity_bytes; this rule couldn't exist before that data
+# did, since a rule with no matching series would just silently never fire).
 #
 # datasourceUid below is PBFA97CFB590B2093 — Prometheus's own already-existing UID in this cluster's
 # Grafana (queried directly from grafana.db, not guessed), NOT a name added to the datasource block
@@ -522,6 +522,37 @@ data:
                   type: classic_conditions
                   conditions:
                     - evaluator: { type: gt, params: [0.05] }
+                      operator: { type: and }
+                      query: { params: ["A"] }
+                      reducer: { type: last, params: [] }
+          - uid: pvc-disk-pressure
+            title: PVC Disk Pressure
+            condition: C
+            noDataState: NoData
+            execErrState: Alerting
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "{{ $labels.persistentvolumeclaim }} in {{ $labels.namespace }} is over 85% full"
+            data:
+              - refId: A
+                relativeTimeRange: { from: 300, to: 0 }
+                datasourceUid: PBFA97CFB590B2093
+                model:
+                  refId: A
+                  expr: 1 - (kubelet_volume_stats_available_bytes / kubelet_volume_stats_capacity_bytes)
+                  instant: true
+                  intervalMs: 1000
+                  maxDataPoints: 43200
+              - refId: C
+                relativeTimeRange: { from: 300, to: 0 }
+                datasourceUid: "__expr__"
+                model:
+                  refId: C
+                  type: classic_conditions
+                  conditions:
+                    - evaluator: { type: gt, params: [0.85] }
                       operator: { type: and }
                       query: { params: ["A"] }
                       reducer: { type: last, params: [] }
