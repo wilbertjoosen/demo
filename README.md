@@ -531,14 +531,13 @@ flowchart LR
   every log line once `micrometer-tracing` is on the classpath (`common-security`/`gateway-service`
   poms), and since Grafana, Loki, and Tempo are now all the same in-cluster instances for both
   environments, a trace's `tracesToLogsV2` jump always resolves against the exact Loki that received
-  its originating service's logs — no split to work around. Every JWT-authenticated request is also
-  tagged with the OTel semantic convention `enduser.id` (the Keycloak user's subject claim,
-  `common-security`'s `EndUserIdTracingFilter`) — filter Grafana's Explore/Tempo search with
-  `{ span.enduser.id = "<user-id>" }` to pull every trace for one user across every service. Keycloak
-  itself also exports native OTel traces (`KC_TRACING_ENABLED`/`KC_TRACING_ENDPOINT`/
-  `KC_TRACING_SAMPLER_RATIO`, sourced from the `keycloak-tracing` Secret so the sample ratio can be
-  retuned without a git commit) — its own spans use `kc.clientId`/`kc.realmName`/`kc.sessionId`, not
-  `enduser.id`, so the two are complementary, not overlapping.
+  its originating service's logs — no split to work around. Keycloak itself also exports native OTel
+  traces (`KC_TRACING_ENABLED`/`KC_TRACING_ENDPOINT`/`KC_TRACING_SAMPLER_RATIO`, sourced from the
+  `keycloak-tracing` Secret so the sample ratio can be retuned without a git commit) — its own spans
+  use `kc.clientId`/`kc.realmName`/`kc.sessionId`, not a per-user tag. (The `testing` branch also
+  tags every JWT-authenticated request's spans with the OTel semantic convention `enduser.id` via
+  `common-security`'s `EndUserIdTracingFilter` — `{ span.enduser.id = "<user-id>" }` in Tempo search
+  — but that hasn't been ported to `main`/`develop` yet.)
 - **Audit trail**: every REST call across every service is captured (who, what, when, request/response
   bodies with secrets redacted) and shipped to Elasticsearch — index `audit-log` for prod, `audit-log-qa`
   for QA (same shared in-cluster ES instance, `k8s/elasticsearch.yaml`, see
