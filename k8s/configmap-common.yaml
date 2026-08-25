@@ -55,6 +55,14 @@ data:
   # Dockerfile.service, PYROSCOPE_APPLICATION_NAME derived there from $HOSTNAME) pushes continuous
   # profiles here directly, same push-based reasoning as Tempo above.
   PYROSCOPE_SERVER_ADDRESS: http://pyroscope.monitoring.svc.cluster.local:4040
+  # PYROSCOPE_PROFILER_TYPE=JFR (2026-08-25) — io.pyroscope:agent:2.1.2's default profilerType,
+  # ASYNC, delegates to a bundled async-profiler native library that SIGSEGVs immediately on this
+  # cluster's JDK 26 + linux/arm64 combination (Recording::writeCpool native crash, confirmed on
+  # testing/demo-qa — see git history around 2026-08-25 for the incident). JFR instead delegates to
+  # the JDK's own built-in Flight Recorder — pure JVM, no native library — verified end-to-end on
+  # demo-qa (all 18 services re-enabled and profiling cleanly under JFR) before porting here. Lower
+  # sampling resolution than async-profiler, but that trade-off is what unblocks profiling at all.
+  PYROSCOPE_PROFILER_TYPE: JFR
   # Task #75, real secrets management — Vault dev-mode instance, single node (no topology
   # discovery needed, unlike Mongo's replica set), now in-cluster (k8s/vault.yaml). The token
   # itself is sensitive and lives in the vault-token k8s Secret (created imperatively per-namespace,
