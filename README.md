@@ -371,7 +371,8 @@ App: http://demo.localhost:18090. Here's what's actually running where:
 |---|---|
 | Kafka, Redis, Mailpit | In-cluster, own instance per namespace (`k8s/kafka.yaml`, `k8s/redis.yaml`, `k8s/mailpit.yaml`) — see [QA / testing environment](#qa--testing-environment) |
 | MySQL, Keycloak, Vault, MongoDB, Elasticsearch | In-cluster, shared cross-namespace from the `demo` (prod) namespace |
-| Grafana, Tempo, Kibana | Still on host (Docker Compose), reached via `host.k3d.internal` |
+| Prometheus, Grafana, Loki, Tempo | In-cluster, shared `monitoring` namespace (main branch's manifests) |
+| Kibana | Still on host (Docker Compose), reached via `host.k3d.internal` — see [Observability](#observability) for why |
 
 <details>
 <summary><b>Why the port mapping and image-import details matter</b> (click to expand)</summary>
@@ -400,11 +401,12 @@ App: http://demo.localhost:18090. Here's what's actually running where:
 | | `--no-watch` | Skip the post-start `kubectl get pods -A -w` tail |
 | | `--with-dev` | Also start/stop dev-only pieces (e.g. running `start-local.sh`'s host-JVM services against the same docker-compose stack at the same time) |
 
-`start`/`stop` only touch the infra pods actually still needed on the host now — just Grafana,
-Tempo, and Kibana (used for host-JVM debugging / not yet in-cluster on this branch). Not
-docker-compose's own app containers (Option B, irrelevant when using k8s), and not
-Prometheus/Loki/Promtail — those run fully in-cluster (`k8s/prometheus.yaml`/`k8s/loki.yaml` on the
-main branch, `k8s/promtail-daemonset.yaml`), a single shared instance for both prod and QA.
+`start`/`stop` only touch the infra pods actually still needed on the host now — just Kibana (used
+for host-JVM debugging; not a live view into k8s environment data, see
+[Observability](#observability)). Not docker-compose's own app containers (Option B, irrelevant when
+using k8s), and not Prometheus/Grafana/Loki/Promtail/Tempo — those run fully in-cluster
+(`k8s/prometheus.yaml`/`k8s/grafana.yaml`/`k8s/loki.yaml`/`k8s/tempo.yaml` on the main branch,
+`k8s/promtail-daemonset.yaml`), a single shared instance for both prod and QA.
 
 ---
 
