@@ -19,6 +19,7 @@ spec:
           ports: [{ containerPort: 8888 }]
           envFrom:
             - configMapRef: { name: demo-common-config }
+            - secretRef: { name: pyroscope-agent }
           resources:
             requests: { cpu: "100m", memory: "256Mi" }
             limits: { cpu: "500m", memory: "384Mi" }
