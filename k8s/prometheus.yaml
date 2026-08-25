@@ -23,6 +23,13 @@ rules:
   - apiGroups: [""]
     resources: ["nodes", "services", "endpoints", "pods"]
     verbs: ["get", "list", "watch"]
+  # nodes/proxy — the kubernetes-nodes-cadvisor scrape job below reaches each kubelet's own
+  # /metrics/cadvisor through the API server's node-proxy endpoint (kubelets aren't otherwise
+  # directly reachable by address the way pod/service discovery targets are), which needs this
+  # separately from the plain "nodes" get/list/watch above.
+  - apiGroups: [""]
+    resources: ["nodes/proxy"]
+    verbs: ["get"]
   - nonResourceURLs: ["/metrics"]
     verbs: ["get"]
 ---
@@ -69,6 +76,52 @@ data:
             target_label: app
           - source_labels: [__meta_kubernetes_pod_name]
             target_label: pod
+      # P2 additions below — kube-state-metrics/node-exporter (k8s/kube-state-metrics.yaml,
+      # k8s/node-exporter.yaml) for cluster/host-level metrics, and a kubelet cAdvisor job
+      # specifically for the PVC disk-pressure alert this was blocked on
+      # (kubelet_volume_stats_available_bytes/capacity_bytes — neither kube-state-metrics nor
+      # node-exporter expose actual volume USAGE, only PVC object metadata / host filesystem stats).
+      - job_name: node-exporter
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces: { names: [monitoring] }
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            regex: node-exporter
+            action: keep
+          - source_labels: [__meta_kubernetes_pod_node_name]
+            target_label: node
+      - job_name: kube-state-metrics
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces: { names: [monitoring] }
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            regex: kube-state-metrics
+            action: keep
+          - source_labels: [__meta_kubernetes_pod_container_port_number]
+            regex: "8080"
+            action: keep
+      - job_name: kubernetes-nodes-cadvisor
+        scheme: https
+        tls_config:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+          insecure_skip_verify: true
+        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+        kubernetes_sd_configs:
+          - role: node
+        relabel_configs:
+          - action: labelmap
+            regex: __meta_kubernetes_node_label_(.+)
+          # kubelets aren't scraped directly by node address — the API server proxies each node's
+          # own /metrics/cadvisor, so __address__ has to point at the API server itself and the
+          # actual node name goes into the metrics path instead.
+          - target_label: __address__
+            replacement: kubernetes.default.svc:443
+          - source_labels: [__meta_kubernetes_node_name]
+            regex: (.+)
+            target_label: __metrics_path__
+            replacement: /api/v1/nodes/${1}/proxy/metrics/cadvisor
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -85,7 +138,10 @@ spec:
       serviceAccountName: prometheus
       containers:
         - name: prometheus
-          image: prom/prometheus:latest
+          # Pinned (2026-08-25, alongside the P2 scrape-config additions this file already needed
+          # touching) — not :latest, same reasoning as every other image in this stack after
+          # Tempo's :latest broke its config schema outright (see k8s/tempo.yaml's comment).
+          image: prom/prometheus:v3.14.0
           args:
             - --config.file=/etc/prometheus/prometheus.yml
             - --storage.tsdb.path=/prometheus
