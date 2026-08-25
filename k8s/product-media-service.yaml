@@ -19,6 +19,7 @@ spec:
           ports: [{ containerPort: 8092 }]
           envFrom:
             - configMapRef: { name: demo-common-config }
+            - secretRef: { name: pyroscope-agent }
             # AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY (read by the S3 SDK's default credential
             # provider chain), AWS_S3_BUCKET_NAME (aws.s3.bucket-name), AWS_REGION
             # (spring.cloud.aws.region.static, via config-server's shared config-repo) — created
