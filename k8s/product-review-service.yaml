@@ -14,7 +14,7 @@ spec:
         - name: ghcr-pull-secret
       containers:
         - name: product-review-service
-          image: ghcr.io/wilbertjoosen/demo-product-review-service:1.0.1-07c5cbd
+          image: ghcr.io/wilbertjoosen/demo-product-review-service:1.0.1-061a4a9
           imagePullPolicy: Always
           ports: [{ containerPort: 8093 }]
           envFrom:
