@@ -25,8 +25,12 @@ spec:
             - secretRef: { name: pyroscope-agent }
           # PYROSCOPE_PROFILER_TYPE=JFR — see configmap-common.yaml's comment for why (ASYNC's
           # bundled native library SIGSEGVs on this cluster's JDK 26 + linux/arm64).
+          # PYROSCOPE_SERVER_ADDRESS also has to be set here directly (2026-08-25 fix) — it only
+          # otherwise lives in demo-common-config, which this service doesn't reference, so the
+          # agent was silently defaulting to localhost:4040 and failing every upload.
           env:
             - { name: PYROSCOPE_PROFILER_TYPE, value: JFR }
+            - { name: PYROSCOPE_SERVER_ADDRESS, value: http://pyroscope.monitoring.svc.cluster.local:4040 }
           ports: [{ containerPort: 8761 }]
           # Memory bumped 384Mi -> 512Mi (2026-08-25) — the Pyroscope JFR agent's recording buffer
           # adds enough overhead during JVM startup to occasionally OOMKill this service at the old
