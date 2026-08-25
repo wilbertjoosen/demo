@@ -1,0 +1,82 @@
+# k6 load testing — on-demand, not scheduled. This is a CronJob with `suspend: true` purely as a
+# vehicle for a git-committed, always-in-sync Job *template*: a plain Job manifest here would run
+# once, automatically, the moment this file merges (ArgoCD applies everything in k8s/ on sync) —
+# not what "on-demand load test" should mean, and definitely not something that should happen as a
+# side effect of merging a PR. A suspended CronJob never fires on its own; trigger a real run
+# whenever you actually want one:
+#
+#   kubectl create job --from=cronjob/k6-load-test k6-run-$(date +%s) -n monitoring
+#
+# Lives in the monitoring namespace on main (like Grafana/Prometheus/Tempo/Pyroscope/node-exporter/
+# kube-state-metrics) rather than demo-qa's own k8s/ set on testing — it's a shared testing tool,
+# not an app-owned resource, same reasoning as everything else already here. Targets demo-qa's
+# gateway-service by default (cross-namespace DNS, same pattern Prometheus/Tempo already use to
+# reach app pods) — override GATEWAY_URL at trigger time to point at demo/prod instead, e.g.
+# `kubectl create job --from=cronjob/k6-load-test k6-run-1 -n monitoring
+# --dry-run=client -o yaml | ... ` or just edit the CronJob's env before triggering if testing prod
+# is genuinely intended (not the default, on purpose — a load test shouldn't accidentally hit
+# production).
+#
+# Results go to Prometheus via k6's built-in remote-write output (Prometheus already has
+# --web.enable-remote-write-receiver on for Tempo's metrics-generator — see k8s/prometheus.yaml),
+# so a completed run's request-rate/latency/failure-rate show up in Grafana like everything else
+# here, queryable by the k6_* metric names alongside the app's own http_server_requests_seconds_*.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: k6-script
+  namespace: monitoring
+data:
+  smoke-test.js: |
+    import http from 'k6/http';
+    import { check, sleep } from 'k6';
+
+    // Smoke-level by default (light, short) — bump VUs/duration for a real load test. Hits only
+    // /actuator/health/** — no auth needed, safe to run repeatedly without touching real data.
+    export const options = {
+      vus: 5,
+      duration: '30s',
+      thresholds: {
+        http_req_failed: ['rate<0.01'],
+        http_req_duration: ['p(95)<500'],
+      },
+    };
+
+    const GATEWAY_URL = __ENV.GATEWAY_URL || 'http://gateway-service.demo-qa.svc.cluster.local:8090';
+
+    export default function () {
+      const res = http.get(`${GATEWAY_URL}/actuator/health/readiness`);
+      check(res, { 'status is 200': (r) => r.status === 200 });
+      sleep(1);
+    }
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: k6-load-test
+  namespace: monitoring
+spec:
+  # Never fires on its own — see this file's header comment for how to trigger a run manually.
+  schedule: "0 0 1 1 *"
+  suspend: true
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: k6
+              image: grafana/k6:2.2.0
+              args: ["run", "--out", "experimental-prometheus-rw", "/scripts/smoke-test.js"]
+              env:
+                - { name: K6_PROMETHEUS_RW_SERVER_URL, value: "http://prometheus.monitoring.svc.cluster.local:9090/api/v1/write" }
+                - { name: GATEWAY_URL, value: "http://gateway-service.demo-qa.svc.cluster.local:8090" }
+              volumeMounts:
+                - { name: script, mountPath: /scripts }
+              resources:
+                requests: { cpu: "100m", memory: "128Mi" }
+                limits: { cpu: "500m", memory: "256Mi" }
+          volumes:
+            - name: script
+              configMap: { name: k6-script }
