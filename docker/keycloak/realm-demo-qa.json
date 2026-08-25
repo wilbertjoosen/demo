@@ -1,6 +1,8 @@
 {
   "realm": "demo-qa",
   "enabled": true,
+  "displayName": "Demo QA",
+  "loginTheme": "demo",
   "sslRequired": "none",
   "roles": {
     "realm": [
