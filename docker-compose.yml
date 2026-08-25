@@ -302,78 +302,11 @@ services:
           ORDER_SERVICE_CLIENT_SECRET=order-service-secret
         echo "order-service secrets written to Vault"
 
-  prometheus:
-    image: prom/prometheus:latest
-    container_name: demo-prometheus
-    restart: unless-stopped
-    volumes:
-      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - prometheus_data:/prometheus
-    ports:
-      - "9090:9090"
-    # Lets the container resolve host.docker.internal on Linux too (already built-in on Docker Desktop/macOS).
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-
-  loki:
-    image: grafana/loki:latest
-    container_name: demo-loki
-    restart: unless-stopped
-    ports:
-      - "3100:3100"
-    volumes:
-      - loki_data:/loki
-
-  promtail:
-    image: grafana/promtail:latest
-    container_name: demo-promtail
-    restart: unless-stopped
-    volumes:
-      - ./docker/promtail/promtail-config.yml:/etc/promtail/config.yml:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    command: -config.file=/etc/promtail/config.yml
-    depends_on:
-      - loki
-
-  grafana:
-    image: grafana/grafana:latest
-    container_name: demo-grafana
-    restart: unless-stopped
-    environment:
-      GF_SECURITY_ADMIN_USER: admin
-      GF_SECURITY_ADMIN_PASSWORD: admin
-    volumes:
-      - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./docker/grafana/dashboards:/etc/grafana/dashboards:ro
-      - grafana_data:/var/lib/grafana
-    # Reaches the in-cluster Prometheus (k8s/prometheus.yaml) through the k3d ingress by hostname —
-    # explicit rather than relying on .localhost auto-resolution working the same way inside a
-    # container's own network namespace as it does on the host.
-    extra_hosts:
-      - "prometheus.demo.localhost:host-gateway"
-    ports:
-      - "3000:3000"
-    depends_on:
-      - prometheus
-      - loki
-      - tempo
-
-  tempo:
-    # Pinned (not :latest) — v3 restructured storage config around a new backend-scheduler/
-    # backend-worker split and dropped the top-level `compactor` block this single-binary,
-    # local-storage config (docker/tempo/tempo.yml) is written against; 2.7.1 is the last 2.x
-    # release and matches that config's schema.
-    image: grafana/tempo:2.7.1
-    container_name: demo-tempo
-    restart: unless-stopped
-    command: ["-config.file=/etc/tempo/tempo.yml"]
-    volumes:
-      - ./docker/tempo/tempo.yml:/etc/tempo/tempo.yml:ro
-      - tempo_data:/var/tempo
-    ports:
-      - "3200:3200" # Tempo's own query API, used by Grafana's datasource
-      - "4317:4317" # OTLP gRPC receiver
-      - "4318:4318" # OTLP HTTP receiver — what every service's OTLP exporter actually sends to
+  # Grafana/Prometheus/Loki/Promtail/Tempo all moved in-cluster (k8s/grafana.yaml, k8s/prometheus.yaml,
+  # k8s/loki.yaml, k8s/promtail-daemonset.yaml, k8s/tempo.yaml) — a single shared instance for both
+  # demo (prod) and demo-qa, same reasoning as MySQL/Keycloak/Vault already being one shared instance
+  # rather than a per-environment docker-compose copy. docker-compose.yml is now purely the
+  # host-JVM/local-dev flow's datastores/broker/mail — it has no observability tooling of its own.
 
   # --- App services -----------------------------------------------------------------------
   # Not meant to run alongside the local `mvn spring-boot:run` processes used throughout dev —
@@ -758,9 +691,5 @@ volumes:
   mongo3_data:
   elasticsearch_data:
   redis_data:
-  prometheus_data:
-  loki_data:
-  grafana_data:
-  tempo_data:
   media_uploads:
   payment_proofs:
