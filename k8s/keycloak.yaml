@@ -28,6 +28,8 @@ data:
     {
       "realm": "demo",
       "enabled": true,
+      "displayName": "Demo",
+      "loginTheme": "demo",
       "sslRequired": "none",
       "roles": {
         "realm": [
@@ -141,6 +143,43 @@ metadata:
   name: keycloak-realm-import
   namespace: infra
 ---
+# "demo" login theme — see docker/keycloak/themes/demo (same files, mounted here via ConfigMap
+# instead of a bind mount) for the theme's own reasoning comment. `items:` reconstructs the
+# theme's on-disk subdirectory layout (theme.properties at login/, styles.css one level deeper
+# at login/resources/css/) from this single ConfigMap's two flat keys.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: keycloak-theme-demo
+  namespace: infra
+data:
+  theme.properties: |
+    parent=keycloak.v2
+    import=common/keycloak
+
+    styles=css/styles.css
+  styles.css: |
+    @import url("../../keycloak.v2/css/styles.css");
+
+    :root {
+        --pf-v5-global--primary-color--100: #7e14ff;
+        --pf-v5-global--primary-color--200: #6100d9;
+        --pf-v5-global--link--Color: #7e14ff;
+        --pf-v5-global--link--Color--hover: #6100d9;
+        --keycloak-card-top-color: #7e14ff;
+    }
+
+    body.login-pf {
+        background: linear-gradient(160deg, #ede6ff 0%, #ffffff 55%);
+    }
+
+    #kc-header-wrapper.pf-v5-c-brand {
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: #7e14ff;
+        letter-spacing: -0.02em;
+    }
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -169,6 +208,7 @@ spec:
           volumeMounts:
             - { name: data, mountPath: /opt/keycloak/data/h2 }
             - { name: realm-import, mountPath: /opt/keycloak/data/import }
+            - { name: theme-demo, mountPath: /opt/keycloak/themes/demo/login }
           resources:
             requests: { cpu: "250m", memory: "512Mi" }
             limits: { cpu: "1", memory: "1Gi" }
@@ -185,6 +225,12 @@ spec:
           persistentVolumeClaim: { claimName: keycloak-data }
         - name: realm-import
           configMap: { name: keycloak-realm-import }
+        - name: theme-demo
+          configMap:
+            name: keycloak-theme-demo
+            items:
+              - { key: theme.properties, path: theme.properties }
+              - { key: styles.css, path: resources/css/styles.css }
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
