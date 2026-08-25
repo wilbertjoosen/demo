@@ -58,8 +58,8 @@
         </dependency>
         <dependency>
             <!-- The gateway is every request's first hop, so it's the natural place for a trace to
-                 start — same tracing setup common-security gives the 13 services behind it, added
-                 directly here since gateway-service doesn't depend on common-security. -->
+                 start — same tracing setup common-security gives the other services, added directly
+                 here since gateway-service doesn't depend on common-security. -->
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-micrometer-tracing-opentelemetry</artifactId>
         </dependency>
