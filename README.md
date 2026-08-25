@@ -372,13 +372,14 @@ App: http://demo.localhost:18090. Here's what's actually running where:
 
 | Runs | Where | Namespace |
 |---|---|---|
-| Kafka, Redis, MySQL, Keycloak, Mailpit, Vault, MongoDB, Elasticsearch, Kibana | In-cluster | `infra` |
+| Kafka, Redis, MySQL, Keycloak, Mailpit, Vault, MongoDB, Elasticsearch | In-cluster | `infra` |
 | App microservices + frontend | In-cluster | `demo` |
 | Rancher (cluster management UI) | In-cluster | `cattle-system` |
-| Grafana, Tempo | Still on host (Docker Compose), reached via `host.k3d.internal` | — |
+| Prometheus, Grafana, Loki, Tempo, Pyroscope, Kibana | In-cluster | `monitoring` |
 
-App services reach `infra` via cross-namespace DNS (`<service>.infra.svc.cluster.local`, see
-`k8s/configmap-common.yaml`) — same pattern used to reach Loki/Prometheus in `monitoring`.
+Everything above runs in-cluster — nothing in this stack still depends on a Docker Compose
+container once the cluster is bootstrapped. App services reach `infra`/`monitoring` via
+cross-namespace DNS (`<service>.infra.svc.cluster.local`, see `k8s/configmap-common.yaml`).
 
 <details>
 <summary><b>Why the port mapping and image-import details matter</b> (click to expand)</summary>
