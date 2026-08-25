@@ -1,16 +1,11 @@
-# In-cluster Loki, mirroring k8s/prometheus.yaml's split: a genuinely separate instance from
-# docker-compose.yml's own Loki (which stays, unchanged, covering the host-JVM/docker-compose dev
-# flow), living in the same "monitoring" namespace, reached through the k3d ingress at
-# loki.demo.localhost for Grafana's benefit (still in docker-compose, needs the external route).
+# In-cluster Loki, mirroring k8s/prometheus.yaml's split: a single shared instance for both demo
+# (prod) and demo-qa, living in the "monitoring" namespace, reached over in-cluster DNS by Grafana
+# (k8s/grafana.yaml) and Tempo's tracesToLogsV2 alike.
 #
-# Unlike Prometheus, this split wasn't forced by a reachability problem — k8s's own Promtail
-# DaemonSet (k8s/promtail-daemonset.yaml) already pushes logs to the HOST Loki successfully today
-# (push-direction traffic works fine across the host/cluster boundary, unlike Prometheus's
-# pull-based scraping). This is a deliberate choice instead, matching the Prometheus precedent for
-# consistency — the tradeoff: Tempo's trace-to-logs jump (docker/grafana/provisioning/datasources/
-# datasources.yml's tracesToLogsV2) only finds logs in the SAME Loki a trace's originating service
-# wrote to, so it stops resolving for k8s-originated traces now that their logs live here instead
-# of the host Loki Tempo is wired to. Accepted tradeoff, not fixed further.
+# docker-compose.yml no longer runs its own Loki/Promtail at all — k8s's own Promtail DaemonSet
+# (k8s/promtail-daemonset.yaml) is now the only log shipper, for both branches, and with Grafana
+# and Tempo also in-cluster (k8s/grafana.yaml, k8s/tempo.yaml) every trace's tracesToLogsV2 jump
+# resolves against this same Loki — no more host/cluster split to work around.
 apiVersion: apps/v1
 kind: Deployment
 metadata:

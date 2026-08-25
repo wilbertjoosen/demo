@@ -1,0 +1,101 @@
+# In-cluster Tempo, single shared instance for both demo (prod) and demo-qa — same reasoning as
+# k8s/prometheus.yaml: one instance, not one per environment, so demo-qa's ArgoCD Application never
+# fights demo's over the same objects. Unlike Prometheus/Loki (pull/scrape-based), every traced
+# service pushes spans here directly over OTLP, so it needs Tempo's address the same way it needs
+# Kafka's or MySQL's — see k8s/configmap-common.yaml's OTLP_ENDPOINT (now pointing in-cluster
+# instead of at docker-compose's Tempo, which this replaces for both branches).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tempo-config
+  namespace: monitoring
+data:
+  tempo.yaml: |
+    server:
+      http_listen_port: 3200
+    distributor:
+      receivers:
+        otlp:
+          protocols:
+            http:
+            grpc:
+    ingester:
+      trace_idle_period: 10s
+    compactor:
+      compaction:
+        block_retention: 24h
+    storage:
+      trace:
+        backend: local
+        local:
+          path: /var/tempo/traces
+        wal:
+          path: /var/tempo/wal
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tempo
+  namespace: monitoring
+  labels: { app: tempo }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: tempo } }
+  template:
+    metadata: { labels: { app: tempo } }
+    spec:
+      containers:
+        - name: tempo
+          image: grafana/tempo:latest
+          args:
+            - -config.file=/etc/tempo/tempo.yaml
+          ports:
+            - { containerPort: 3200, name: http }
+            - { containerPort: 4317, name: otlp-grpc }
+            - { containerPort: 4318, name: otlp-http }
+          volumeMounts:
+            - { name: config, mountPath: /etc/tempo }
+            - { name: data, mountPath: /var/tempo }
+          resources:
+            requests: { cpu: "100m", memory: "256Mi" }
+            limits: { cpu: "500m", memory: "512Mi" }
+          readinessProbe:
+            httpGet: { path: /ready, port: 3200 }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /ready, port: 3200 }
+            initialDelaySeconds: 20
+            periodSeconds: 20
+      volumes:
+        - name: config
+          configMap: { name: tempo-config }
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tempo
+  namespace: monitoring
+spec:
+  selector: { app: tempo }
+  ports:
+    - { name: http, port: 3200, targetPort: 3200 }
+    - { name: otlp-grpc, port: 4317, targetPort: 4317 }
+    - { name: otlp-http, port: 4318, targetPort: 4318 }
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: tempo-ingress
+  namespace: monitoring
+spec:
+  rules:
+    - host: tempo.demo.localhost
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service: { name: tempo, port: { number: 3200 } }
