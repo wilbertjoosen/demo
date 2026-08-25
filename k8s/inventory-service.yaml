@@ -14,7 +14,7 @@ spec:
         - name: ghcr-pull-secret
       containers:
         - name: inventory-service
-          image: ghcr.io/wilbertjoosen/demo-inventory-service:1.0.1-d013bc7
+          image: ghcr.io/wilbertjoosen/demo-inventory-service:1.0.1-07c5cbd
           imagePullPolicy: Always
           ports: [{ containerPort: 8089 }]
           envFrom:
