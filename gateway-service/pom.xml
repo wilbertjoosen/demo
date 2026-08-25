@@ -65,6 +65,14 @@
         </dependency>
         <dependency>
             <!-- Required alongside the above — see common-security/pom.xml's comment.
+                 OtelTracer (needed by both OtlpTracingAutoConfiguration and
+                 OpenTelemetryTracingAutoConfiguration, the one that actually creates the Tracer bean)
+                 lives here, not in spring-boot-micrometer-tracing-opentelemetry itself. -->
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-tracing-bridge-otel</artifactId>
+        </dependency>
+        <dependency>
+            <!-- Required alongside the above — see common-security/pom.xml's comment.
                  OtlpTracingAutoConfiguration is @ConditionalOnClass on OtlpHttpSpanExporter, which
                  doesn't ship with spring-boot-micrometer-tracing-opentelemetry itself. -->
             <groupId>io.opentelemetry</groupId>

@@ -42,6 +42,19 @@
             <artifactId>spring-boot-micrometer-tracing-opentelemetry</artifactId>
         </dependency>
         <dependency>
+            <!-- Both OtlpTracingAutoConfiguration AND OpenTelemetryTracingAutoConfiguration (the one
+                 that actually creates the Tracer bean) are @ConditionalOnClass on OtelTracer, which
+                 lives here — confirmed missing from the actually-deployed jar's BOOT-INF/lib even
+                 after adding opentelemetry-exporter-otlp below (that fix alone was necessary but not
+                 sufficient: zero tracing-related log lines at all, not even a Tracer being created,
+                 because this half of the requirement was still missing). This is the artifact PR #17
+                 removed under the (at the time reasonable-looking, but incomplete) theory that
+                 spring-boot-micrometer-tracing-opentelemetry alone supplied the autoconfiguration — it
+                 does, but only once OtelTracer/OtlpHttpSpanExporter both also exist on the classpath. -->
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-tracing-bridge-otel</artifactId>
+        </dependency>
+        <dependency>
             <!-- OtlpTracingAutoConfiguration (in the artifact above) is @ConditionalOnClass on
                  OtlpHttpSpanExporter/OtlpGrpcSpanExporter — neither ships transitively with
                  spring-boot-micrometer-tracing-opentelemetry itself (confirmed: absent from this
