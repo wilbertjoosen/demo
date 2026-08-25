@@ -59,6 +59,13 @@ data:
   # Dockerfile.service's entrypoint wrapper via the io.pyroscope agent's PYROSCOPE_SERVER_ADDRESS
   # env var.
   PYROSCOPE_SERVER_ADDRESS: http://pyroscope.monitoring.svc.cluster.local:4040
+  # TEMPORARILY DISABLED (2026-08-25): io.pyroscope:agent:2.1.2's bundled async-profiler build
+  # SIGSEGVs immediately on startup on this cluster's JDK 26 + linux/arm64 combination
+  # (Recording::writeCpool native crash, confirmed identical on eureka-server/gateway-service/
+  # product-review-service in demo-qa) — crash-loops every service that picks up the agent. Agent
+  # wiring stays in Dockerfile.service for when a compatible async-profiler/JDK/arch combination is
+  # found; this just keeps the JVM from loading the profiler at all in the meantime.
+  PYROSCOPE_AGENT_ENABLED: "false"
   # Task #75, real secrets management — Vault dev-mode instance, single node, shared across prod
   # and QA the same way Tempo is above (one throwaway local Vault, not per-environment), now
   # in-cluster (k8s/vault.yaml on the main branch) and reached cross-namespace. The token itself is
