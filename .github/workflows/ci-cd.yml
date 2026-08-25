@@ -10,7 +10,12 @@ on:
     # triggers on develop pushes/PRs for test-only validation — this file doesn't need to.
     branches: [main, testing]
   pull_request:
-    branches: [main]
+    # testing included so a PR into testing gets pre-merge validation (changes/backend-test/
+    # frontend-test) before it triggers testing's own real build-and-push on merge — previously
+    # missing, so PRs like #31 merged with zero CI signal beforehand. build-and-push itself still
+    # only runs on an actual push to testing (see its own `if:` below), so adding this doesn't
+    # start building images from a PR.
+    branches: [main, testing]
   # Manual "rebuild + redeploy everything" — e.g. after a change that doesn't touch any single
   # service's own path (a Dockerfile fix, a versioning-scheme change) but every service still needs
   # picking up, OR a genuine hotfix committed directly to main that has no tested-in-QA artifact to
