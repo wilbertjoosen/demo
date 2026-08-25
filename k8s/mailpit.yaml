@@ -47,3 +47,22 @@ spec:
   ports:
     - { name: smtp, port: 1025, targetPort: 1025 }
     - { name: http, port: 8025, targetPort: 8025 }
+---
+# Web UI ingress — this instance is where Grafana's email alerting (k8s/grafana.yaml) is pointed,
+# since Grafana is one shared instance across demo/demo-qa but Mailpit is genuinely per-environment
+# (see this file's header comment); fired alert emails land here regardless of which namespace
+# they're about.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mailpit-ingress
+  namespace: infra
+spec:
+  rules:
+    - host: mailpit.demo.localhost
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service: { name: mailpit, port: { number: 8025 } }

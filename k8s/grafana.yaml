@@ -32,6 +32,7 @@ data:
     apiVersion: 1
     datasources:
       - name: Prometheus
+        uid: prometheus
         type: prometheus
         access: proxy
         url: http://prometheus.monitoring.svc.cluster.local:9090
@@ -409,6 +410,112 @@ data:
       ]
     }
 ---
+# Grafana-managed (unified) alerting, provisioned the same file-based way as datasources/
+# dashboards above — see https://grafana.com/docs/grafana/latest/alerting/set-up/provision-alerting-resources/.
+# Two rules for now (P1): instance-down and a 5xx-error-rate threshold, both backed by metrics
+# Prometheus already scrapes today. A third rule (PVC disk pressure) is deliberately not here yet —
+# it needs kubelet/cAdvisor or kube-state-metrics data that doesn't exist until P2's node-exporter/
+# kube-state-metrics work lands; a rule with no matching series would just silently never fire.
+#
+# Delivery is email via Mailpit (k8s/mailpit.yaml) — already in-cluster as a local SMTP catcher, no
+# auth, so no real credentials needed. View fired alert emails at mailpit.demo.localhost. Swap the
+# GF_SMTP_HOST/contact-point address below for a real SMTP relay when actual delivery is wanted.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-alerting
+  namespace: monitoring
+data:
+  contactpoints.yaml: |
+    apiVersion: 1
+    contactPoints:
+      - orgId: 1
+        name: email-alerts
+        receivers:
+          - uid: email-alerts-receiver
+            type: email
+            settings:
+              addresses: alerts@demo.local
+  notification-policies.yaml: |
+    apiVersion: 1
+    policies:
+      - orgId: 1
+        receiver: email-alerts
+        group_by: ["alertname"]
+        group_wait: 30s
+        group_interval: 5m
+        repeat_interval: 4h
+  rules.yaml: |
+    apiVersion: 1
+    groups:
+      - orgId: 1
+        name: demo-alerts
+        folder: Demo Alerts
+        interval: 1m
+        rules:
+          - uid: instance-down
+            title: Instance Down
+            condition: C
+            noDataState: NoData
+            execErrState: Alerting
+            for: 2m
+            labels:
+              severity: critical
+            annotations:
+              summary: "{{ $labels.app }} instance down in namespace {{ $labels.namespace }}"
+            data:
+              - refId: A
+                relativeTimeRange: { from: 300, to: 0 }
+                datasourceUid: prometheus
+                model:
+                  refId: A
+                  expr: up{job="kubernetes-pods"}
+                  instant: true
+                  intervalMs: 1000
+                  maxDataPoints: 43200
+              - refId: C
+                relativeTimeRange: { from: 300, to: 0 }
+                datasourceUid: "__expr__"
+                model:
+                  refId: C
+                  type: classic_conditions
+                  conditions:
+                    - evaluator: { type: lt, params: [1] }
+                      operator: { type: and }
+                      query: { params: ["A"] }
+                      reducer: { type: last, params: [] }
+          - uid: high-5xx-rate
+            title: High 5xx Error Rate
+            condition: C
+            noDataState: NoData
+            execErrState: Alerting
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "{{ $labels.app }} in {{ $labels.namespace }} has >5% 5xx error rate"
+            data:
+              - refId: A
+                relativeTimeRange: { from: 300, to: 0 }
+                datasourceUid: prometheus
+                model:
+                  refId: A
+                  expr: sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m])) by (app, namespace) / sum(rate(http_server_requests_seconds_count[5m])) by (app, namespace)
+                  instant: true
+                  intervalMs: 1000
+                  maxDataPoints: 43200
+              - refId: C
+                relativeTimeRange: { from: 300, to: 0 }
+                datasourceUid: "__expr__"
+                model:
+                  refId: C
+                  type: classic_conditions
+                  conditions:
+                    - evaluator: { type: gt, params: [0.05] }
+                      operator: { type: and }
+                      query: { params: ["A"] }
+                      reducer: { type: last, params: [] }
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -428,10 +535,20 @@ spec:
           ports: [{ containerPort: 3000 }]
           envFrom:
             - secretRef: { name: grafana-admin }
+          # SMTP via the in-cluster Mailpit (k8s/mailpit.yaml) — a local catcher, no auth, so no
+          # real credentials belong here. Alert emails land in Mailpit's own web UI
+          # (mailpit.demo.localhost), not a real inbox — swap GF_SMTP_HOST for a real relay (and add
+          # GF_SMTP_USER/PASSWORD via a Secret, same pattern as grafana-admin) for actual delivery.
+          env:
+            - { name: GF_SMTP_ENABLED, value: "true" }
+            - { name: GF_SMTP_HOST, value: "mailpit.infra.svc.cluster.local:1025" }
+            - { name: GF_SMTP_FROM_ADDRESS, value: "alerts@demo.local" }
+            - { name: GF_SMTP_FROM_NAME, value: "Grafana Alerting (demo)" }
           volumeMounts:
             - { name: datasources, mountPath: /etc/grafana/provisioning/datasources }
             - { name: dashboard-provider, mountPath: /etc/grafana/provisioning/dashboards }
             - { name: dashboards, mountPath: /etc/grafana/dashboards }
+            - { name: alerting, mountPath: /etc/grafana/provisioning/alerting }
             - { name: data, mountPath: /var/lib/grafana }
           resources:
             requests: { cpu: "100m", memory: "256Mi" }
@@ -451,6 +568,8 @@ spec:
           configMap: { name: grafana-dashboard-provider }
         - name: dashboards
           configMap: { name: grafana-dashboards }
+        - name: alerting
+          configMap: { name: grafana-alerting }
         - name: data
           persistentVolumeClaim: { claimName: grafana-data }
 ---
