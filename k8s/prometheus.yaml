@@ -3,12 +3,12 @@
 # for the same reason: one cluster-wide instance, not one per environment, to avoid the demo-qa
 # ArgoCD Application fighting the demo one over the same ClusterRole/ClusterRoleBinding names).
 #
-# Runs INSIDE the cluster rather than alongside docker-compose.yml's Prometheus (which stays,
-# unchanged, covering the host-JVM/docker-compose dev flow) — pod IPs on the k3d overlay network
-# turned out not to be reachable from a container outside the cluster at all, discovery-via-API-
-# server notwithstanding. Grafana (still in docker-compose) reaches this one through the k3d
-# ingress at prometheus.demo.localhost, same port (18090) as everything else, routed by hostname.
-# The "monitoring" namespace itself is k8s/namespace-monitoring.yaml, not declared here.
+# Originally split from docker-compose.yml's own Prometheus because pod IPs on the k3d overlay
+# network turned out not to be reachable from a container outside the cluster at all,
+# discovery-via-API-server notwithstanding. Grafana (k8s/grafana.yaml, also now in-cluster) reaches
+# this one directly over in-cluster DNS — docker-compose no longer runs its own Prometheus/Grafana
+# at all; both branches' docker-compose.yml only covers datastores/broker/mail for the host-JVM dev
+# flow now. The "monitoring" namespace itself is k8s/namespace-monitoring.yaml, not declared here.
 apiVersion: v1
 kind: ServiceAccount
 metadata:
