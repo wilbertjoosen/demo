@@ -319,6 +319,12 @@ QA-flavored Mongo today, so this is currently a documented capability more than 
 
 Realm: `demo`. Client: `demo-spa` (public, PKCE).
 
+The login page itself uses a custom "demo" theme (`docker/keycloak/themes/demo`) instead of stock
+Keycloak branding — purple accent/button matching the frontend's own palette, realm `displayName`
+("Demo") shown in place of the Keycloak wordmark. See the theme's own `styles.css` comment for why
+it extends `keycloak.v2` via `@import` rather than the more obvious-looking `styles=` override
+(the latter silently drops the base theme's layout rules).
+
 > **Two separate Keycloak instances, deliberately different hostnames:** docker-compose's own
 > Keycloak (used by both local-dev flows — Option A host-JVM and Option B full-compose) answers on
 > `http://keycloak.localhost:8181`, while the k3d/k8s cluster's Keycloak answers on
