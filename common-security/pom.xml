@@ -29,6 +29,16 @@
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
             <version>3.1.0</version>
         </dependency>
+        <dependency>
+            <!-- The autoconfiguration that actually wires up a Tracer/OTLP span exporter in Boot 4.x
+                 lives specifically in this artifact — micrometer-tracing-bridge-otel +
+                 opentelemetry-exporter-otlp alone register no autoconfiguration (verified: neither
+                 jar's META-INF/spring/...AutoConfiguration.imports lists anything OTLP-related).
+                 One place to add it for every service behind common-security, same as
+                 gateway-service getting it directly since it doesn't depend on this module. -->
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-micrometer-tracing-opentelemetry</artifactId>
+        </dependency>
     </dependencies>
 
 </project>

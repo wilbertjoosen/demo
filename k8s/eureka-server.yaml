@@ -17,11 +17,6 @@ spec:
           image: ghcr.io/wilbertjoosen/demo-eureka-server:31a854c1d3857860b1085cf7a802be02cab0984f
           imagePullPolicy: IfNotPresent
           ports: [{ containerPort: 8761 }]
-          env:
-            # Only var this needs — deliberately not pulling in the rest of demo-common-config
-            # (DB_HOST, KAFKA_BOOTSTRAP_SERVERS, ...) for a service that doesn't use any of it.
-            - name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
-              value: http://tempo.monitoring.svc.cluster.local:4318/v1/traces
           resources:
             requests: { cpu: "100m", memory: "256Mi" }
             limits: { cpu: "500m", memory: "384Mi" }
