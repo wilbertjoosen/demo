@@ -246,6 +246,12 @@ QA-flavored Mongo today, so this is currently a documented capability more than 
 
 Realm: `demo` (prod) / `demo-qa` (QA) — same users/passwords in both. Client: `demo-spa` (public, PKCE).
 
+The login page itself uses a custom "demo" theme (`docker/keycloak/themes/demo`) instead of stock
+Keycloak branding — purple accent/button matching the frontend's own palette, realm `displayName`
+("Demo" / "Demo QA") shown in place of the Keycloak wordmark. See the theme's own `styles.css`
+comment for why it extends `keycloak.v2` via `@import` rather than the more obvious-looking
+`styles=` override (the latter silently drops the base theme's layout rules).
+
 ## Useful URLs
 
 | Tool | URL | Credentials |
@@ -261,8 +267,9 @@ Realm: `demo` (prod) / `demo-qa` (QA) — same users/passwords in both. Client: 
 | Tempo (prod + QA) | http://tempo.demo.localhost:18090 | — |
 | Kibana (host-JVM/compose) | http://localhost:5601 | — |
 | Kibana (k8s, prod + QA) | http://kibana.demo.localhost:18090 | — |
+| Pyroscope (prod + QA) | http://pyroscope.demo.localhost:18090 | — continuous profiling, toggle per-env via `PYROSCOPE_AGENT_ENABLED` |
 | Kafka UI | http://localhost:8095 | prod Kafka only — QA's Kafka has no UI wired up |
-| Mailpit (SMTP inbox, prod) | http://localhost:8025 | — |
+| Mailpit (SMTP inbox, prod) | http://localhost:8025 / http://mailpit.demo.localhost:18090 | — also where Grafana alert emails land |
 | Mailpit (SMTP inbox, QA) | http://localhost:8026 | — |
 | Rancher (k8s, in-cluster) | https://localhost:9443 | bootstrap password `rancherdemo123` (set via `CATTLE_BOOTSTRAP_PASSWORD` in `k8s-rancher/rancher.yaml`) |
 | ArgoCD | http://argocd.localhost:18090 (via `k8s-argocd/ingress.yaml`) | `admin` / `kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' \| base64 -d` — manages two Applications, `demo` (prod) and `demo-qa` |
@@ -479,14 +486,42 @@ flowchart LR
 - **Metrics**: every service exposes `/actuator/prometheus`. A single Prometheus runs *inside* the
   k3d cluster (`k8s/prometheus.yaml`, namespace `monitoring`), covering the k8s-deployed services in
   **both** `demo` and `demo-qa`, discovered via `kubernetes_sd_configs` (`role: pod`, opted in by the
-  `monitored: "true"` label most manifests already carry) and labeled by `namespace`. `docker-compose.yml`
-  has no Prometheus of its own — pod IPs on the k3d overlay network aren't reachable from outside the
-  cluster at all, so a host-side instance couldn't scrape them anyway. Grafana (`k8s/grafana.yaml`,
-  same namespace, also the only Grafana — nothing in `docker-compose.yml` duplicates it) has this as
-  its default datasource, plus two pre-provisioned dashboards (embedded directly in the manifest):
-  "Services Overview" and **"Kubernetes Overview (prod vs QA)"** — the latter has a `namespace`
-  filter variable and puts prod/QA side by side in the top row (Services Up/Down for each), so
-  environment health is a single glance, not two separate dashboards.
+  `monitored: "true"` label most manifests already carry) and labeled by `namespace`. Cluster-level
+  metrics come from `kube-state-metrics` (`k8s/kube-state-metrics.yaml` — object state: deployment
+  replica counts, pod phases, PVC status) and `node-exporter` (`k8s/node-exporter.yaml` — host-level
+  CPU/memory/disk), both scraped as their own jobs; a `kubelet`/cAdvisor scrape job for per-node
+  `container_*`/`kubelet_volume_stats_*` metrics exists in the same file but is currently commented
+  out (it monopolized the control-plane node's CPU during a mass-restart incident — see the comment
+  above it for the re-enable condition). `docker-compose.yml` has no Prometheus of its own — pod IPs
+  on the k3d overlay network aren't reachable from outside the cluster at all, so a host-side instance
+  couldn't scrape them anyway. Grafana (`k8s/grafana.yaml`, same namespace, also the only Grafana —
+  nothing in `docker-compose.yml` duplicates it) has this as its default datasource, plus two
+  pre-provisioned dashboards (embedded directly in the manifest): "Services Overview" and
+  **"Kubernetes Overview (prod vs QA)"** — the latter has a `namespace` filter variable and puts
+  prod/QA side by side in the top row (Services Up/Down for each), so environment health is a single
+  glance, not two separate dashboards.
+- **Alerting**: Grafana's unified alerting (`k8s/grafana.yaml`'s `grafana-alerting` ConfigMap,
+  file-provisioned — no UI clicking, and note it does **not** hot-reload on ConfigMap changes, a full
+  pod restart is needed) fires three rules against Prometheus: `instance-down` (`up == 0` for 2m),
+  `high-5xx-rate` (5xx ratio > 5% for 5m), and `pvc-disk-pressure` (PVC usage > 85% for 5m, needs the
+  kubelet volume-stats scrape job above). Delivery is by email through Mailpit (`k8s/mailpit.yaml`'s
+  `mailpit-ingress`, http://mailpit.demo.localhost:18090) — a real inbox to check, not a webhook you
+  have to trust fired correctly.
+- **Continuous profiling**: every service ships an embedded Pyroscope Java agent (JFR-based, not
+  async-profiler — the latter SIGSEGVs on JDK 26/arm64, see the agent's own comment in
+  `k8s/configmap-common.yaml`) to the in-cluster Pyroscope (`k8s/pyroscope.yaml`, `monitoring`
+  namespace, single shared instance for both environments) — http://pyroscope.demo.localhost:18090.
+  Toggle per-environment via the `PYROSCOPE_AGENT_ENABLED` key in each namespace's `pyroscope-agent`
+  Secret (pod restart required to pick up a change, same as every other `envFrom`/`secretRef` in this
+  stack) — useful to disable under CPU pressure, since profiling isn't free. Ingestion is rate-limited
+  server-side (`limits.ingestion_rate_mb`/`ingestion_burst_size_mb` in the ConfigMap) generously above
+  a full mass-restart's simultaneous JFR-snapshot burst, after the default limits caused a client-side
+  retry storm during exactly that scenario.
+- **Load testing**: `k8s/k6.yaml` ships a k6 script (`smoke-test.js`, 5 VUs / 30s against
+  `/actuator/health/readiness`) as a `CronJob` with `schedule: "0 0 1 1 *"` and `suspend: true` — it
+  never runs on its own, it's a git-committed, ready-to-trigger template. Run it on demand with
+  `kubectl create job --from=cronjob/k6-load-test <name> -n monitoring`; results are pushed to
+  Prometheus via `--out experimental-prometheus-rw`, queryable/graphable like any other metric.
 - **Logs**: services log to stdout; in k8s, Promtail (`k8s/promtail-daemonset.yaml`, one shared
   instance, not per-environment) ships every pod's logs — from both namespaces — to the in-cluster
   Loki (`k8s/loki.yaml`, namespace `monitoring`), labeled by `namespace`. Query through Grafana's
@@ -496,7 +531,14 @@ flowchart LR
   every log line once `micrometer-tracing` is on the classpath (`common-security`/`gateway-service`
   poms), and since Grafana, Loki, and Tempo are now all the same in-cluster instances for both
   environments, a trace's `tracesToLogsV2` jump always resolves against the exact Loki that received
-  its originating service's logs — no split to work around.
+  its originating service's logs — no split to work around. Every JWT-authenticated request is also
+  tagged with the OTel semantic convention `enduser.id` (the Keycloak user's subject claim,
+  `common-security`'s `EndUserIdTracingFilter`) — filter Grafana's Explore/Tempo search with
+  `{ span.enduser.id = "<user-id>" }` to pull every trace for one user across every service. Keycloak
+  itself also exports native OTel traces (`KC_TRACING_ENABLED`/`KC_TRACING_ENDPOINT`/
+  `KC_TRACING_SAMPLER_RATIO`, sourced from the `keycloak-tracing` Secret so the sample ratio can be
+  retuned without a git commit) — its own spans use `kc.clientId`/`kc.realmName`/`kc.sessionId`, not
+  `enduser.id`, so the two are complementary, not overlapping.
 - **Audit trail**: every REST call across every service is captured (who, what, when, request/response
   bodies with secrets redacted) and shipped to Elasticsearch — index `audit-log` for prod, `audit-log-qa`
   for QA (same shared in-cluster ES instance, `k8s/elasticsearch.yaml`, see
