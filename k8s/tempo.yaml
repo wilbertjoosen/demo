@@ -10,6 +10,14 @@
 # this single-binary, local-storage config below is written against (same incompatibility
 # docker-compose.yml's own former Tempo container already had a comment about, for the exact same
 # reason) — 2.7.1 is the last 2.x release and matches this config's schema.
+#
+# otlp receiver endpoints are explicit (0.0.0.0), not left to Tempo's own default — confirmed live
+# that an empty `http:`/`grpc:` block makes Tempo bind its OTLP receivers to localhost:4318/4317
+# ("Starting HTTP server" / "Starting GRPC server" ... endpoint=localhost:*** in its own logs), which
+# only accepts connections from inside the same network namespace. The Service/Endpoints still
+# looked correctly wired (routes to the pod's real IP), so every service's span export just got a
+# silent "connection refused" cluster-wide — no traces ever reached storage despite everything else
+# (config, DNS, DNS resolution, the endpoint value itself) being correct.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -24,7 +32,9 @@ data:
         otlp:
           protocols:
             http:
+              endpoint: 0.0.0.0:4318
             grpc:
+              endpoint: 0.0.0.0:4317
     ingester:
       trace_idle_period: 10s
     compactor:
