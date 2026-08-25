@@ -27,6 +27,7 @@ spec:
           ports: [{ containerPort: 8095 }]
           envFrom:
             - configMapRef: { name: demo-common-config }
+            - secretRef: { name: pyroscope-agent }
           env:
             - { name: EUREKA_INSTANCE_HOSTNAME, value: reporting-service }
             # RocksDB state store dir — must be on the mounted volume below, not the container's
