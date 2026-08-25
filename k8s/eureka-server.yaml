@@ -23,6 +23,10 @@ spec:
           # in sync with every other service's.
           envFrom:
             - secretRef: { name: pyroscope-agent }
+          # PYROSCOPE_PROFILER_TYPE=JFR — see configmap-common.yaml's comment for why (ASYNC's
+          # bundled native library SIGSEGVs on this cluster's JDK 26 + linux/arm64).
+          env:
+            - { name: PYROSCOPE_PROFILER_TYPE, value: JFR }
           ports: [{ containerPort: 8761 }]
           resources:
             requests: { cpu: "100m", memory: "256Mi" }
