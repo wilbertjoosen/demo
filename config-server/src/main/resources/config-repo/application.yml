@@ -62,6 +62,13 @@ management:
       # Demo-scale traffic — trace every request rather than tuning a sample rate. Drop this well
       # below 1.0 before this ever carries real production load.
       probability: 1.0
-  otlp:
+  opentelemetry:
     tracing:
-      endpoint: ${OTEL_EXPORTER_OTLP_TRACES_ENDPOINT:http://localhost:4318/v1/traces}
+      export:
+        otlp:
+          # Verified against the actual Spring Boot 4.1 OtlpTracingProperties class: this Boot
+          # version's tracing autoconfiguration (spring-boot-micrometer-tracing-opentelemetry, see
+          # common-security/pom.xml) exposes the endpoint under
+          # management.opentelemetry.tracing.export.otlp, not management.otlp.tracing — that prefix
+          # doesn't exist here and would silently bind nothing.
+          endpoint: ${OTEL_EXPORTER_OTLP_TRACES_ENDPOINT:http://localhost:4318/v1/traces}
