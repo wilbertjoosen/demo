@@ -54,6 +54,11 @@ data:
   # every service picks this up. Was http://host.k3d.internal:4318/v1/traces (docker-compose's own
   # Tempo) before Grafana/Loki/Prometheus/Tempo all moved in-cluster.
   OTLP_ENDPOINT: http://tempo.monitoring.svc.cluster.local:4318/v1/traces
+  # Pyroscope continuous-profiling server, same shared single-instance reasoning as Tempo above
+  # (one cluster-wide monitoring-namespace resource, not per-environment) — picked up by
+  # Dockerfile.service's entrypoint wrapper via the io.pyroscope agent's PYROSCOPE_SERVER_ADDRESS
+  # env var.
+  PYROSCOPE_SERVER_ADDRESS: http://pyroscope.monitoring.svc.cluster.local:4040
   # Task #75, real secrets management — Vault dev-mode instance, single node, shared across prod
   # and QA the same way Tempo is above (one throwaway local Vault, not per-environment), now
   # in-cluster (k8s/vault.yaml on the main branch) and reached cross-namespace. The token itself is
