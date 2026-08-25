@@ -47,10 +47,13 @@ data:
   MAIL_PORT: "1025"
   INVENTORY_SERVICE_URI: http://inventory-service:8089
   CORS_ALLOWED_ORIGINS: http://qa.demo.localhost:18090
-  # Tempo's OTLP/HTTP receiver, running alongside Grafana/Loki/Prometheus in docker-compose —
-  # shared across prod and QA (same Tempo instance) — see config-server's config-repo/application.yml
-  # for how every service picks this up.
-  OTLP_ENDPOINT: http://host.k3d.internal:4318/v1/traces
+  # In-cluster Tempo's OTLP/HTTP receiver (main's k8s/tempo.yaml, monitoring namespace) — shared
+  # across prod and QA (same Tempo instance, one of the cluster-wide "monitoring" namespace
+  # resources main's own ArgoCD Application owns; see main's k8s/prometheus.yaml's comment for why
+  # this branch doesn't get its own copy) — see config-server's config-repo/application.yml for how
+  # every service picks this up. Was http://host.k3d.internal:4318/v1/traces (docker-compose's own
+  # Tempo) before Grafana/Loki/Prometheus/Tempo all moved in-cluster.
+  OTLP_ENDPOINT: http://tempo.monitoring.svc.cluster.local:4318/v1/traces
   # Task #75, real secrets management — Vault dev-mode instance, single node, shared across prod
   # and QA the same way Tempo is above (one throwaway local Vault, not per-environment), now
   # in-cluster (k8s/vault.yaml on the main branch) and reached cross-namespace. The token itself is

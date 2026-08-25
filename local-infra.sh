@@ -11,36 +11,30 @@ INFRASTRUCTURE=(
     "mongo-rs-init"
     "kafka"
     "kafka-ui"
-    "loki"
-    "prometheus"
     "keycloak"
     "mailpit"
-    "promtail"
     "elasticsearch"
     "redis"
     "vault"
     "vault-init"
-    "grafana"
-    "tempo"
     "kibana"
 )
 
-# Of the above, the ones k8s pods no longer depend on — Grafana/Tempo/Kibana are the only pieces
-# still reached by pods via host.k3d.internal now (see k8s/configmap-common.yaml); everything else
-# moved in-cluster: Kafka, Redis, MySQL, Keycloak, Mailpit, Vault (k8s/kafka.yaml, k8s/redis.yaml,
-# and — cross-namespace from main's demo namespace — MySQL/Keycloak/Vault, plus this namespace's
-# own k8s/mailpit.yaml), and now MongoDB and Elasticsearch too (also cross-namespace from main's
-# demo namespace). kafka-ui only makes sense once kafka itself is reachable from the host; this
-# compose file's own "prometheus" and "loki" are the host-JVM/compose-flow instances specifically —
-# k8s has its own separate in-cluster ones (k8s/prometheus.yaml, k8s/loki.yaml on the main branch,
-# shared cluster-wide); "promtail" only ships logs to this file's own "loki" (k8s pods get their
-# own logs shipped by the in-cluster k8s/promtail-daemonset.yaml instead, a cluster-wide resource
-# defined on the main branch, not per-namespace).
+# Of the above, the ones k8s pods no longer depend on — Kibana is the only piece still reached by
+# pods via host.k3d.internal now (see k8s/configmap-common.yaml); everything else moved in-cluster:
+# Kafka, Redis, MySQL, Keycloak, Mailpit, Vault (k8s/kafka.yaml, k8s/redis.yaml, and — cross-namespace
+# from main's demo namespace — MySQL/Keycloak/Vault, plus this namespace's own k8s/mailpit.yaml), and
+# now MongoDB and Elasticsearch too (also cross-namespace from main's demo namespace). kafka-ui only
+# makes sense once kafka itself is reachable from the host. Grafana/Prometheus/Loki/Promtail/Tempo
+# used to be here too — now fully in-cluster, a single shared instance for both prod and QA owned by
+# main's own ArgoCD Application (k8s/grafana.yaml, k8s/prometheus.yaml, k8s/loki.yaml,
+# k8s/promtail-daemonset.yaml, k8s/tempo.yaml, all on the main branch) — this branch never gets its
+# own copies (see main's k8s/prometheus.yaml's comment), so there's no docker-compose service left to
+# toggle for any of them.
 DEV_ONLY_INFRASTRUCTURE=(
     "kafka"
     "kafka-ui"
     "redis"
-    "prometheus"
     "mysql"
     "keycloak"
     "mailpit"
@@ -51,8 +45,6 @@ DEV_ONLY_INFRASTRUCTURE=(
     "mongo3"
     "mongo-rs-init"
     "elasticsearch"
-    "loki"
-    "promtail"
 )
 
 # What a k8s-only workflow (k8s-local.sh's default) actually needs: INFRASTRUCTURE minus
