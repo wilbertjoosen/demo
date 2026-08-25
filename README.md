@@ -189,14 +189,15 @@ Docker Compose infra containers, `--services` builds and runs (or stops) the bac
 frontend dev server, and running either script with no flags does both. `k8s-local.sh start|stop|restart|status`
 manages the k3d cluster together with the host infra it depends on — `--no-watch` skips the
 post-start `kubectl get pods -A -w` and returns immediately. `start`/`stop` only touch the infra
-pods actually need now (just Grafana and Tempo) — not docker-compose's own app containers
-(Option B, irrelevant when using k8s) and not the pieces that are dev-only now that Kafka, Redis,
-MySQL, Keycloak, Mailpit, Vault, MongoDB, Elasticsearch, and Kibana all run in-cluster
-(docker-compose's own Prometheus/Loki/Promtail are dev-only too — k8s has its own separate
-Prometheus and Loki, `k8s/prometheus.yaml`/`k8s/loki.yaml`, and its own Promtail,
-`k8s/promtail-daemonset.yaml`). Pass `--with-dev` to also start/stop those, e.g. if
-`start-local.sh`'s host-JVM services are running against the same docker-compose stack at the same
-time.
+pods actually need now (just Mailpit's docker-compose copy, used for host-JVM debugging — k8s pods
+reach their own in-cluster Mailpit instead) — not docker-compose's own app containers (Option B,
+irrelevant when using k8s) and not the pieces that are dev-only now that Kafka, Redis, MySQL,
+Keycloak, Vault, MongoDB, Elasticsearch, and Kibana all run in-cluster. Grafana, Prometheus, Loki,
+Promtail, and Tempo aren't docker-compose services at all anymore — they're fully in-cluster
+(`k8s/grafana.yaml`, `k8s/prometheus.yaml`, `k8s/loki.yaml`, `k8s/promtail-daemonset.yaml`,
+`k8s/tempo.yaml`), a single shared instance for both prod and QA. Pass `--with-dev` to also
+start/stop the dev-only pieces, e.g. if `start-local.sh`'s host-JVM services are running against
+the same docker-compose stack at the same time.
 
 ## Config profiles: local / testing / production
 
@@ -254,10 +255,10 @@ Realm: `demo` (prod) / `demo-qa` (QA) — same users/passwords in both. Client: 
 | Frontend (k8s, QA) | http://qa.demo.localhost:18090 | — (realm `demo-qa`, same users as above) |
 | Keycloak admin | http://localhost:8081 | `admin` / `admin` (realm: **`demo`** for prod, **`demo-qa`** for QA — not `master`, see note below) |
 | Swagger UI (aggregated) | http://localhost:8080/swagger-ui.html | — |
-| Grafana | http://localhost:3000 | `admin` / `admin` — datasources: **Prometheus**/**Loki** (host-JVM/compose flow), **Prometheus (k8s)**/**Loki (k8s)** (both k8s namespaces), **Tempo** (traces from both flows — trace-to-logs jump only resolves for host-JVM/compose-originated traces, see `k8s/loki.yaml`'s comment) |
-| Prometheus (host-JVM/compose) | http://localhost:9090 | — |
-| Prometheus (k8s, prod + QA) | http://prometheus.demo.localhost:18090 | — |
-| Loki (k8s, prod + QA) | http://loki.demo.localhost:18090 | — |
+| Grafana (prod + QA) | http://grafana.demo.localhost:18090 | Secret `grafana-admin` in the `monitoring` namespace (create it yourself, see `k8s/grafana.yaml`'s comment) — datasources: **Prometheus**, **Loki**, **Tempo** (traces from both namespaces, trace-to-logs jump always resolves — no more host/cluster split) |
+| Prometheus (prod + QA) | http://prometheus.demo.localhost:18090 | — |
+| Loki (prod + QA) | http://loki.demo.localhost:18090 | — |
+| Tempo (prod + QA) | http://tempo.demo.localhost:18090 | — |
 | Kibana (host-JVM/compose) | http://localhost:5601 | — |
 | Kibana (k8s, prod + QA) | http://kibana.demo.localhost:18090 | — |
 | Kafka UI | http://localhost:8095 | prod Kafka only — QA's Kafka has no UI wired up |
@@ -287,7 +288,6 @@ for host-JVM/`start-local.sh` debugging.
 | Redis (host / dev, prod) | `localhost:6379` | **dev-only**; prod k8s pods use their own in-cluster Redis (`k8s/redis.yaml`, `infra` namespace) |
 | Redis (host / dev, QA) | `localhost:6380` | **dev-only**; QA's own separate in-cluster Redis (`demo-qa` namespace) |
 | Elasticsearch (host / dev) | `localhost:9200` | `demo-elasticsearch` — `audit-service`'s store, index `audit-log` (prod) / `audit-log-qa` (QA); **dev-only**, in-cluster instance is shared cross-namespace, now in the `infra` namespace |
-| Loki (host / dev) | `localhost:3100` | `demo-loki`; **dev-only** for k8s — query via Grafana's Explore tab; k8s pods' logs go to the separate in-cluster Loki instead (see the Loki (k8s) row in Useful URLs above) |
 | Mailpit SMTP (host / dev, prod) | `localhost:1025` | `demo-mailpit`; **dev-only**, prod's in-cluster Mailpit (`k8s/mailpit.yaml`, `infra` namespace) is what `notification-service` sends to in k8s |
 | Mailpit SMTP (host / dev, QA) | `localhost:1026` | **dev-only**; QA's own in-cluster Mailpit (`demo-qa` namespace) |
 | Vault (host / dev) | `localhost:8200` | `demo-vault`, fixed dev root token; **dev-only**, in-cluster instance is shared cross-namespace, now in the `infra` namespace |
@@ -413,9 +413,11 @@ flowchart LR
             MAILPIT_PROD["Mailpit (prod-only)"]
         end
         subgraph MON["namespace: monitoring — cluster-wide, shared by both"]
-            PROM_K8S["Prometheus (k8s)"]
-            LOKI_K8S["Loki (k8s)"]
-            KIBANA_K8S["Kibana (k8s)"]
+            PROM_K8S["Prometheus"]
+            LOKI_K8S["Loki"]
+            TEMPO_K8S["Tempo"]
+            GRAFANA["Grafana"]
+            KIBANA_K8S["Kibana"]
         end
         ARGO_PROD["ArgoCD app: demo"]
         ARGO_QA["ArgoCD app: demo-qa"]
@@ -426,9 +428,10 @@ flowchart LR
     ARGO_PROD --> APPS_PROD
     ARGO_QA --> APPS_QA
 
-    APPS_PROD --> MYSQL & MONGO & ES & KC & VAULT & KAFKA_PROD & REDIS_PROD & MAILPIT_PROD
-    APPS_QA --> KAFKA_QA & REDIS_QA & MAILPIT_QA
+    APPS_PROD --> MYSQL & MONGO & ES & KC & VAULT & KAFKA_PROD & REDIS_PROD & MAILPIT_PROD & TEMPO_K8S
+    APPS_QA --> KAFKA_QA & REDIS_QA & MAILPIT_QA & TEMPO_K8S
     APPS_QA -. "cross-namespace Service DNS" .-> MYSQL & MONGO & ES & KC & VAULT
+    GRAFANA --> PROM_K8S & LOKI_K8S & TEMPO_K8S
 ```
 
 - **Branch model**: `main` is production (bugfixes branch from here); `develop` is where feature
@@ -464,35 +467,36 @@ flowchart LR
 - **`demo_qa` database creation** on the shared in-cluster MySQL is handled automatically by a Job
   (`mysql-create-qa-db` in `k8s/mysql.yaml`) rather than a manual step. MongoDB and Elasticsearch
   need no equivalent step — both auto-create on first write.
-- **Excluded from QA on purpose**: `promtail-daemonset.yaml`, `prometheus.yaml`, `loki.yaml`, and
-  `kibana.yaml` are cluster-wide, single-shared-instance resources (see
-  [Observability](#observability)) — duplicating them per environment would just make the `demo`
-  and `demo-qa` Applications fight over the same ClusterRole/ClusterRoleBinding names
+- **Excluded from QA on purpose**: `promtail-daemonset.yaml`, `prometheus.yaml`, `loki.yaml`,
+  `grafana.yaml`, `tempo.yaml`, and `kibana.yaml` are cluster-wide, single-shared-instance resources
+  (see [Observability](#observability)) — duplicating them per environment would just make the
+  `demo` and `demo-qa` Applications fight over the same ClusterRole/ClusterRoleBinding names
   (`promtail-daemonset.yaml`, `prometheus.yaml`) or the same `infra`/`monitoring` Namespace objects
   (`namespace-infra.yaml`, `namespace-monitoring.yaml`).
 
 ## Observability
 
-- **Metrics**: every service exposes `/actuator/prometheus`. Two separate Prometheus instances cover
-  two separate deploy modes — `docker-compose.yml`'s (static targets, `host.docker.internal:<port>`)
-  covers the host-JVM/docker-compose dev flow; a second one runs *inside* the k3d cluster
-  (`k8s/prometheus.yaml`, namespace `monitoring`) covering the k8s-deployed services in **both**
-  `demo` and `demo-qa`, discovered via `kubernetes_sd_configs` (`role: pod`, opted in by the
-  `monitored: "true"` label most manifests already carry) and labeled by `namespace`. Pod IPs on the
-  k3d overlay network aren't reachable from outside the cluster at all, which is why this one has to
-  run in-cluster rather than as a third docker-compose static-target job. Grafana has both as
-  datasources, plus two pre-provisioned dashboards (`docker/grafana/dashboards/`): "Services Overview"
-  (the docker-compose/host-JVM Prometheus) and **"Kubernetes Overview (prod vs QA)"** (the in-cluster
-  one) — the latter has a `namespace` filter variable and puts prod/QA side by side in the top row
-  (Services Up/Down for each), so environment health is a single glance, not two separate dashboards.
-- **Logs**: services log to stdout; in Docker Compose that's `docker logs <container>`. In k8s,
-  Promtail (`k8s/promtail-daemonset.yaml`, one shared instance, not per-environment) ships every pod's
-  logs — from both namespaces — to the separate in-cluster Loki (`k8s/loki.yaml`, namespace
-  `monitoring`, mirroring `k8s/prometheus.yaml`'s host/cluster split), labeled by `namespace`. Query
-  through Grafana's Explore tab against the **Loki (k8s)** datasource, e.g. `{namespace="demo-qa"}`
-  to see QA only; the plain **Loki** datasource is the host-JVM/docker-compose flow's own instance —
-  Tempo's trace-to-logs jump only resolves against that one, so it stops finding logs for
-  k8s-originated traces (accepted tradeoff — see `k8s/loki.yaml`'s comment).
+- **Metrics**: every service exposes `/actuator/prometheus`. A single Prometheus runs *inside* the
+  k3d cluster (`k8s/prometheus.yaml`, namespace `monitoring`), covering the k8s-deployed services in
+  **both** `demo` and `demo-qa`, discovered via `kubernetes_sd_configs` (`role: pod`, opted in by the
+  `monitored: "true"` label most manifests already carry) and labeled by `namespace`. `docker-compose.yml`
+  has no Prometheus of its own — pod IPs on the k3d overlay network aren't reachable from outside the
+  cluster at all, so a host-side instance couldn't scrape them anyway. Grafana (`k8s/grafana.yaml`,
+  same namespace, also the only Grafana — nothing in `docker-compose.yml` duplicates it) has this as
+  its default datasource, plus two pre-provisioned dashboards (embedded directly in the manifest):
+  "Services Overview" and **"Kubernetes Overview (prod vs QA)"** — the latter has a `namespace`
+  filter variable and puts prod/QA side by side in the top row (Services Up/Down for each), so
+  environment health is a single glance, not two separate dashboards.
+- **Logs**: services log to stdout; in k8s, Promtail (`k8s/promtail-daemonset.yaml`, one shared
+  instance, not per-environment) ships every pod's logs — from both namespaces — to the in-cluster
+  Loki (`k8s/loki.yaml`, namespace `monitoring`), labeled by `namespace`. Query through Grafana's
+  Explore tab against the **Loki** datasource, e.g. `{namespace="demo-qa"}` to see QA only.
+- **Traces**: every service exports spans over OTLP to the in-cluster Tempo (`k8s/tempo.yaml`, same
+  namespace, same single-shared-instance pattern) — Spring Boot auto-adds `[traceId,spanId]` to
+  every log line once `micrometer-tracing` is on the classpath (`common-security`/`gateway-service`
+  poms), and since Grafana, Loki, and Tempo are now all the same in-cluster instances for both
+  environments, a trace's `tracesToLogsV2` jump always resolves against the exact Loki that received
+  its originating service's logs — no split to work around.
 - **Audit trail**: every REST call across every service is captured (who, what, when, request/response
   bodies with secrets redacted) and shipped to Elasticsearch — index `audit-log` for prod, `audit-log-qa`
   for QA (same shared in-cluster ES instance, `k8s/elasticsearch.yaml`, see
