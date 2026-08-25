@@ -19,6 +19,18 @@ data:
       http_listen_port: 4040
     self_profiling:
       disable_push: true
+    # Defaults (4MB/s rate, 2MB burst) were sized for a handful of services publishing
+    # periodically — 18 services simultaneously restarting (each pushing its own ~150-180KiB JFR
+    # snapshot right at startup) blew through both, causing constant "resource_exhausted: push rate
+    # limit exceeded" 429s during the 2026-08-25 enduser.id rollout. Each rejected push also cost
+    # its own app pod real retry-storm CPU ("Gave up uploading profiling snapshot after 8 tries",
+    # repeating), compounding the very CPU contention a mass rollout already causes — confirmed as a
+    # major contributor to that incident, not just Pyroscope's own problem. Bumped generously (8x
+    # rate, 32x burst) since single-node profiling data isn't reasonably going to threaten this
+    # limit outside of exactly this kind of burst.
+    limits:
+      ingestion_rate_mb: 32
+      ingestion_burst_size_mb: 64
 ---
 apiVersion: apps/v1
 kind: Deployment
