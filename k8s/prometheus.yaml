@@ -102,47 +102,51 @@ data:
           - source_labels: [__meta_kubernetes_pod_container_port_number]
             regex: "8080"
             action: keep
-      - job_name: kubernetes-nodes-cadvisor
-        scheme: https
-        tls_config:
-          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
-          insecure_skip_verify: true
-        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
-        kubernetes_sd_configs:
-          - role: node
-        relabel_configs:
-          - action: labelmap
-            regex: __meta_kubernetes_node_label_(.+)
-          # kubelets aren't scraped directly by node address — the API server proxies each node's
-          # own /metrics/cadvisor, so __address__ has to point at the API server itself and the
-          # actual node name goes into the metrics path instead.
-          - target_label: __address__
-            replacement: kubernetes.default.svc:443
-          - source_labels: [__meta_kubernetes_node_name]
-            regex: (.+)
-            target_label: __metrics_path__
-            replacement: /api/v1/nodes/${1}/proxy/metrics/cadvisor
-      # Separate from the cadvisor job above — /metrics/cadvisor only exposes container_* metrics.
-      # kubelet_volume_stats_available_bytes/capacity_bytes (what the PVC disk-pressure alert
-      # actually needs) live on the kubelet's own plain /metrics endpoint instead. Confirmed live:
-      # the cadvisor job alone returned zero kubelet_volume_stats_* series.
-      - job_name: kubernetes-nodes
-        scheme: https
-        tls_config:
-          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
-          insecure_skip_verify: true
-        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
-        kubernetes_sd_configs:
-          - role: node
-        relabel_configs:
-          - action: labelmap
-            regex: __meta_kubernetes_node_label_(.+)
-          - target_label: __address__
-            replacement: kubernetes.default.svc:443
-          - source_labels: [__meta_kubernetes_node_name]
-            regex: (.+)
-            target_label: __metrics_path__
-            replacement: /api/v1/nodes/${1}/proxy/metrics
+      # TEMPORARILY DISABLED (2026-08-25) — confirmed live, mid-rollout, that scraping
+      # k3d-demo-server-0's cAdvisor endpoint alone took 8.4s and the kubernetes-nodes job below
+      # another 6.7s, on that same node, on the default 15s interval — combined, essentially a
+      # 100% scrape duty cycle sitting on the exact node the API server/control plane also lives
+      # on (explains the TLS handshake timeouts hitting kubectl during that same window). Found
+      # while investigating why an unrelated, low-risk rollout (enduser.id tagging) was taking far
+      # longer and hitting far more restarts than every earlier rollout today. Re-enable with a
+      # much longer scrape_interval (60s+) once node headroom is confirmed comfortable again —
+      # don't just flip this back on at the original 15s.
+      # - job_name: kubernetes-nodes-cadvisor
+      #   scheme: https
+      #   tls_config:
+      #     ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+      #     insecure_skip_verify: true
+      #   bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+      #   kubernetes_sd_configs:
+      #     - role: node
+      #   relabel_configs:
+      #     - action: labelmap
+      #       regex: __meta_kubernetes_node_label_(.+)
+      #     - target_label: __address__
+      #       replacement: kubernetes.default.svc:443
+      #     - source_labels: [__meta_kubernetes_node_name]
+      #       regex: (.+)
+      #       target_label: __metrics_path__
+      #       replacement: /api/v1/nodes/${1}/proxy/metrics/cadvisor
+      # TEMPORARILY DISABLED (2026-08-25) — see kubernetes-nodes-cadvisor's comment above, same
+      # reasoning, same fix.
+      # - job_name: kubernetes-nodes
+      #   scheme: https
+      #   tls_config:
+      #     ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+      #     insecure_skip_verify: true
+      #   bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+      #   kubernetes_sd_configs:
+      #     - role: node
+      #   relabel_configs:
+      #     - action: labelmap
+      #       regex: __meta_kubernetes_node_label_(.+)
+      #     - target_label: __address__
+      #       replacement: kubernetes.default.svc:443
+      #     - source_labels: [__meta_kubernetes_node_name]
+      #       regex: (.+)
+      #       target_label: __metrics_path__
+      #       replacement: /api/v1/nodes/${1}/proxy/metrics
 ---
 apiVersion: apps/v1
 kind: Deployment
