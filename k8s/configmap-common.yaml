@@ -21,6 +21,12 @@
 # No LOKI_HOST here — app services never talk to Loki directly, Promtail ships their stdout logs
 # to it transparently. See k8s/loki.yaml's comment for why it's a genuinely separate in-cluster
 # instance rather than something app services would need to know the address of.
+#
+# OTEL_EXPORTER_OTLP_TRACES_ENDPOINT IS here, unlike Loki — tracing is push-based (each service
+# exports spans itself over OTLP), so it needs Tempo's address the same way it needs Kafka's or
+# MySQL's. Without this override every service falls back to config-repo/application.yml's
+# http://localhost:4318/v1/traces default, meant for a host-JVM run with no in-cluster Tempo to
+# reach.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -44,5 +50,6 @@ data:
   DB_NAME: demo
   MAIL_HOST: mailpit.infra.svc.cluster.local
   MAIL_PORT: "1025"
+  OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: http://tempo.monitoring.svc.cluster.local:4318/v1/traces
   INVENTORY_SERVICE_URI: http://inventory-service:8089
   CORS_ALLOWED_ORIGINS: http://localhost:5173,http://demo.localhost:18090

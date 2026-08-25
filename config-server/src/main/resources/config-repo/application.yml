@@ -57,3 +57,11 @@ management:
   metrics:
     tags:
       application: ${spring.application.name}
+  tracing:
+    sampling:
+      # Demo-scale traffic — trace every request rather than tuning a sample rate. Drop this well
+      # below 1.0 before this ever carries real production load.
+      probability: 1.0
+  otlp:
+    tracing:
+      endpoint: ${OTEL_EXPORTER_OTLP_TRACES_ENDPOINT:http://localhost:4318/v1/traces}
