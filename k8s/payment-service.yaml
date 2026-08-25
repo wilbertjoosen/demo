@@ -29,6 +29,7 @@ spec:
           ports: [{ containerPort: 8086 }]
           envFrom:
             - configMapRef: { name: demo-common-config }
+            - secretRef: { name: pyroscope-agent }
           env:
             - { name: EUREKA_INSTANCE_HOSTNAME, value: payment-service }
             - { name: MONGO_DB, value: payments_qa }

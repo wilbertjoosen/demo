@@ -16,14 +16,13 @@ spec:
         - name: eureka-server
           image: ghcr.io/wilbertjoosen/demo-eureka-server:1.0.1-07c5cbd
           imagePullPolicy: Always
-          # No envFrom here (unlike every other app service) — eureka-server doesn't need
-          # Kafka/MySQL/OTLP config, so it never picked up demo-common-config. Set directly here
-          # instead: TEMPORARILY DISABLED (2026-08-25, see configmap-common.yaml's own comment) —
-          # io.pyroscope:agent:2.1.2's bundled async-profiler SIGSEGVs on this cluster's JDK 26 +
-          # linux/arm64.
-          env:
-            - name: PYROSCOPE_AGENT_ENABLED
-              value: "false"
+          # No configMapRef here (unlike every other app service) — eureka-server doesn't need
+          # Kafka/MySQL/OTLP config, so it never picked up demo-common-config. It still needs the
+          # pyroscope-agent Secret below (imperatively created per-namespace via Rancher's Secrets
+          # UI, not committed — same pattern as grafana-admin/mysql-credentials) so its toggle stays
+          # in sync with every other service's.
+          envFrom:
+            - secretRef: { name: pyroscope-agent }
           ports: [{ containerPort: 8761 }]
           resources:
             requests: { cpu: "100m", memory: "256Mi" }
