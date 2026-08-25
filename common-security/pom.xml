@@ -43,6 +43,18 @@
             <artifactId>spring-boot-micrometer-tracing-opentelemetry</artifactId>
         </dependency>
         <dependency>
+            <!-- OtlpTracingAutoConfiguration (in the artifact above) is @ConditionalOnClass on
+                 OtlpHttpSpanExporter/OtlpGrpcSpanExporter — neither ships transitively with
+                 spring-boot-micrometer-tracing-opentelemetry itself (confirmed: absent from this
+                 module's own resolved dependency:tree). Without this, the whole OTLP autoconfiguration
+                 silently backs off — no Tracer, no exporter, nothing — which is exactly what was
+                 happening here: every span export appeared correctly configured end to end (endpoint,
+                 sampling, network path, all independently verified reachable) and Tempo still received
+                 precisely zero traces. This is the actual missing piece, not a config problem. -->
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-exporter-otlp</artifactId>
+        </dependency>
+        <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-devtools</artifactId>
             <optional>true</optional>
