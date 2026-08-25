@@ -16,6 +16,13 @@ spec:
         - name: eureka-server
           image: ghcr.io/wilbertjoosen/demo-eureka-server:1.0.1-d013bc7
           imagePullPolicy: Always
+          # No configMapRef here (unlike every other app service) — eureka-server doesn't need
+          # Kafka/MySQL/OTLP config, so it never picked up demo-common-config. It still needs the
+          # pyroscope-agent Secret below (imperatively created per-namespace via Rancher's Secrets
+          # UI, not committed — same pattern as grafana-admin/mysql-credentials) so its toggle stays
+          # in sync with every other service's.
+          envFrom:
+            - secretRef: { name: pyroscope-agent }
           ports: [{ containerPort: 8761 }]
           resources:
             requests: { cpu: "100m", memory: "256Mi" }
