@@ -51,6 +51,10 @@ data:
   # In-cluster Tempo's OTLP/HTTP receiver (k8s/tempo.yaml) — see config-server's
   # config-repo/application.yml for how every service picks this up.
   OTLP_ENDPOINT: http://tempo.monitoring.svc.cluster.local:4318/v1/traces
+  # In-cluster Pyroscope (k8s/pyroscope.yaml) — every service's Java agent (bundled in
+  # Dockerfile.service, PYROSCOPE_APPLICATION_NAME derived there from $HOSTNAME) pushes continuous
+  # profiles here directly, same push-based reasoning as Tempo above.
+  PYROSCOPE_SERVER_ADDRESS: http://pyroscope.monitoring.svc.cluster.local:4040
   # Task #75, real secrets management — Vault dev-mode instance, single node (no topology
   # discovery needed, unlike Mongo's replica set), now in-cluster (k8s/vault.yaml). The token
   # itself is sensitive and lives in the vault-token k8s Secret (created imperatively per-namespace,
