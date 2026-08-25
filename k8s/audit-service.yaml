@@ -21,6 +21,12 @@ spec:
             - configMapRef: { name: demo-common-config }
             - secretRef: { name: pyroscope-agent }
           env:
+            # CANARY (2026-08-25): explicit env always overrides envFrom, so this re-enables the
+            # agent for audit-service only while pyroscope-agent Secret stays "false" for every
+            # other service — validating PYROSCOPE_PROFILER_TYPE=JFR actually works end-to-end
+            # (profiles reaching the Pyroscope server) before rolling the Secret flip out fleet-wide.
+            # Remove this override once validated and flip the Secret instead.
+            - { name: PYROSCOPE_AGENT_ENABLED, value: "true" }
             - { name: EUREKA_INSTANCE_HOSTNAME, value: audit-service }
             # Shares the prod Elasticsearch instance (see docker-compose.qa.yml) — a separate index
             # keeps this environment's audit trail from mixing with production's.
