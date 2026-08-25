@@ -59,17 +59,21 @@ data:
   # Dockerfile.service's entrypoint wrapper via the io.pyroscope agent's PYROSCOPE_SERVER_ADDRESS
   # env var.
   PYROSCOPE_SERVER_ADDRESS: http://pyroscope.monitoring.svc.cluster.local:4040
+  # PYROSCOPE_PROFILER_TYPE=JFR (2026-08-25) — io.pyroscope:agent:2.1.2's default profilerType,
+  # ASYNC, delegates to a bundled async-profiler native library that SIGSEGVs immediately on this
+  # cluster's JDK 26 + linux/arm64 combination (Recording::writeCpool native crash, confirmed
+  # identical on eureka-server/gateway-service/product-review-service in demo-qa — see git history
+  # around 2026-08-25 for the incident). JFR instead delegates to the JDK's own built-in Flight
+  # Recorder — pure JVM, no native library involved, verified locally (docker run) to start and
+  # profile cleanly on the same JDK/arch combination that crashed under ASYNC. Lower sampling
+  # resolution than async-profiler, but that trade-off is what unblocks profiling at all here.
+  PYROSCOPE_PROFILER_TYPE: JFR
   # PYROSCOPE_AGENT_ENABLED lives in the imperatively-created pyroscope-agent Secret instead of
   # here (referenced via each service's own envFrom, plus configmap-common.yaml can't reach
   # eureka-server which has no configMapRef at all — see eureka-server.yaml's comment) — a plain
   # ConfigMap value would work as well as a Secret for a non-sensitive boolean, but a single
   # Secret every service references keeps the enable/disable toggle in one place regardless of
-  # whether that service uses this ConfigMap. TEMPORARILY DISABLED (2026-08-25): io.pyroscope:
-  # agent:2.1.2's bundled async-profiler build SIGSEGVs immediately on startup on this cluster's
-  # JDK 26 + linux/arm64 combination (Recording::writeCpool native crash, confirmed identical on
-  # eureka-server/gateway-service/product-review-service in demo-qa) — crash-loops every service
-  # that picks up the agent. Agent wiring stays in Dockerfile.service for when a compatible
-  # async-profiler/JDK/arch combination is found.
+  # whether that service uses this ConfigMap.
   # Task #75, real secrets management — Vault dev-mode instance, single node, shared across prod
   # and QA the same way Tempo is above (one throwaway local Vault, not per-environment), now
   # in-cluster (k8s/vault.yaml on the main branch) and reached cross-namespace. The token itself is
