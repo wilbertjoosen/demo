@@ -283,14 +283,32 @@ spec:
         kubernetes.io/hostname: k3d-demo-server-0
       containers:
         - name: keycloak
-          image: quay.io/keycloak/keycloak:latest
+          # Pinned (2026-08-25, matching the exact version already running, confirmed via
+          # /realms/master) — not :latest, same reasoning as every other image in this stack after
+          # Tempo's :latest incident.
+          image: quay.io/keycloak/keycloak:26.7.2
           args: ["start-dev", "--import-realm"]
           ports:
             - { containerPort: 8080, hostPort: 8081, name: http }
+          # Native OTel tracing (2026-08-25) — see https://www.keycloak.org/observability/tracing.
+          # KC_TRACING_ENABLED is documented as a "build-time" option, but start-dev already runs an
+          # implicit build/augmentation on every startup regardless (confirmed live: "Quarkus
+          # augmentation completed" appears in the logs either way), so no separate `kc.sh build`
+          # step is needed here. Verified end-to-end locally (docker run against a port-forwarded
+          # Tempo) before touching this file — real keycloak-service spans (schema migration, realm
+          # import) showed up in Tempo's search API. Both KC_TRACING_ENABLED and
+          # KC_TRACING_SAMPLER_RATIO come from the keycloak-tracing Secret (imperatively created in
+          # this namespace, not committed — same pattern as grafana-admin/mysql-credentials, and the
+          # same on/off-via-Secret shape as pyroscope-agent) rather than literals here, so tracing can
+          # be toggled or retuned without a git commit — though a pod restart is still needed to pick
+          # up a changed value, same limitation as every other envFrom/secretRef in this stack.
+          envFrom:
+            - secretRef: { name: keycloak-tracing }
           env:
             - { name: KEYCLOAK_ADMIN, value: "admin" }
             - { name: KEYCLOAK_ADMIN_PASSWORD, value: "admin" }
             - { name: KC_HOSTNAME, value: "http://localhost:8081" }
+            - { name: KC_TRACING_ENDPOINT, value: "http://tempo.monitoring.svc.cluster.local:4317" }
           volumeMounts:
             - { name: data, mountPath: /opt/keycloak/data/h2 }
             - { name: realm-import, mountPath: /opt/keycloak/data/import }
