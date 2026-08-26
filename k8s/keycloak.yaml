@@ -337,6 +337,13 @@ data:
         color: #151515 !important;
     }
 
+    /* The password show/hide toggle is a separate "control"-variant button, not part of
+       .pf-v5-c-form-control itself, so it needs its own override. */
+    .login-pf .pf-v5-c-button.pf-m-control {
+        background-color: #ffffff !important;
+        color: #6a6e73 !important;
+    }
+
     /* color needs !important too: the base keycloak.v2 theme's own #kc-header-wrapper rule sets
        color with !important, which no amount of specificity alone can beat. Confirmed live: the
        header rendered light grey, not purple, until this was added. */

@@ -71,6 +71,14 @@
     color: #151515 !important;
 }
 
+/* The password show/hide toggle is a separate "control"-variant button, not part of
+   .pf-v5-c-form-control itself, so it needs its own override — dark mode left it as a dark-grey
+   square sitting on the now-white input row. */
+.login-pf .pf-v5-c-button.pf-m-control {
+    background-color: #ffffff !important;
+    color: #6a6e73 !important;
+}
+
 /* The realm sets a plain "displayName" ("Demo" / "Demo QA"), not "displayNameHtml" — the base
    template renders that directly into #kc-header-wrapper as text (class pf-v5-c-brand), NOT
    wrapped in the .kc-logo-text/<span> markup the Keycloak-branded fallback uses. Confirmed by
