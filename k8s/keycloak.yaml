@@ -169,7 +169,7 @@ data:
         --keycloak-card-top-color: #7e14ff;
     }
 
-    body.login-pf {
+    .login-pf body {
         background: linear-gradient(160deg, #ede6ff 0%, #ffffff 55%);
     }
 
