@@ -5,10 +5,7 @@
 
 INFRASTRUCTURE=(
     "mysql"
-    "mongo1"
-    "mongo2"
-    "mongo3"
-    "mongo-rs-init"
+    "mongo"
     "kafka"
     "kafka-ui"
     "keycloak"
@@ -40,10 +37,7 @@ DEV_ONLY_INFRASTRUCTURE=(
     "mailpit"
     "vault"
     "vault-init"
-    "mongo1"
-    "mongo2"
-    "mongo3"
-    "mongo-rs-init"
+    "mongo"
     "elasticsearch"
 )
 

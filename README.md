@@ -1,6 +1,6 @@
 # Demo — Full-Stack Microservices Reference Architecture
 
-**A monolith, deliberately taken apart — 17 Spring Boot services, a Vue 3 frontend, and the entire
+**A monolith, deliberately taken apart — 18 Spring Boot services, a Vue 3 frontend, and the entire
 production toolchain around them (CI/CD, GitOps, Kubernetes, observability) — built to show not just
 *how* each piece works, but *why* it exists.**
 
@@ -61,7 +61,7 @@ flowchart TB
         CFG["config-server"]
     end
 
-    subgraph domain["17 domain microservices"]
+    subgraph domain["18 domain microservices"]
         ORD["order-service<br/>saga initiator, CQRS"]
         PAY["payment-service"]
         SHIP["shipping-service"]
@@ -124,7 +124,7 @@ flowchart TB
     class PROM,GRAF,LOKI,TEMPO obsStyle
 ```
 
-**The one-sentence version:** a browser talks to a gateway, the gateway routes to one of 17
+**The one-sentence version:** a browser talks to a gateway, the gateway routes to one of 18
 independently-deployable services, those services choreograph a Kafka saga instead of calling each
 other directly, everything ships through CI/CD to GHCR and gets pulled into Kubernetes by ArgoCD
 without a human running `kubectl apply`, and every hop is observable end-to-end (metrics, logs,
@@ -193,7 +193,7 @@ and the tool picked to solve it — click through to the real file.
 | ![ArgoCD](https://img.shields.io/badge/-%20-EF7B4D?style=flat-square&logo=argo&logoColor=white) **ArgoCD** | GitOps continuous delivery | The cluster's actual state is *reconciled from git*, not pushed to by a human running `kubectl apply` — see [Kubernetes / GitOps](#kubernetes--gitops) | `k8s-argocd/` |
 | ![GitHub Actions](https://img.shields.io/badge/-%20-2088FF?style=flat-square&logo=githubactions&logoColor=white) **GitHub&nbsp;Actions** | CI/CD | Free, tightly integrated with GHCR, no separate CI system to run — see [The path to production](#the-path-to-production-every-gate-explained) | `.github/workflows/ci-cd.yml` |
 | ![GHCR (GitHub Container Registry)](https://img.shields.io/badge/-%20-181717?style=flat-square&logo=github&logoColor=white) **GHCR** | Image registry (GitHub Container Registry) | Private, free for this project's usage, one less external account to manage | referenced in every `k8s/*.yaml`'s `image:` field |
-| ![Rancher](https://img.shields.io/badge/-%20-0075A8?style=flat-square&logo=rancher&logoColor=white) **Rancher** | Kubernetes management UI | A GUI for the cluster (Secrets, pod logs, resource usage) alongside the CLI — runs in-cluster itself | `k8s-rancher/rancher.yaml` |
+| ![Rancher](https://img.shields.io/badge/-%20-0075A8?style=flat-square&logo=rancher&logoColor=white) **Rancher** | Kubernetes management UI | A GUI for the cluster (Secrets, pod logs, resource usage) alongside the CLI — runs in-cluster itself | main branch's `k8s-rancher/rancher.yaml` |
 
 ### Observability
 
@@ -356,7 +356,7 @@ Frontend: http://localhost:5173
 docker compose up -d --build
 ```
 
-Everything (infra + all 19 backend services + frontend) runs in containers on one network.
+Everything (infra + all 18 backend services + frontend) runs in containers on one network.
 
 ### Option C — Kubernetes (k3d) + GitOps
 
@@ -446,7 +446,7 @@ bits that were already tested in QA — never a fresh, unvalidated build of the 
 | Gate | What happens | Why it exists | File |
 |---|---|---|---|
 | **1. Test** | Full Maven reactor `verify` (unit + Testcontainers-backed integration tests, Checkstyle, SpotBugs) + frontend `lint`/typecheck/build | Nothing downstream runs if this fails — a broken build never reaches an image, let alone a cluster | `.github/workflows/ci-cd.yml` |
-| **2. Detect changed services** | Path-filters the diff between this push and the branch's own previous commit | Rebuilding all 17 services on every commit would be slow and wasteful — only touched services (or anything depending on a shared module) get rebuilt. A manual `workflow_dispatch` skips the filter when everything needs picking up | same file, `changes` job |
+| **2. Detect changed services** | Path-filters the diff between this push and the branch's own previous commit | Rebuilding all 18 services on every commit would be slow and wasteful — only touched services (or anything depending on a shared module) get rebuilt. A manual `workflow_dispatch` skips the filter when everything needs picking up | same file, `changes` job |
 | **3. Build & push** | Each changed service's image → GHCR, tagged 3 ways: commit SHA, semver (from `pom.xml`/`package.json`), and `<version>-<sha>` combined | The combined tag guarantees every commit produces a real manifest diff (so a rollout always happens) while still showing the human-readable version at a glance — a version-only tag once left a service silently stale when someone forgot to bump it | same file, `build` job |
 | **4. Update manifests** | Bumps the changed services' `image:` lines in `k8s/*.yaml`, commits back to `testing` | Gated behind the image actually existing in GHCR — ArgoCD's `selfHeal` never sees a manifest pointing at something unpullable | same file, `update-manifests` job |
 | **5. Promote (main only)** | Copies `testing`'s exact `image:` lines into `main`'s manifests — no rebuild | This *is* the "promote-many" half — production gets the QA-validated artifact, bit-for-bit | same file, `promote-to-production` job |
@@ -512,13 +512,15 @@ longer depends on them.
 ArgoCD itself is installed once
 (`kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml`),
 then both `k8s-argocd/application.yaml` (tracks `main` → `demo`) and `k8s-argocd/application-qa.yaml`
-(tracks `testing` → `demo-qa`) are applied, each with auto-sync + self-heal enabled. Rancher is
-bootstrapped the same manual, one-time way: `kubectl apply -f k8s-rancher/` (see
-`k8s-rancher/rancher.yaml`'s comment for why it's plain YAML, not the Helm chart, and for the RBAC it
-needs to self-register the cluster it's running in as "local"). `k8s-argocd/` and `k8s-rancher/` hold
-the manifests applied once by hand, not GitOps-managed — a tool shouldn't be managed by the thing it
-manages, and (for ArgoCD specifically) nothing can sync it into existence before it's already
-watching anything.
+(tracks `testing` → `demo-qa`) are applied, each with auto-sync + self-heal enabled — both files live
+in this branch's own `k8s-argocd/`. Rancher is bootstrapped the same manual, one-time way, but from
+**main branch's** `k8s-rancher/` (this directory doesn't exist on `testing` — Rancher is a
+cluster-wide tool, bootstrapped once regardless of which branch you're checked out on): `kubectl
+apply -f k8s-rancher/` (see `k8s-rancher/rancher.yaml`'s comment for why it's plain YAML, not the
+Helm chart, and for the RBAC it needs to self-register the cluster it's running in as "local").
+`k8s-argocd/` and `k8s-rancher/` hold the manifests applied once by hand, not GitOps-managed — a tool
+shouldn't be managed by the thing it manages, and (for ArgoCD specifically) nothing can sync it into
+existence before it's already watching anything.
 
 `Dockerfile.service` (repo root) is a single parameterized Dockerfile (`--build-arg SERVICE=<module>`)
 shared by every backend service — build context is the repo root so the multi-module Maven build can
@@ -544,7 +546,7 @@ flowchart LR
 
     subgraph K8S["k3d cluster"]
         subgraph DEMO["namespace: demo (prod)"]
-            APPS_PROD["17 services\n+ frontend"]
+            APPS_PROD["18 services\n+ frontend"]
             MYSQL[("MySQL (in-cluster)\ndb: demo / demo_qa")]
             MONGO[("MongoDB (in-cluster, 3-node rs)\ndb: <svc> / <svc>_qa")]
             ES[("Elasticsearch (in-cluster)\nindex: audit-log / audit-log-qa")]
@@ -553,7 +555,7 @@ flowchart LR
             MAILPIT_PROD["Mailpit (in-cluster)"]
         end
         subgraph DEMOQA["namespace: demo-qa (QA, this branch)"]
-            APPS_QA["17 services\n+ frontend"]
+            APPS_QA["18 services\n+ frontend"]
             KAFKA_QA["Kafka (in-cluster)\nk8s/kafka.yaml"]
             REDIS_QA["Redis (in-cluster)\nk8s/redis.yaml"]
             MAILPIT_QA["Mailpit (in-cluster)"]
@@ -787,7 +789,7 @@ debugging.
 | Service | Host:Port | Notes |
 |---|---|---|
 | MySQL (host / dev) | `localhost:3306` | `demo-mysql` — `order-service`'s write model, db `demo` (prod) / `demo_qa` (QA), user/pass `demo`/`demo`; **dev-only**, in-cluster instance is shared cross-namespace from the `infra` namespace (`mysql.infra.svc.cluster.local`) |
-| MongoDB (host / dev) | `localhost:27017` | `demo-mongo1/2/3` — every other service's store, `_qa`-suffixed for QA; **dev-only**, in-cluster is a proper 3-node replica set (`k8s/mongo.yaml`) shared cross-namespace |
+| MongoDB (host / dev) | `localhost:27017` | `demo-mongo` — a single standalone instance, every other service's store; **dev-only**, in-cluster is a proper 3-node replica set (`k8s/mongo.yaml`) shared cross-namespace |
 | Kafka (host clients / dev, prod) | `localhost:9092` | `PLAINTEXT` listener for local JVM services / host tools — **dev-only**; QA and prod k8s pods use their own in-cluster Kafka (`kafka:9092` inside the cluster, `k8s/kafka.yaml`), not this container |
 | Kafka (host clients / dev, QA) | `localhost:9192` | separate broker — shared topics would mean QA test traffic triggering prod's saga; host-JVM debugging only, same in-cluster-Kafka caveat as above |
 | Redis (host / dev, prod) | `localhost:6379` | `demo-redis` — Resilience4j response caching for the local `mvnw`/IDE flow; **dev-only**, QA and prod k8s pods use their own in-cluster Redis (`redis:6379` inside the cluster, `k8s/redis.yaml`) |
