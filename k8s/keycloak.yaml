@@ -161,22 +161,68 @@ data:
   styles.css: |
     @import url("../../keycloak.v2/css/styles.css");
 
+    /* !important below is load-bearing: PatternFly v5 ships a zero-specificity
+       `:where(.pf-v5-theme-dark) { ... }` block that redefines these same --pf-v5-global--*
+       variables for dark mode, and it wins a specificity tie against a plain :root rule on
+       source order alone. !important is the only thing that isn't out-specificity'd by that
+       block, since PatternFly's own variable definitions never use !important. Confirmed live
+       in a real dark-mode browser session: without this, the button/link/focus colors silently
+       reverted to PatternFly's defaults while every other selector in this file still worked. */
     :root {
-        --pf-v5-global--primary-color--100: #7e14ff;
-        --pf-v5-global--primary-color--200: #6100d9;
-        --pf-v5-global--link--Color: #7e14ff;
-        --pf-v5-global--link--Color--hover: #6100d9;
-        --keycloak-card-top-color: #7e14ff;
+        --pf-v5-global--primary-color--100: #409eff !important;
+        --pf-v5-global--primary-color--200: #3a8ee6 !important;
+        --pf-v5-global--primary-color--300: #409eff !important;
+        --pf-v5-global--primary-color--400: #ffffff !important;
+        --pf-v5-global--primary-color--light-100: #409eff !important;
+        --pf-v5-global--primary-color--dark-100: #409eff !important;
+        --pf-v5-global--link--Color: #409eff !important;
+        --pf-v5-global--link--Color--hover: #3a8ee6 !important;
+        --pf-v5-global--link--Color--light: #409eff !important;
+        --pf-v5-global--link--Color--light--hover: #3a8ee6 !important;
+        --pf-v5-global--link--Color--dark: #409eff !important;
+        --pf-v5-global--link--Color--dark--hover: #3a8ee6 !important;
+        --keycloak-card-top-color: #409eff !important;
     }
 
     .login-pf body {
-        background: linear-gradient(160deg, #ede6ff 0%, #ffffff 55%);
+        background: linear-gradient(160deg, #ecf5ff 0%, #ffffff 55%);
     }
 
+    /* This theme is light-only by design — PatternFly's dark theme reassigns the login card, form
+       controls, and header/footer text to component-scoped variables that bypass the
+       --pf-v5-global--* tokens above entirely, so token overrides alone can't reach them. Setting
+       the rendered background-color/color directly wins regardless of which token chain produced
+       the losing value. Confirmed live: without this the card, labels, and inputs stayed dark. */
+    .login-pf .pf-v5-c-login__main {
+        background-color: #ffffff !important;
+    }
+
+    .login-pf .pf-v5-c-login__header,
+    .login-pf .pf-v5-c-login__main-body,
+    .login-pf .pf-v5-c-login__main-footer,
+    .login-pf .pf-v5-c-login__footer {
+        color: #151515 !important;
+    }
+
+    .login-pf .pf-v5-c-form-control {
+        background-color: #ffffff !important;
+        color: #151515 !important;
+    }
+
+    /* The password show/hide toggle is a separate "control"-variant button, not part of
+       .pf-v5-c-form-control itself, so it needs its own override. */
+    .login-pf .pf-v5-c-button.pf-m-control {
+        background-color: #ffffff !important;
+        color: #6a6e73 !important;
+    }
+
+    /* color needs !important too: the base keycloak.v2 theme's own #kc-header-wrapper rule sets
+       color with !important, which no amount of specificity alone can beat. Confirmed live: the
+       header rendered light grey, not the brand color, until this was added. */
     #kc-header-wrapper.pf-v5-c-brand {
         font-size: 1.75rem;
         font-weight: 700;
-        color: #7e14ff;
+        color: #409eff !important;
         letter-spacing: -0.02em;
     }
 ---

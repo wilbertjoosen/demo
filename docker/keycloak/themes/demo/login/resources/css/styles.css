@@ -1,10 +1,12 @@
 /*
- * "demo" login theme — reuses the frontend's brand palette (frontend/public/favicon.svg:
- * #7e14ff / #863bff purple, #ede6ff lavender, #47bfff blue) so the Keycloak login page doesn't
- * look like a stock IdP screen when a user is bounced here from the app. Overrides only the
- * CSS custom properties the base "keycloak.v2" theme and PatternFly v5 already expose for
- * exactly this purpose, rather than restyling individual selectors — keeps this theme
- * forward-compatible with Keycloak version bumps as long as those variable names hold.
+ * "demo" login theme — matches the frontend's actual live primary color: Element Plus's default
+ * blue (#409eff, #3a8ee6 for hover/pressed states) so the Keycloak login page doesn't look like a
+ * stock IdP screen when a user is bounced here from the app. (The app's favicon uses a purple mark,
+ * but the running UI was never themed to match it — Element Plus's own default blue is what users
+ * actually see, so that's what this theme follows.) Overrides only the CSS custom properties the
+ * base "keycloak.v2" theme and PatternFly v5 already expose for exactly this purpose, rather than
+ * restyling individual selectors — keeps this theme forward-compatible with Keycloak version bumps
+ * as long as those variable names hold.
  *
  * theme.properties' `styles=` REPLACES (not merges with) the parent's own stylesheet list, so
  * keycloak.v2's real layout rules (login card grid-template, responsive header breakpoint,
@@ -14,26 +16,84 @@
  */
 @import url("../../keycloak.v2/css/styles.css");
 
+/* !important on every custom property below is load-bearing, not stylistic: PatternFly v5 ships
+   a second, zero-specificity `:where(.pf-v5-theme-dark) { ... }` block that redefines these same
+   --pf-v5-global--* variables (to its own blue/grey palette) whenever the OS is in dark mode.
+   `:where()` strips that block's selector down to zero specificity, but a plain, non-important
+   `:root` rule still loses to it on a specificity tie decided by source order (the dark block sits
+   later in patternfly.min.css than the base :root block). Confirmed live in a real dark-mode
+   browser session — the button/link/focus-underline colors silently reverted to PatternFly's
+   defaults there even though this file's `styles=` correctly won for every other selector.
+   !important is the only thing here that isn't itself out-specificity'd by that block, since
+   PatternFly's own variable definitions never use !important. Every variant (--100/200/300/400,
+   --dark-100/--light-100) is covered because different components read different variants of the
+   same "primary color" concept, and dark mode remaps several of them independently. */
 :root {
-    --pf-v5-global--primary-color--100: #7e14ff;
-    --pf-v5-global--primary-color--200: #6100d9;
-    --pf-v5-global--link--Color: #7e14ff;
-    --pf-v5-global--link--Color--hover: #6100d9;
-    --keycloak-card-top-color: #7e14ff;
+    --pf-v5-global--primary-color--100: #409eff !important;
+    --pf-v5-global--primary-color--200: #3a8ee6 !important;
+    --pf-v5-global--primary-color--300: #409eff !important;
+    --pf-v5-global--primary-color--400: #ffffff !important;
+    --pf-v5-global--primary-color--light-100: #409eff !important;
+    --pf-v5-global--primary-color--dark-100: #409eff !important;
+    --pf-v5-global--link--Color: #409eff !important;
+    --pf-v5-global--link--Color--hover: #3a8ee6 !important;
+    --pf-v5-global--link--Color--light: #409eff !important;
+    --pf-v5-global--link--Color--light--hover: #3a8ee6 !important;
+    --pf-v5-global--link--Color--dark: #409eff !important;
+    --pf-v5-global--link--Color--dark--hover: #3a8ee6 !important;
+    --keycloak-card-top-color: #409eff !important;
 }
 
 .login-pf body {
-    background: linear-gradient(160deg, #ede6ff 0%, #ffffff 55%);
+    background: linear-gradient(160deg, #ecf5ff 0%, #ffffff 55%);
 }
 
-/* The realm sets a plain "displayName" ("Demo"), not "displayNameHtml" — the base template
-   renders that directly into #kc-header-wrapper as text (class pf-v5-c-brand), NOT wrapped in
-   the .kc-logo-text/<span> markup the Keycloak-branded fallback uses. Confirmed by diffing the
-   actual rendered markup between the master realm (no displayName -> kc-logo-text/"Keycloak"
-   logo image) and the demo realm (displayName set -> plain text) locally before writing this. */
+/* This theme is light-only by design (it's meant to look like the frontend app, which has no dark
+   mode) — but PatternFly's dark theme doesn't just override the tokens above, it reassigns the
+   login card, form controls, and header/footer text to different, component-scoped variables
+   (--pf-v5-c-login__main--BackgroundColor, --pf-v5-c-form-control--BackgroundColor, etc.) that
+   bypass the --pf-v5-global--* tokens entirely, so no amount of token overriding above can reach
+   them. Setting the rendered background-color/color directly here wins regardless of which token
+   chain produced the losing value. Confirmed live: without this, the outer page picked up the
+   light gradient correctly but the sign-in card, its labels, and its input fields still rendered
+   as PatternFly's dark slate card with light-on-dark text. */
+.login-pf .pf-v5-c-login__main {
+    background-color: #ffffff !important;
+}
+
+.login-pf .pf-v5-c-login__header,
+.login-pf .pf-v5-c-login__main-body,
+.login-pf .pf-v5-c-login__main-footer,
+.login-pf .pf-v5-c-login__footer {
+    color: #151515 !important;
+}
+
+.login-pf .pf-v5-c-form-control {
+    background-color: #ffffff !important;
+    color: #151515 !important;
+}
+
+/* The password show/hide toggle is a separate "control"-variant button, not part of
+   .pf-v5-c-form-control itself, so it needs its own override — dark mode left it as a dark-grey
+   square sitting on the now-white input row. */
+.login-pf .pf-v5-c-button.pf-m-control {
+    background-color: #ffffff !important;
+    color: #6a6e73 !important;
+}
+
+/* The realm sets a plain "displayName" ("Demo" / "Demo QA"), not "displayNameHtml" — the base
+   template renders that directly into #kc-header-wrapper as text (class pf-v5-c-brand), NOT
+   wrapped in the .kc-logo-text/<span> markup the Keycloak-branded fallback uses. Confirmed by
+   diffing the actual rendered markup between the master realm (no displayName -> kc-logo-text/
+   "Keycloak" logo image) and the demo realm (displayName set -> plain text) locally before
+   writing this.
+   color needs !important too: the base keycloak.v2 theme's own `#kc-header-wrapper` rule sets
+   color with !important, and !important declarations are never beaten by higher specificity
+   alone — confirmed live (the header rendered light grey, not the brand color, until this was
+   added). */
 #kc-header-wrapper.pf-v5-c-brand {
     font-size: 1.75rem;
     font-weight: 700;
-    color: #7e14ff;
+    color: #409eff !important;
     letter-spacing: -0.02em;
 }
