@@ -17,24 +17,18 @@
 # plain `localhost:8081`; that's real, load-bearing, deployed-cluster identity, not something to
 # rename as a side effect of fixing local dev's cookie collision.
 #
-# MONGO_HOST/MONGO_REPLICA_SET_PARAM (task #74, HA for stateful stores): every consumer — this
-# compose network, k8s pods, and any other Docker Desktop container — reaches the 3-node replica
-# set the same way, through host.docker.internal at each member's own published port, because
-# that's the ONE identity actually baked into the replica set's own config (see mongo-rs-init
-# below) — a driver that first connects via a compose-internal name like "mongo1" still gets told
-# by the replica set itself that the real members live at host.docker.internal:2701{7,8,9}, so
-# using anything else as the steady-state address would just be a seed that immediately gets
-# corrected. host.docker.internal resolves automatically in every container on Docker Desktop
-# (verified: also reachable from k8s pods, since k3d's own nodes are themselves Docker Desktop
-# containers) — no extra_hosts needed here, only on Linux hosts (not this setup).
+# MONGO_HOST: single standalone mongod, addressed the same way as everything else in this block
+# (kafka:29092, redis) — a plain in-network compose service name. No replica set here (that's a
+# k8s-only concern now — the in-cluster Mongo in demo/demo-qa is a real 3-node replica set,
+# k8s/mongo.yaml/k8s/configmap-common.yaml — this container is purely local-dev convenience and
+# was never meant to model production HA).
 x-app-env: &app-env
   CONFIG_SERVER_URI: http://config-server:8888
   EUREKA_URI: http://eureka-server:8761/eureka
   KAFKA_BOOTSTRAP_SERVERS: kafka:29092
   KEYCLOAK_ISSUER_URI: http://keycloak.localhost:8081/realms/demo
   KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/demo/protocol/openid-connect/certs
-  MONGO_HOST: host.docker.internal:27017,host.docker.internal:27018,host.docker.internal:27019
-  MONGO_REPLICA_SET_PARAM: "?replicaSet=rs0"
+  MONGO_HOST: mongo:27017
   REDIS_HOST: redis
 
 services:
@@ -57,78 +51,18 @@ services:
       timeout: 5s
       retries: 10
 
-  # 3-node replica set (task #74, HA for stateful stores) — real automatic primary election and
-  # failover, not just replica-set-flavored single-node config. Each member's own published port
-  # (27017/27018/27019) is what distinguishes it in the replica set's config below, since all
-  # three otherwise resolve to the same host.docker.internal address.
-  mongo1:
+  # Single standalone instance — local-dev convenience only. The in-cluster Mongo (k8s/mongo.yaml,
+  # demo/demo-qa) is the one that's a real 3-node replica set, matching production; this container
+  # was never meant to model that HA behavior, just to give the host-JVM/full-compose dev flows
+  # somewhere to point.
+  mongo:
     image: mongo:7
-    container_name: demo-mongo1
+    container_name: demo-mongo
     restart: unless-stopped
-    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     ports:
       - "27017:27017"
     volumes:
-      - mongo1_data:/data/db
-
-  mongo2:
-    image: mongo:7
-    container_name: demo-mongo2
-    restart: unless-stopped
-    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    ports:
-      - "27018:27017"
-    volumes:
-      - mongo2_data:/data/db
-
-  mongo3:
-    image: mongo:7
-    container_name: demo-mongo3
-    restart: unless-stopped
-    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    ports:
-      - "27019:27017"
-    volumes:
-      - mongo3_data:/data/db
-
-  # One-shot: waits for all 3 mongod processes to accept connections, then initiates the replica
-  # set exactly once. Safe to re-run (rs.initiate() on an already-initiated set just errors, which
-  # this ignores) — matters because `docker compose up` re-runs this container on every restart.
-  mongo-rs-init:
-    image: mongo:7
-    container_name: demo-mongo-rs-init
-    restart: "no"
-    depends_on:
-      - mongo1
-      - mongo2
-      - mongo3
-    entrypoint: ["bash", "-c"]
-    command:
-      - |
-        until mongosh --host mongo1 --quiet --eval "db.runCommand({ping:1})" >/dev/null 2>&1; do
-          echo "waiting for mongo1..."; sleep 2
-        done
-        mongosh --host mongo1 --quiet --eval '
-          try {
-            rs.initiate({
-              _id: "rs0",
-              members: [
-                { _id: 0, host: "host.docker.internal:27017" },
-                { _id: 1, host: "host.docker.internal:27018" },
-                { _id: 2, host: "host.docker.internal:27019" }
-              ]
-            });
-            print("replica set initiated");
-          } catch (e) {
-            print("replica set already initiated (or init failed): " + e);
-          }
-        '
+      - mongo_data:/data/db
 
   # k3d pods no longer reach this container — they now talk to their own in-cluster Kafka
   # (k8s/kafka.yaml) instead of the PLAINTEXT_K8S listener below, matching the switch already made
@@ -311,7 +245,7 @@ services:
 
   # --- App services -----------------------------------------------------------------------
   # Not meant to run alongside the local `mvn spring-boot:run` processes used throughout dev —
-  # both bind the same host ports. Run `docker compose up -d mysql mongo1 mongo2 mongo3 mongo-rs-init kafka mailpit keycloak
+  # both bind the same host ports. Run `docker compose up -d mysql mongo kafka mailpit keycloak
   # elasticsearch redis` for infra-only (the local-JVM flow), or `docker compose up -d --build` for
   # the fully containerized stack.
 
@@ -393,7 +327,7 @@ services:
     depends_on:
       - eureka-server
       - config-server
-      - mongo-rs-init
+      - mongo
       - kafka
       - keycloak
 
@@ -414,7 +348,7 @@ services:
     depends_on:
       - eureka-server
       - config-server
-      - mongo-rs-init
+      - mongo
       - kafka
       - keycloak
       - redis
@@ -452,7 +386,7 @@ services:
       - eureka-server
       - config-server
       - mysql
-      - mongo-rs-init
+      - mongo
       - kafka
       - keycloak
       - vault-init
@@ -477,7 +411,7 @@ services:
     depends_on:
       - eureka-server
       - config-server
-      - mongo-rs-init
+      - mongo
       - kafka
       - keycloak
 
@@ -498,7 +432,7 @@ services:
     depends_on:
       - eureka-server
       - config-server
-      - mongo-rs-init
+      - mongo
       - kafka
       - keycloak
 
@@ -519,7 +453,7 @@ services:
     depends_on:
       - eureka-server
       - config-server
-      - mongo-rs-init
+      - mongo
       - kafka
       - keycloak
 
@@ -540,7 +474,7 @@ services:
     depends_on:
       - eureka-server
       - config-server
-      - mongo-rs-init
+      - mongo
       - kafka
       - keycloak
       - redis
@@ -562,7 +496,7 @@ services:
     depends_on:
       - eureka-server
       - config-server
-      - mongo-rs-init
+      - mongo
       - kafka
       - keycloak
 
@@ -583,7 +517,7 @@ services:
     depends_on:
       - eureka-server
       - config-server
-      - mongo-rs-init
+      - mongo
       - kafka
       - keycloak
 
@@ -607,7 +541,7 @@ services:
     depends_on:
       - eureka-server
       - config-server
-      - mongo-rs-init
+      - mongo
       - kafka
       - keycloak
 
@@ -628,7 +562,7 @@ services:
     depends_on:
       - eureka-server
       - config-server
-      - mongo-rs-init
+      - mongo
       - kafka
       - keycloak
 
@@ -649,7 +583,7 @@ services:
     depends_on:
       - eureka-server
       - config-server
-      - mongo-rs-init
+      - mongo
       - kafka
       - keycloak
 
@@ -687,9 +621,7 @@ services:
 
 volumes:
   mysql_data:
-  mongo1_data:
-  mongo2_data:
-  mongo3_data:
+  mongo_data:
   elasticsearch_data:
   redis_data:
   media_uploads:

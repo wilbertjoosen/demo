@@ -1,6 +1,6 @@
 # Demo — Full-Stack Microservices Reference Architecture
 
-**A monolith, deliberately taken apart — 17 Spring Boot services, a Vue 3 frontend, and the entire
+**A monolith, deliberately taken apart — 18 Spring Boot services, a Vue 3 frontend, and the entire
 production toolchain around them (CI/CD, GitOps, Kubernetes, observability) — built to show not just
 *how* each piece works, but *why* it exists.**
 
@@ -142,7 +142,7 @@ and the tool picked to solve it — click through to the real file.
 |---|---|---|---|
 | ![Java 26](https://img.shields.io/badge/-%20-000000?style=flat-square&logo=openjdk&logoColor=white) **Java&nbsp;26** | Runtime for every backend service | Latest LTS-track JDK — modern language features (records, pattern matching, virtual threads available) without legacy baggage | every service's `pom.xml` |
 | ![Spring Boot 4](https://img.shields.io/badge/-%20-6DB33F?style=flat-square&logo=springboot&logoColor=white) **Spring&nbsp;Boot&nbsp;4** | Application framework | The de-facto standard for JVM microservices — auto-configuration, embedded Tomcat, and first-class support for everything else in this stack (Data, Security, Kafka, Actuator) | every service module |
-| ![Spring Cloud Gateway](https://img.shields.io/badge/-%20-6DB33F?style=flat-square&logo=spring&logoColor=white) **Spring&nbsp;Cloud&nbsp;Gateway** | API gateway / reverse proxy | One public entry point instead of 17 — routes `/api/**` by path, centralizes CORS, hides internal service topology from the browser | `gateway-service/` |
+| ![Spring Cloud Gateway](https://img.shields.io/badge/-%20-6DB33F?style=flat-square&logo=spring&logoColor=white) **Spring&nbsp;Cloud&nbsp;Gateway** | API gateway / reverse proxy | One public entry point instead of 18 — routes `/api/**` by path, centralizes CORS, hides internal service topology from the browser | `gateway-service/` |
 | ![Netflix Eureka](https://img.shields.io/badge/-%20-E50914?style=flat-square&logo=netflix&logoColor=white) **Netflix&nbsp;Eureka** | Service discovery | Services register themselves and discover each other by name, not hardcoded IPs — essential once you have more than a couple of services that scale independently | `eureka-server/` |
 | ![Spring Cloud Config](https://img.shields.io/badge/-%20-6DB33F?style=flat-square&logo=spring&logoColor=white) **Spring&nbsp;Cloud&nbsp;Config** | Centralized configuration | One place for config that's shared across services (currently light use — most config is per-service, see [Config profiles](#config-profiles-local--testing--production)) | `config-server/` |
 | ![Spring Data (JPA + MongoDB)](https://img.shields.io/badge/-%20-6DB33F?style=flat-square&logo=spring&logoColor=white) **Spring&nbsp;Data** | Persistence abstraction (JPA + MongoDB) | Repository pattern out of the box — service code never touches a driver or `EntityManager` directly | every service's `repository/` package |
@@ -355,7 +355,10 @@ Frontend: http://localhost:5173
 docker compose up -d --build
 ```
 
-Everything (infra + all 19 backend services + frontend) runs in containers on one network.
+Everything (infra + 17 of the 18 backend services + frontend) runs in containers on one network.
+`reporting-service` is the one exception — it has no `docker-compose.yml` service block despite
+being fully wired into k8s and CI; run it separately via `./mvnw -pl reporting-service spring-boot:run`
+against this same stack if you need it.
 
 ### Option C — Kubernetes (k3d) + GitOps
 
@@ -458,7 +461,7 @@ bits that were already tested in QA — never a fresh, unvalidated build of the 
 | Gate | What happens | Why it exists | File |
 |---|---|---|---|
 | **1. Test** | Full Maven reactor `verify` (unit + Testcontainers-backed integration tests, Checkstyle, SpotBugs) + frontend `lint`/typecheck/build | Nothing downstream runs if this fails — a broken build never reaches an image, let alone a cluster | `.github/workflows/ci-cd.yml` |
-| **2. Detect changed services** | Path-filters the diff between this push and the branch's own previous commit | Rebuilding all 17 services on every commit would be slow and wasteful — only touched services (or anything depending on a shared module) get rebuilt. A manual `workflow_dispatch` skips the filter when everything needs picking up | same file, `changes` job |
+| **2. Detect changed services** | Path-filters the diff between this push and the branch's own previous commit | Rebuilding all 18 services on every commit would be slow and wasteful — only touched services (or anything depending on a shared module) get rebuilt. A manual `workflow_dispatch` skips the filter when everything needs picking up | same file, `changes` job |
 | **3. Build & push** | Each changed service's image → GHCR, tagged 3 ways: commit SHA, semver (from `pom.xml`/`package.json`), and `<version>-<sha>` combined | The combined tag guarantees every commit produces a real manifest diff (so a rollout always happens) while still showing the human-readable version at a glance — a version-only tag once left a service silently stale when someone forgot to bump it | same file, `build` job |
 | **4. Update manifests** | Bumps the changed services' `image:` lines in `k8s/*.yaml`, commits back to `testing` | Gated behind the image actually existing in GHCR — ArgoCD's `selfHeal` never sees a manifest pointing at something unpullable | same file, `update-manifests` job |
 | **5. Promote (main only)** | Copies `testing`'s exact `image:` lines into `main`'s manifests — no rebuild | This *is* the "promote-many" half — production gets the QA-validated artifact, bit-for-bit | same file, `promote-to-production` job |
@@ -557,10 +560,10 @@ flowchart LR
 
     subgraph K8S["k3d cluster"]
         subgraph DEMO["namespace: demo (prod app tier only)"]
-            APPS_PROD["17 services\n+ frontend"]
+            APPS_PROD["18 services\n+ frontend"]
         end
         subgraph DEMOQA["namespace: demo-qa (QA)"]
-            APPS_QA["17 services\n+ frontend"]
+            APPS_QA["18 services\n+ frontend"]
             KAFKA_QA["Kafka"]
             REDIS_QA["Redis"]
             MAILPIT_QA["Mailpit"]
@@ -829,7 +832,7 @@ for host-JVM/`start-local.sh` debugging.
 | Service | Host:Port | Notes |
 |---|---|---|
 | MySQL (host / dev) | `localhost:3306` | `demo-mysql` — `order-service`'s write model, db `demo` (prod) / `demo_qa` (QA), user/pass `demo`/`demo`; **dev-only**, in-cluster instance is shared cross-namespace from the `infra` namespace (`mysql.infra.svc.cluster.local`) |
-| MongoDB (host / dev) | `localhost:27017` | `demo-mongo1/2/3` — every other service's store, `_qa`-suffixed for QA; **dev-only**, in-cluster is a proper 3-node replica set (`k8s/mongo.yaml`) shared cross-namespace, now in the `infra` namespace |
+| MongoDB (host / dev) | `localhost:27017` | `demo-mongo` — a single standalone instance, every other service's store, `_qa`-suffixed DB names for QA; **dev-only**, in-cluster is a proper 3-node replica set (`k8s/mongo.yaml`) shared cross-namespace, now in the `infra` namespace |
 | Kafka (host clients / dev, prod) | `localhost:9092` | **dev-only**; prod k8s pods use their own in-cluster Kafka (`kafka.infra.svc.cluster.local:9092`, `k8s/kafka.yaml`) |
 | Kafka (host clients / dev, QA) | `localhost:9192` | **dev-only**; QA k8s pods use their own separate in-cluster Kafka (`demo-qa` namespace) — shared topics would mean QA test traffic triggering prod's saga |
 | Redis (host / dev, prod) | `localhost:6379` | **dev-only**; prod k8s pods use their own in-cluster Redis (`k8s/redis.yaml`, `infra` namespace) |
