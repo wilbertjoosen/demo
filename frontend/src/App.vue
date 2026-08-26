@@ -30,7 +30,7 @@ onUnmounted(() => {
 
 <template>
   <div v-if="!auth.isAuthenticated" class="flex min-h-screen items-center justify-center bg-gray-50">
-    <el-card class="w-96 text-center">
+    <el-card class="w-96">
       <h1 class="mb-2 text-2xl font-semibold">{{ t('nav.home') }}</h1>
       <p class="mb-6 text-gray-600">{{ t('home.description') }}</p>
       <el-button type="primary" size="large" class="w-full" @click="auth.login">{{ t('nav.login') }}</el-button>
