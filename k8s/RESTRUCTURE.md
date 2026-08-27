@@ -1,196 +1,164 @@
-# k8s manifests → Kustomize base + overlays
+# k8s manifest layout — folder split + Kustomize
 
-**Status:** proposal / not yet implemented.
-**Owner:** wilbertjoosen.
-**Goal:** stop hand-maintaining a full copy of every manifest per branch.
-
----
-
-## Problem
-
-Environment differentiation is currently **the git branch**:
-
-| Branch | `k8s/*.yaml` targets | ArgoCD Application | Namespace |
-|---|---|---|---|
-| `main` | production | `k8s-argocd/application.yaml` (`targetRevision: main`, `path: k8s`) | `demo` |
-| `testing` | QA | `k8s-argocd/application-qa.yaml` (`targetRevision: testing`, `path: k8s`) | `demo-qa` |
-| `develop` | local k3d dev | — (applied by hand / `k8s-local.sh`) | `demo` |
-
-Every manifest is copied in full on each branch with the environment's `namespace:`,
-image tags, DB names, and (on `testing`) Argo Rollouts / Vault wiring baked directly in.
-Consequences:
-
-- **Every `develop → testing` promotion re-diffs ~20 manifests.** The sync that produced
-  this document hit 15 conflicting files; ~6 needed manual infra judgment.
-- Files exist on one branch and not another (`k8s/keycloak.yaml`, `k8s/grafana.yaml`,
-  `k8s/mongo.yaml`, … are on `main`/`develop` but not `testing`, which shares that infra
-  with prod) — so a merge sees "deleted here / modified there" conflicts.
-- The intentional per-environment differences and the accidental drift are impossible to
-  tell apart in a diff.
-
-Divergence at time of writing:
-
-| Pair | ahead / behind | files differ |
-|---|---|---|
-| develop ↔ testing | testing +155, develop +29 | 243 |
-| testing ↔ main | main +142, testing +59 | 174 |
-| develop ↔ main | main +242, develop +33 | 226 |
+**Status:** live on all three branches. `main` — folder split (#74) + thin Kustomization / ArgoCD
+Kustomize mode (#75). `testing` — same tree + the `demo-qa` overlay + CI `images:` automation
+(#76). `develop` — adopts `k8s/demo/` + `k8s/platform/` (this PR), no `demo-qa/` (develop deploys
+the `demo` namespace, same as `main`). `k8s/demo/**` and `k8s/platform/**` are now byte-identical
+on every branch, so they never conflict on a merge. testing's `demo-qa` overlay details live in
+that branch's copy of this file until the next `testing → main` sync.
 
 ---
 
-## Target layout
+## Problem it solved
+
+The environment used to be **the git branch**: `main`'s `k8s/*.yaml` was prod (`namespace: demo`),
+`testing`'s the same files rewritten for QA (`namespace: demo-qa`), each a full hand-maintained
+copy. Every `develop → testing → main` promotion re-diffed ~20 manifests — namespace, image tag,
+DB name, `Deployment`-vs-`Rollout`, Vault wiring interleaved with real changes. Files existed on one
+branch and not another, so merges hit "deleted here / modified there".
+
+## Layout
 
 ```
 k8s/
-├── base/
-│   ├── apps/                      # every app workload, namespace-less, no image tag
-│   │   ├── audit-service.yaml
-│   │   ├── chat-service.yaml
-│   │   ├── common-service.yaml
-│   │   ├── config-server.yaml
-│   │   ├── delivery-service.yaml
-│   │   ├── eureka-server.yaml
-│   │   ├── frontend.yaml
-│   │   ├── gateway-service.yaml
-│   │   ├── inventory-service.yaml
-│   │   ├── notification-service.yaml
-│   │   ├── order-service.yaml     # plain Deployment in base; demo-qa overlay patches it to a Rollout
-│   │   ├── payment-service.yaml
-│   │   ├── product-comment-service.yaml
-│   │   ├── product-media-service.yaml
-│   │   ├── product-review-service.yaml
-│   │   ├── product-service.yaml
-│   │   ├── reporting-service.yaml
-│   │   ├── shipping-service.yaml
-│   │   ├── user-service.yaml
-│   │   ├── ingress.yaml
-│   │   └── kustomization.yaml
-│   ├── infra/                     # shared stateful — mysql, mongo, kafka, redis, keycloak,
-│   │   │                          #   elasticsearch, mailpit, vault
-│   │   └── kustomization.yaml
-│   └── monitoring/                # grafana, prometheus, loki, tempo, promtail, kibana
-│       └── kustomization.yaml     #   (pyroscope server lives here too if/when self-hosted)
-└── overlays/
-    ├── demo/                      # PRODUCTION
-    │   ├── kustomization.yaml     #   namespace: demo
-    │   │                          #   resources: ../../base/apps, ../../base/infra, ../../base/monitoring
-    │   ├── configmap-common.yaml  #   full demo values (replace, not patch)
-    │   ├── images.yaml            #   `images:` tag pins
-    │   └── patches/               #   prod-only tweaks, if any
-    └── demo-qa/                   # QA
-        ├── kustomization.yaml     #   namespace: demo-qa
-        │                          #   resources: ../../base/apps
-        │                          #            + ../../base/infra  (kafka, redis, mailpit ONLY — see below)
-        │                          #   NO base/monitoring (shares prod's)
-        ├── configmap-common.yaml  #   demo-qa values (OTLP_ENDPOINT, *_qa DB names, demo-qa realm, VAULT_*)
-        ├── images.yaml            #   independent tag pins — this is how QA runs ahead of prod
-        └── patches/
-            ├── order-service-rollout.yaml   # Deployment → argoproj.io Rollout + canary steps
-            ├── db-names.yaml                # MONGO_DB: orders_qa / media_qa / reviews_qa / …
-            ├── media-upload-dir.yaml        # MEDIA_UPLOAD_DIR: media-uploads-qa
-            └── vault.yaml                   # VAULT_TOKEN env + spring.cloud.vault.* where needed
+├── kustomization.yaml         # resources: [platform, demo]        ← what `path: k8s` renders
+├── platform/                  # cluster-wide, ONE copy, on every branch, kept identical by merges
+│   ├── kustomization.yaml     #   resources: [namespaces, infra, monitoring]
+│   ├── namespaces/            #   namespace(.yaml = demo), namespace-infra, namespace-monitoring
+│   ├── infra/                 #   elasticsearch, kafka, keycloak, mailpit, mongo, mysql,
+│   │                          #   promtail-daemonset, redis, vault           (namespace: infra)
+│   └── monitoring/            #   grafana, k6, kibana, kube-state-metrics, loki, node-exporter,
+│                              #   prometheus, pyroscope, tempo               (namespace: monitoring)
+├── demo/                      # the app tier (namespace: demo) — 21 manifests: every service +
+│   ├── kustomization.yaml     #   gateway + eureka + config-server + frontend + ingress +
+│   └── *.yaml                 #   configmap-common
+└── demo-qa/                   # (testing branch only) a THIN OVERLAY of demo/ — see below.
 ```
 
-### What is "common"
+`platform/` is what "common" means: namespaces + the shared stateful `infra` tier + the shared
+`monitoring` tier. QA reaches all of it cross-namespace (`mysql.infra.svc.cluster.local`, …) and
+never re-deploys it.
 
-`base/infra` + `base/monitoring`. The `demo` overlay takes all of both. The `demo-qa`
-overlay takes **only** `kafka`, `redis`, `mailpit` from `infra` (the genuinely
-QA-isolated pieces) and **none** of `monitoring` — QA reaches the shared
-`monitoring`-namespace Grafana / Prometheus / Loki / Tempo the same way prod does.
+Every `kustomization.yaml` under `platform/` and `demo/` is a **plain resource list** — no
+transformers — so `kubectl kustomize k8s` renders byte-identical to the raw manifests. It exists to
+(a) let ArgoCD and `kubectl -k` use the Kustomize renderer and (b) give `demo-qa/` something to
+`../demo`-reference.
 
-`namespace-infra.yaml` / `namespace-monitoring.yaml` / `namespace.yaml` stay as-is
-(or fold into `CreateNamespace=true`, already set on both Applications).
+## ArgoCD
 
-`secret-order-db.yaml` and every imperatively-created Secret (`ghcr-pull-secret`,
-`mysql-credentials`, `grafana-admin`, `pyroscope-agent`, `aws-credentials`,
-`vault-token`) stay **out** of Kustomize, unchanged — see the README's k8s section.
+| Application | `source` | `targetRevision` | Renders |
+|---|---|---|---|
+| `demo` (`application.yaml`) | `path: k8s` (Kustomize auto-detected — no `directory:` block) | `main` | `k8s/kustomization.yaml` → `platform/**` + `demo/**` |
+| `demo-qa` (`application-qa.yaml`) | `path: k8s/demo-qa` *(pending step 5; currently `path: k8s`)* | `testing` | `k8s/demo-qa/**` only |
 
----
+`k8s/kustomization.yaml` does **not** list `demo-qa`, so the `demo` Application never renders it —
+that overlay is owned entirely by `application-qa.yaml`.
 
-## The real per-overlay diff
+## The `demo-qa` overlay
 
-Distilled from the develop↔testing manifest conflicts:
+`k8s/demo-qa/` is **~8 files**, not 24 copies. It reuses `../demo`'s manifests and changes only
+what actually differs between prod and QA:
 
-| Concern | `demo` overlay | `demo-qa` overlay |
-|---|---|---|
-| namespace | `demo` | `demo-qa` |
-| image tags | `images.yaml` | `images.yaml` (independent — lets QA run newer builds) |
-| `imagePullPolicy` | `IfNotPresent` | `Always` |
-| `MONGO_DB` per service | `orders`, `media`, `reviews`, … | `orders_qa`, `media_qa`, … (patch) |
-| Keycloak realm | `demo` | `demo-qa` |
-| `CORS_ALLOWED_ORIGINS` | `demo.localhost` | `qa.demo.localhost` |
-| `MEDIA_UPLOAD_DIR` | `media-uploads` | `media-uploads-qa` (patch) |
-| order-service kind | `Deployment` | `Rollout` + canary steps (patch) |
-| Vault | — | `VAULT_TOKEN` + `spring.cloud.vault.*` (patch) |
-| infra deployed | all of `base/infra` | `kafka`, `redis`, `mailpit` only |
-| monitoring deployed | all of `base/monitoring` | none (shared) |
-| `TRACING_EXPORT_OTLP_ENABLED` | `"true"` | `"true"` |
-| OTLP endpoint var | `OTLP_ENDPOINT` | `OTLP_ENDPOINT` (unify the name while doing this) |
-
-Everything not in this table is identical and belongs in `base/`.
-
----
-
-## ArgoCD changes
+```
+k8s/demo-qa/
+├── kustomization.yaml
+├── configmap-common.yaml          # strategic-merge patch: the QA values (see table)
+├── kafka.yaml                     # QA-isolated infra — own copies, namespace: demo-qa
+├── redis.yaml
+├── mailpit.yaml
+├── namespace.yaml                 # the demo-qa Namespace object
+└── patches/
+    ├── mongo-db-names.yaml        # MONGO_DB: <svc>_qa  for all 12 stateful services
+    ├── order-service.yaml         # canary step weights (kind is already Rollout in demo/)
+    └── vault.yaml                 # VAULT_TOKEN env on the services that read Vault
+```
 
 ```yaml
-# k8s-argocd/application.yaml      (demo)     spec.source.path: k8s          →  k8s/overlays/demo
-# k8s-argocd/application-qa.yaml   (demo-qa)  spec.source.path: k8s          →  k8s/overlays/demo-qa
+# k8s/demo-qa/kustomization.yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: demo-qa                  # one line — rewrites every inherited manifest's namespace
+resources:
+  - namespace.yaml
+  - ../demo                         # the whole app tier, reused
+  - kafka.yaml                      # ...plus QA's own kafka/redis/mailpit
+  - redis.yaml
+  - mailpit.yaml
+images:                             # QA runs its own tags, promoted to prod later
+  - { name: ghcr.io/wilbertjoosen/demo-order-service, newTag: <qa-tag> }
+  # ...one per service + frontend
+patches:
+  - path: configmap-common.yaml     # target: ConfigMap/demo-common-config
+  - path: patches/mongo-db-names.yaml
+  - path: patches/order-service.yaml
+  - path: patches/vault.yaml
 ```
 
-`targetRevision` unchanged for now (`main` / `testing`). See Phase 2.
+| Concern | `demo/` (prod) | `demo-qa/` overlay does |
+|---|---|---|
+| namespace | `demo` | `namespace: demo-qa` transformer |
+| image tags | promoted from QA | `images:` list (independent) |
+| `MONGO_DB` | `orders`, `media`, … | `patches/mongo-db-names.yaml` → `orders_qa`, `media_qa`, … (12 services) |
+| Keycloak realm / JWK / token / admin URIs | `demo` realm | `configmap-common.yaml` patch → `demo-qa` realm |
+| `KAFKA_BOOTSTRAP_SERVERS` | `kafka.infra…:9092` | patch → `kafka:9092` (in-namespace) |
+| `REDIS_HOST` / `MAIL_HOST` | `…infra.svc…` | patch → `redis` / `mailpit` (in-namespace) |
+| `DB_NAME` | `demo` | patch → `demo_qa` |
+| `CORS_ALLOWED_ORIGINS` | `demo.localhost` | patch → `qa.demo.localhost` |
+| `MONGO_HOST` | replica-set DNS | patch (same replica set, kept explicit) |
+| order-service canary steps | prod weights | `patches/order-service.yaml` |
+| Vault | — | `patches/vault.yaml` — `VAULT_TOKEN` env on order-service (+ any other Vault reader) |
+| own kafka / redis / mailpit | — | `kafka.yaml` / `redis.yaml` / `mailpit.yaml` in the overlay |
+| shared infra (mysql, mongo, keycloak, es, vault) + all monitoring | deployed by `platform/` | not referenced — reached cross-namespace |
 
----
+## CI
 
-## Migration steps
+`.github/workflows/ci-cd.yml`'s two manifest-mutating jobs no longer hardcode `k8s/<svc>.yaml`:
 
-1. **Branch off `main`** — production is the canonical manifest shape.
-   `mkdir -p k8s/base/{apps,infra,monitoring} k8s/overlays/{demo,demo-qa}`.
-2. Move each `k8s/*.yaml` into the right `base/…` folder. **Strip `namespace:` and image
-   tags**; reduce env to the common set. Write the three `base/**/kustomization.yaml`
-   `resources:` lists.
-3. **`overlays/demo/`**: `kustomization.yaml` (`namespace: demo`, resources = all three base
-   groups), full `configmap-common.yaml`, `images.yaml` from `main`'s current tags.
-   **Verify:** `kubectl kustomize k8s/overlays/demo` must render byte-identical (modulo key
-   ordering) to `main`'s current flat manifests. `diff` it.
-4. **`overlays/demo-qa/`**: `kustomization.yaml` (`namespace: demo-qa`, resources = `base/apps`
-   + partial `base/infra`), `configmap-common.yaml` with `testing`'s current values, the
-   patches from the table. **Verify** the same way against `testing`'s current manifests.
-5. Repoint both ArgoCD Application `path`s. Sync `demo` first (render-diff is a no-op = safe),
-   then `demo-qa`.
-6. Delete the flat `k8s/*.yaml`. Update the README's k8s section and `k8s-local.sh`
-   (`kubectl apply -k k8s/overlays/demo` instead of `-f k8s/`).
+- **`update-manifests`** (push → `testing`, or `workflow_dispatch`): resolves each rebuilt service
+  to its manifest with `find k8s -maxdepth 3 -name "<svc>.yaml" -not -path 'k8s/platform/*'`.
+- **`promote-to-production`** (push → `main`): for each `k8s/demo/*.yaml`, finds testing's
+  counterpart (`k8s/demo-qa/<name>` then `k8s/<name>`) and copies its image tag across.
 
-Land the whole thing on `main`, then merge to `testing` and `develop` so `base/` is identical
-everywhere.
+Both stage with `git add k8s/`. These still `sed` the `image:` line inside each manifest —
+switching them to edit Kustomize `images:` blocks instead is a later optimization, tracked in
+[below](#later-move-image-bumps-into-kustomize).
 
----
+## Rollout
 
-## Phase 2 (optional, the real prize)
+1. **Folder split (#74, done)** — `main` has `k8s/platform/` + `k8s/demo/`.
+2. **Thin Kustomization (this PR)** — `kustomization.yaml` in `k8s/`, `k8s/platform/**`, `k8s/demo/`;
+   `application.yaml` drops its `directory:` block (Kustomize auto-detected); README bootstrap is
+   `kubectl apply -k k8s`.
+3. **`main` → `testing`** — brings `platform/` + `demo/` + the Kustomization files onto testing.
+   Then, on `testing`:
+   - `git rm` the flat manifests `platform/` now supersedes (`k8s/kafka.yaml` etc. — but keep a
+     copy of `kafka`/`redis`/`mailpit` for the overlay), and `k8s/keycloak.yaml` (superseded by
+     `k8s/platform/infra/keycloak.yaml`).
+   - author `k8s/demo-qa/` per the [overlay spec](#the-demo-qa-overlay), moving `k8s/configmap-common.yaml`
+     (QA values) → `k8s/demo-qa/configmap-common.yaml` as the patch, `k8s/{kafka,redis,mailpit,namespace}.yaml`
+     → `k8s/demo-qa/`, and distilling the 21 per-service diffs into `patches/`.
+   - `git rm` the remaining flat `k8s/*-service.yaml` etc. (their content now comes from `../demo`
+     + patches).
+   - set `application-qa.yaml` → `path: k8s/demo-qa`.
+   - verify: `kubectl kustomize k8s/demo-qa` renders, and diff its output against `testing`'s
+     pre-change manifests — only namespace / image tag / the listed keys may differ.
+4. **`main` → `develop`** — develop's apps are already `namespace: demo`, so it adopts `demo/` +
+   `platform/` + the Kustomization files and `git rm`s its flat copies.
 
-Once both overlays live on `main`, point the **`demo-qa` Application's `targetRevision` at
-`main`** too. Then:
+Between steps 2 and 3, CI's `promote-to-production` finds nothing under `k8s/demo-qa/` on `testing`
+and no-ops — fine, no releases are expected mid-rollout.
 
-- `testing` and `develop` become **code-only branches** — no k8s manifests to merge, ever.
-- QA runs ahead of prod purely via `overlays/demo-qa/images.yaml` pinning newer per-commit
-  image tags (CI already builds one image per commit — see README CI/CD section).
-- A promotion is: bump `overlays/demo/images.yaml` to the tag QA has been running.
+## Verification done in this PR
 
-This is a process change (QA no longer defined by "whatever's on the `testing` branch"),
-so it's deliberately a separate decision from the mechanical restructure above.
+- Every `kustomization.yaml` added is a plain `resources:` list — no transformers.
+- `kubectl kustomize k8s` renders **115 resources**, matching the pre-Kustomize
+  `kubectl apply --dry-run=client -R` count against the live cluster.
+- No manifest content, `namespace:`, or `image:` line changed.
 
----
+## Later: move image bumps into Kustomize
 
-## Risks / notes
-
-- **`kubectl kustomize` render-diff in steps 3–4 is the safety net.** Do not skip it. A
-  clean diff against the current live manifests is the whole proof the migration is inert.
-- **ArgoCD `prune: true`** on both Applications: the cutover sync will show a
-  delete+create for every resource (same content, moved file). Set `prune: false` for the
-  one cutover sync, re-enable immediately after.
-- `bucket4j` / rate limiting, `EndUserIdTracingFilter`, Pyroscope env, replica-set Mongo:
-  these are testing-first features not yet on `develop`. They are code + `base/` concerns,
-  independent of this restructure — but doing the restructure first means the
-  `testing → develop` back-merge that brings them over is code-only.
-- Estimated size: ~40 files moved, ~10 new `kustomization.yaml` / patch files, 2 ArgoCD
-  edits, README + `k8s-local.sh` updates. One focused PR.
+Once `demo-qa` is an overlay, both CI jobs can stop `sed`-ing `image:` lines inside manifests and
+instead edit the `images:` block in `k8s/demo/kustomization.yaml` (prod) /
+`k8s/demo-qa/kustomization.yaml` (QA) — or set them on the ArgoCD Application's
+`spec.source.kustomize.images`. One list per environment, no per-file edits. Its own PR — it
+rewrites both CI jobs, which gate prod deploys.

@@ -1,0 +1,211 @@
+# Scrapes k8s-deployed pods across BOTH the demo (prod) and demo-qa namespaces — a single shared
+# instance, same reasoning as promtail-daemonset.yaml (this file is excluded on the testing branch
+# for the same reason: one cluster-wide instance, not one per environment, to avoid the demo-qa
+# ArgoCD Application fighting the demo one over the same ClusterRole/ClusterRoleBinding names).
+#
+# Originally split from docker-compose.yml's own Prometheus because pod IPs on the k3d overlay
+# network turned out not to be reachable from a container outside the cluster at all,
+# discovery-via-API-server notwithstanding. Grafana (k8s/grafana.yaml, also now in-cluster) reaches
+# this one directly over in-cluster DNS — docker-compose no longer runs its own Prometheus/Grafana
+# at all; both branches' docker-compose.yml only covers datastores/broker/mail for the host-JVM dev
+# flow now. The "monitoring" namespace itself is k8s/namespace-monitoring.yaml, not declared here.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: prometheus
+  namespace: monitoring
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: prometheus
+rules:
+  - apiGroups: [""]
+    resources: ["nodes", "services", "endpoints", "pods"]
+    verbs: ["get", "list", "watch"]
+  # nodes/proxy — the kubernetes-nodes-cadvisor scrape job below reaches each kubelet's own
+  # /metrics/cadvisor through the API server's node-proxy endpoint (kubelets aren't otherwise
+  # directly reachable by address the way pod/service discovery targets are), which needs this
+  # separately from the plain "nodes" get/list/watch above.
+  - apiGroups: [""]
+    resources: ["nodes/proxy"]
+    verbs: ["get"]
+  - nonResourceURLs: ["/metrics"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: prometheus
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: prometheus
+subjects:
+  - kind: ServiceAccount
+    name: prometheus
+    namespace: monitoring
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: monitoring
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+
+    scrape_configs:
+      - job_name: kubernetes-pods
+        # No api_server/authorization block — running as a pod in-cluster, the client-go library
+        # auto-discovers the API server and this ServiceAccount's auto-mounted, auto-rotated token.
+        kubernetes_sd_configs:
+          - role: pod
+        metrics_path: /actuator/prometheus
+        relabel_configs:
+          # Opt-in via the same "monitored: true" label already on most Service/Deployment
+          # manifests (was meant for a kube-prometheus-stack ServiceMonitor that never
+          # materialized — reused here instead).
+          - source_labels: [__meta_kubernetes_pod_label_monitored]
+            regex: "true"
+            action: keep
+          - source_labels: [__meta_kubernetes_namespace]
+            target_label: namespace
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            target_label: app
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: pod
+      # P2 additions below — kube-state-metrics/node-exporter (k8s/kube-state-metrics.yaml,
+      # k8s/node-exporter.yaml) for cluster/host-level metrics, and a kubelet cAdvisor job
+      # specifically for the PVC disk-pressure alert this was blocked on
+      # (kubelet_volume_stats_available_bytes/capacity_bytes — neither kube-state-metrics nor
+      # node-exporter expose actual volume USAGE, only PVC object metadata / host filesystem stats).
+      - job_name: node-exporter
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces: { names: [monitoring] }
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            regex: node-exporter
+            action: keep
+          - source_labels: [__meta_kubernetes_pod_node_name]
+            target_label: node
+      - job_name: kube-state-metrics
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces: { names: [monitoring] }
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            regex: kube-state-metrics
+            action: keep
+          - source_labels: [__meta_kubernetes_pod_container_port_number]
+            regex: "8080"
+            action: keep
+      # TEMPORARILY DISABLED (2026-08-25) — confirmed live, mid-rollout, that scraping
+      # k3d-demo-server-0's cAdvisor endpoint alone took 8.4s and the kubernetes-nodes job below
+      # another 6.7s, on that same node, on the default 15s interval — combined, essentially a
+      # 100% scrape duty cycle sitting on the exact node the API server/control plane also lives
+      # on (explains the TLS handshake timeouts hitting kubectl during that same window). Found
+      # while investigating why an unrelated, low-risk rollout (enduser.id tagging) was taking far
+      # longer and hitting far more restarts than every earlier rollout today. Re-enable with a
+      # much longer scrape_interval (60s+) once node headroom is confirmed comfortable again —
+      # don't just flip this back on at the original 15s.
+      # - job_name: kubernetes-nodes-cadvisor
+      #   scheme: https
+      #   tls_config:
+      #     ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+      #     insecure_skip_verify: true
+      #   bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+      #   kubernetes_sd_configs:
+      #     - role: node
+      #   relabel_configs:
+      #     - action: labelmap
+      #       regex: __meta_kubernetes_node_label_(.+)
+      #     - target_label: __address__
+      #       replacement: kubernetes.default.svc:443
+      #     - source_labels: [__meta_kubernetes_node_name]
+      #       regex: (.+)
+      #       target_label: __metrics_path__
+      #       replacement: /api/v1/nodes/${1}/proxy/metrics/cadvisor
+      # TEMPORARILY DISABLED (2026-08-25) — see kubernetes-nodes-cadvisor's comment above, same
+      # reasoning, same fix.
+      # - job_name: kubernetes-nodes
+      #   scheme: https
+      #   tls_config:
+      #     ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+      #     insecure_skip_verify: true
+      #   bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+      #   kubernetes_sd_configs:
+      #     - role: node
+      #   relabel_configs:
+      #     - action: labelmap
+      #       regex: __meta_kubernetes_node_label_(.+)
+      #     - target_label: __address__
+      #       replacement: kubernetes.default.svc:443
+      #     - source_labels: [__meta_kubernetes_node_name]
+      #       regex: (.+)
+      #       target_label: __metrics_path__
+      #       replacement: /api/v1/nodes/${1}/proxy/metrics
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  namespace: monitoring
+  labels: { app: prometheus }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: prometheus } }
+  template:
+    metadata: { labels: { app: prometheus } }
+    spec:
+      serviceAccountName: prometheus
+      containers:
+        - name: prometheus
+          # Pinned (2026-08-25, alongside the P2 scrape-config additions this file already needed
+          # touching) — not :latest, same reasoning as every other image in this stack after
+          # Tempo's :latest broke its config schema outright (see k8s/tempo.yaml's comment).
+          image: prom/prometheus:v3.14.0
+          args:
+            - --config.file=/etc/prometheus/prometheus.yml
+            - --storage.tsdb.path=/prometheus
+            # Off by default — Tempo's metrics-generator (k8s/tempo.yaml) pushes span-metrics and
+            # service-graph metrics here via remote_write, so this needs to actually accept them.
+            - --web.enable-remote-write-receiver
+          ports: [{ containerPort: 9090 }]
+          volumeMounts:
+            - { name: config, mountPath: /etc/prometheus }
+            - { name: data, mountPath: /prometheus }
+          resources:
+            requests: { cpu: "100m", memory: "256Mi" }
+            limits: { cpu: "500m", memory: "512Mi" }
+      volumes:
+        - name: config
+          configMap: { name: prometheus-config }
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+  namespace: monitoring
+spec:
+  selector: { app: prometheus }
+  ports: [{ port: 9090, targetPort: 9090 }]
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: prometheus-ingress
+  namespace: monitoring
+spec:
+  rules:
+    - host: prometheus.demo.localhost
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service: { name: prometheus, port: { number: 9090 } }

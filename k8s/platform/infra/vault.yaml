@@ -1,0 +1,81 @@
+# In-cluster Vault (dev mode), in the infra namespace (k8s/namespace-infra.yaml) — shared across
+# prod and QA the same way it already is on the host (docker-compose.yml's own vault comment: "one
+# throwaway local Vault, not per-environment"). Both demo and demo-qa reach this via cross-namespace
+# Service DNS (vault.infra.svc.cluster.local — see k8s/configmap-common.yaml here and on the
+# testing branch).
+#
+# emptyDir, not a PVC: dev-mode Vault is in-memory storage already (nothing persists across a
+# restart on the host either — see docker-compose.yml's comment), so there's nothing to preserve
+# either way. The root token is fixed (demo-root-token) for the same "throwaway, low-stakes demo
+# credentials" reasoning already accepted for the host instance.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vault
+  namespace: infra
+  labels: { app: vault }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: vault } }
+  template:
+    metadata: { labels: { app: vault } }
+    spec:
+      containers:
+        - name: vault
+          image: hashicorp/vault:latest
+          ports: [{ containerPort: 8200 }]
+          env:
+            - { name: VAULT_DEV_ROOT_TOKEN_ID, value: "demo-root-token" }
+            - { name: VAULT_DEV_LISTEN_ADDRESS, value: "0.0.0.0:8200" }
+          resources:
+            requests: { cpu: "50m", memory: "64Mi" }
+            limits: { cpu: "250m", memory: "192Mi" }
+          readinessProbe:
+            tcpSocket: { port: 8200 }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket: { port: 8200 }
+            initialDelaySeconds: 15
+            periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vault
+  namespace: infra
+spec:
+  selector: { app: vault }
+  ports: [{ name: vault, port: 8200, targetPort: 8200 }]
+---
+# One-shot: writes order-service's DB credentials + Keycloak client secret into Vault's KV store,
+# same as docker-compose.yml's vault-init. Safe to re-run (`vault kv put` is idempotent) — set as
+# a Job for the same reason mysql-create-qa-db (k8s/mysql.yaml) is.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: vault-init
+  namespace: infra
+spec:
+  backoffLimit: 5
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: vault-init
+          image: hashicorp/vault:latest
+          env:
+            - { name: VAULT_ADDR, value: "http://vault:8200" }
+            - { name: VAULT_TOKEN, value: "demo-root-token" }
+          command:
+            - sh
+            - -c
+            - |
+              until vault status >/dev/null 2>&1; do
+                echo "waiting for vault..."; sleep 2
+              done
+              vault kv put secret/order-service \
+                DB_USERNAME=demo \
+                DB_PASSWORD=demo \
+                ORDER_SERVICE_CLIENT_SECRET=order-service-secret
+              echo "order-service secrets written to Vault"

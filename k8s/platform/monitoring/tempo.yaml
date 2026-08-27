@@ -1,0 +1,160 @@
+# In-cluster Tempo, single shared instance for both demo (prod) and demo-qa — same reasoning as
+# k8s/prometheus.yaml: one instance, not one per environment, so demo-qa's ArgoCD Application never
+# fights demo's over the same objects. Unlike Prometheus/Loki (pull/scrape-based), every traced
+# service pushes spans here directly over OTLP, so it needs Tempo's address the same way it needs
+# Kafka's or MySQL's — see k8s/configmap-common.yaml's OTLP_ENDPOINT (now pointing in-cluster
+# instead of at docker-compose's Tempo, which this replaces for both branches).
+#
+# Image pinned to 2.7.1, not :latest — confirmed live: v3 restructured storage config around a new
+# backend-scheduler/backend-worker split and dropped the top-level `ingester`/`compactor` blocks
+# this single-binary, local-storage config below is written against (same incompatibility
+# docker-compose.yml's own former Tempo container already had a comment about, for the exact same
+# reason) — 2.7.1 is the last 2.x release and matches this config's schema.
+#
+# otlp receiver endpoints are explicit (0.0.0.0), not left to Tempo's own default — confirmed live
+# that an empty `http:`/`grpc:` block makes Tempo bind its OTLP receivers to localhost:4318/4317
+# ("Starting HTTP server" / "Starting GRPC server" ... endpoint=localhost:*** in its own logs), which
+# only accepts connections from inside the same network namespace. The Service/Endpoints still
+# looked correctly wired (routes to the pod's real IP), so every service's span export just got a
+# silent "connection refused" cluster-wide — no traces ever reached storage despite everything else
+# (config, DNS, DNS resolution, the endpoint value itself) being correct.
+#
+# metrics_generator powers Grafana's Traces Drilldown "Span rate"/service-graph panels (TraceQL
+# metrics queries like rate()/histogram_over_time()) — without it those panels 500 with "error
+# finding generators in Querier.queryRangeRecent: empty ring", since nothing ever registers as a
+# generator instance. Pushes to the in-cluster Prometheus over remote_write, which needs
+# --web.enable-remote-write-receiver (k8s/prometheus.yaml) to actually accept it — off by default.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tempo-config
+  namespace: monitoring
+data:
+  tempo.yaml: |
+    server:
+      http_listen_port: 3200
+    distributor:
+      receivers:
+        otlp:
+          protocols:
+            http:
+              endpoint: 0.0.0.0:4318
+            grpc:
+              endpoint: 0.0.0.0:4317
+    ingester:
+      trace_idle_period: 10s
+    compactor:
+      compaction:
+        block_retention: 24h
+    storage:
+      trace:
+        backend: local
+        local:
+          path: /var/tempo/traces
+        wal:
+          path: /var/tempo/wal
+    metrics_generator:
+      ring:
+        # Unlike the ingester ring above (which defaults to an in-memory KV store and auto-joins on
+        # its own in single-binary mode), the metrics-generator ring's own lifecycler needs this
+        # explicit — without it nothing ever registers, so the querier's TraceQL metrics queries
+        # (rate()/histogram_over_time(), the "Span rate" Traces Drilldown panel) permanently 500
+        # with "error finding generators in Querier.queryRangeRecent: empty ring", even once the
+        # module itself starts cleanly with no other error.
+        kvstore:
+          store: inmemory
+      registry:
+        collection_interval: 15s
+        external_labels:
+          source: tempo
+      storage:
+        path: /var/tempo/generator/wal
+        remote_write:
+          - url: http://prometheus.monitoring.svc.cluster.local:9090/api/v1/write
+            send_exemplars: true
+      # Trimmed at first, on the (wrong) assumption it was only needed for local-blocks specifically
+      # and we weren't enabling that processor — turns out Grafana's Traces Drilldown app itself
+      # requires local-blocks to be enabled for its own TraceQL metrics queries ("localblocks
+      # processor not found" once the ring issue above was fixed and this became the next error).
+      traces_storage:
+        path: /var/tempo/generator/traces
+    overrides:
+      defaults:
+        metrics_generator:
+          # local-blocks specifically required by Grafana's Traces Drilldown app for its own
+          # TraceQL metrics queries — confirmed live via "localblocks processor not found" once
+          # the ring config above was fixed and this became the next (and last) blocking error.
+          processors: [service-graphs, span-metrics, local-blocks]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tempo
+  namespace: monitoring
+  labels: { app: tempo }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: tempo } }
+  template:
+    metadata: { labels: { app: tempo } }
+    spec:
+      containers:
+        - name: tempo
+          image: grafana/tempo:2.7.1
+          args:
+            - -config.file=/etc/tempo/tempo.yaml
+          ports:
+            - { containerPort: 3200, name: http }
+            - { containerPort: 4317, name: otlp-grpc }
+            - { containerPort: 4318, name: otlp-http }
+          volumeMounts:
+            - { name: config, mountPath: /etc/tempo }
+            - { name: data, mountPath: /var/tempo }
+          # Bumped from 256Mi/512Mi (2026-08-25) — a burst of trace ingestion from ~18 services
+          # restarting repeatedly during an unrelated incident (Pyroscope agent crash-looping) drove
+          # Tempo well past the old 512Mi limit, OOMKilling it every ~15-20s (exit code 137) and
+          # breaking Grafana's Traces Drilldown ("connection refused") for everyone, not just the
+          # services that were actually restarting.
+          resources:
+            requests: { cpu: "100m", memory: "384Mi" }
+            limits: { cpu: "500m", memory: "1536Mi" }
+          readinessProbe:
+            httpGet: { path: /ready, port: 3200 }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /ready, port: 3200 }
+            initialDelaySeconds: 20
+            periodSeconds: 20
+      volumes:
+        - name: config
+          configMap: { name: tempo-config }
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tempo
+  namespace: monitoring
+spec:
+  selector: { app: tempo }
+  ports:
+    - { name: http, port: 3200, targetPort: 3200 }
+    - { name: otlp-grpc, port: 4317, targetPort: 4317 }
+    - { name: otlp-http, port: 4318, targetPort: 4318 }
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: tempo-ingress
+  namespace: monitoring
+spec:
+  rules:
+    - host: tempo.demo.localhost
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service: { name: tempo, port: { number: 3200 } }
