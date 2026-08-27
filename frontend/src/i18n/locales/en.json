@@ -173,7 +173,9 @@
     "identityStoredInKeycloak": "Saving these updates the account directly in Keycloak.",
     "userCreated": "User created",
     "userCreateError": "Could not create user",
-    "reports": "Reports"
+    "reports": "Reports",
+    "roles": "Realm roles",
+    "rolesPlaceholder": "Realm default only"
   },
   "queues": {
     "title": "Action Queues",

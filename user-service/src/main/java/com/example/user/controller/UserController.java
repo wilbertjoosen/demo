@@ -44,6 +44,13 @@ public class UserController {
         return assembler.toCollectionModel(userService.list());
     }
 
+    /** Realm roles an admin can pick from on the create-user form — read live from Keycloak. */
+    @GetMapping("/roles")
+    @PreAuthorize("hasRole('ADMIN')")
+    public List<RealmRole> roles() {
+        return userService.assignableRoles();
+    }
+
     /** Any authenticated user — a minimal, PII-free directory for picking someone to message. */
     @GetMapping("/directory")
     public List<UserDirectoryEntry> directory(@AuthenticationPrincipal Jwt jwt) {
@@ -69,7 +76,7 @@ public class UserController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<EntityModel<UserProfileView>> createUser(@Valid @RequestBody CreateUserRequest request) {
         UserProfileView created = userService.createUser(request.username(), request.email(), request.firstName(),
-                request.lastName(), request.password(), request.toFields());
+                request.lastName(), request.password(), request.toFields(), request.rolesOrEmpty());
         EntityModel<UserProfileView> model = assembler.toModel(created);
         return ResponseEntity.created(URI.create(model.getRequiredLink("self").getHref())).body(model);
     }

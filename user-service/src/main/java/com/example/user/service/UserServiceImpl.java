@@ -22,6 +22,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -48,13 +49,25 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public UserProfileView createUser(
-            String username, String email, String firstName, String lastName, String password, ProfileFields fields) {
+    public UserProfileView createUser(String username, String email, String firstName, String lastName,
+                                      String password, ProfileFields fields, List<String> roles) {
         String keycloakId = keycloakAdminClient.createUser(username, email, firstName, lastName, password);
-        User user = new User(keycloakId);
-        applyProfileFields(user, fields);
-        user = saveChecked(user);
-        return UserProfileView.merge(user, new KeycloakUserSummary(keycloakId, username, email, firstName, lastName));
+        try {
+            keycloakAdminClient.assignRealmRoles(keycloakId, roles);
+            User user = new User(keycloakId);
+            applyProfileFields(user, fields);
+            user = saveChecked(user);
+            return UserProfileView.merge(user, new KeycloakUserSummary(keycloakId, username, email, firstName, lastName));
+        } catch (RuntimeException ex) {
+            // The Keycloak account is created but roles/profile aren't — undo it so a retry is clean.
+            keycloakAdminClient.deleteUserQuietly(keycloakId);
+            throw ex;
+        }
+    }
+
+    @Override
+    public List<com.example.user.model.RealmRole> assignableRoles() {
+        return keycloakAdminClient.listAssignableRealmRoles();
     }
 
     private void applyProfileFields(User user, ProfileFields fields) {
@@ -98,15 +111,32 @@ public class UserServiceImpl implements UserService {
         }
     }
 
+    /**
+     * Keycloak is the source of truth for who exists, so the admin list is driven by it — not by
+     * this service's Mongo store, which only gains a row when a user first signs in
+     * ({@link #getOrRegister}). Anyone in the realm who has never used this app is backfilled with
+     * an empty local profile here, so (a) they show up and (b) admin edit/delete — which key off
+     * the Mongo id — work for them. After one call the two stores are in step.
+     */
     @Override
     public List<UserProfileView> list() {
-        List<User> users = userRepository.findByDeletedFalse();
-        Map<String, KeycloakUserSummary> identitiesByKeycloakId = new HashMap<>();
-        for (KeycloakUserSummary identity : keycloakAdminClient.listUsers()) {
-            identitiesByKeycloakId.put(identity.id(), identity);
+        Map<String, User> byKeycloakId = userRepository.findByDeletedFalse().stream()
+                .collect(Collectors.toMap(User::getKeycloakId, u -> u, (a, b) -> a));
+
+        List<KeycloakUserSummary> identities = keycloakAdminClient.listUsers();
+
+        List<User> missing = identities.stream()
+                .filter(identity -> !byKeycloakId.containsKey(identity.id()))
+                .map(identity -> new User(identity.id()))
+                .toList();
+        if (!missing.isEmpty()) {
+            // No USER_REGISTERED event — these accounts already exist, this is a local backfill,
+            // not a new registration (reporting-service would otherwise double-count them).
+            userRepository.saveAll(missing).forEach(u -> byKeycloakId.put(u.getKeycloakId(), u));
         }
-        return users.stream()
-                .map(user -> UserProfileView.merge(user, identitiesByKeycloakId.get(user.getKeycloakId())))
+
+        return identities.stream()
+                .map(identity -> UserProfileView.merge(byKeycloakId.get(identity.id()), identity))
                 .toList();
     }
 

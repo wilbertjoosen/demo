@@ -4,9 +4,9 @@ import { useI18n } from 'vue-i18n'
 import type { FormInstance, FormRules } from 'element-plus'
 import AddressForm from '../AddressForm.vue'
 import { useCommonStore } from '../../stores/common'
-import type { Address, User } from '../../models'
+import type { Address, RealmRole, User } from '../../models'
 
-const props = defineProps<{ modelValue: boolean; user: User | null }>()
+const props = defineProps<{ modelValue: boolean; user: User | null; roles?: RealmRole[] }>()
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]
   submit: [
@@ -16,6 +16,7 @@ const emit = defineEmits<{
       firstName?: string
       lastName?: string
       password?: string
+      roles?: string[]
       nationalId: string
       phone: string
       shippingAddress: Address
@@ -35,6 +36,7 @@ const form = reactive({
   firstName: '',
   lastName: '',
   password: '',
+  roles: [] as string[],
   nationalId: '',
   phone: '',
   shippingAddress: { ...emptyAddress },
@@ -61,6 +63,7 @@ watch(
     form.firstName = props.user?.firstName ?? ''
     form.lastName = props.user?.lastName ?? ''
     form.password = ''
+    form.roles = []
     form.nationalId = props.user?.nationalId ?? ''
     form.phone = props.user?.phone ?? ''
     form.shippingAddress = props.user?.shippingAddress ? { ...props.user.shippingAddress } : { ...emptyAddress }
@@ -76,7 +79,7 @@ async function submit() {
     email: form.email,
     firstName: form.firstName,
     lastName: form.lastName,
-    ...(isCreate.value ? { password: form.password } : {}),
+    ...(isCreate.value ? { password: form.password, roles: form.roles } : {}),
     nationalId: form.nationalId,
     phone: form.phone,
     shippingAddress: form.shippingAddress,
@@ -107,6 +110,22 @@ async function submit() {
       </el-form-item>
       <el-form-item v-if="isCreate" :label="t('admin.temporaryPassword')" prop="password">
         <el-input v-model="form.password" show-password />
+      </el-form-item>
+      <el-form-item v-if="isCreate" :label="t('admin.roles')">
+        <el-select
+          v-model="form.roles"
+          multiple
+          collapse-tags
+          :placeholder="t('admin.rolesPlaceholder')"
+          class="w-full"
+        >
+          <el-option
+            v-for="role in props.roles ?? []"
+            :key="role.name"
+            :label="role.description || role.name"
+            :value="role.name"
+          />
+        </el-select>
       </el-form-item>
       <el-form-item :label="t('profile.nationalId')">
         <el-input v-model="form.nationalId" />

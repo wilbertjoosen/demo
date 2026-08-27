@@ -73,6 +73,7 @@ async function deleteUser(user: User) {
 function openUserCreate() {
   editingUser.value = null
   userFormDialog.value = true
+  users.loadRoles()
 }
 
 function openUserEdit(user: User) {
@@ -104,6 +105,7 @@ async function saveUser(payload: {
   firstName?: string
   lastName?: string
   password?: string
+  roles?: string[]
   nationalId: string
   phone: string
   shippingAddress: Address
@@ -258,7 +260,7 @@ onMounted(() => {
     <ProductFormDialog v-model="productDialog" :product="editingProduct" @submit="saveProduct" />
     <ProductDetailDialog v-model="productDetailDialog" :product="editingProduct" />
     <StockDialog v-model="stockDialog" :product="stockTarget" @submit="addStock" />
-    <UserFormDialog v-model="userFormDialog" :user="editingUser" @submit="saveUser" />
+    <UserFormDialog v-model="userFormDialog" :user="editingUser" :roles="users.roles" @submit="saveUser" />
     <UserDetailDialog v-model="userDetailDialog" :user="editingUser" />
     <RecordHistoryDialog v-model="historyDialog" :record-id="historyRecordId" :title="historyTitle" />
     <AdminMediaDialog v-model="mediaDialog" :product="mediaTarget" />
