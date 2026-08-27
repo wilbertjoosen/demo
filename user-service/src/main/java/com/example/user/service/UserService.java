@@ -1,6 +1,7 @@
 package com.example.user.service;
 import com.example.user.model.IdentityFields;
 import com.example.user.model.ProfileFields;
+import com.example.user.model.RealmRole;
 import com.example.user.model.UserDirectoryEntry;
 import com.example.user.model.UserProfileView;
 
@@ -14,8 +15,19 @@ public interface UserService {
 
     UserProfileView updateProfile(Jwt jwt, ProfileFields fields);
 
-    /** Admin-only: provisions a real Keycloak account via the Admin REST API, then a linked local profile. */
-    UserProfileView createUser(String username, String email, String firstName, String lastName, String password, ProfileFields fields);
+    /**
+     * Admin-only: provisions a real Keycloak account via the Admin REST API, assigns {@code roles}
+     * (empty = realm default only), then a linked local profile. Rolls the Keycloak account back if
+     * role assignment or the local save fails.
+     */
+    UserProfileView createUser(String username, String email, String firstName, String lastName, String password,
+                               ProfileFields fields, List<String> roles);
+
+    /** Realm roles an admin may pick from when creating/editing a user — read live from Keycloak. */
+    List<RealmRole> assignableRoles();
+
+    /** The assignable realm roles a user currently holds — for pre-filling the edit form. */
+    List<String> currentRoles(String id);
 
     List<UserProfileView> list();
 
@@ -29,7 +41,7 @@ public interface UserService {
      * username/email/name directly in Keycloak — self-service {@link #updateProfile} can't do this,
      * only an admin editing someone else's record can.
      */
-    UserProfileView updateUser(String id, ProfileFields fields, IdentityFields identity);
+    UserProfileView updateUser(String id, ProfileFields fields, IdentityFields identity, List<String> roles);
 
     /**
      * Soft delete — marks the profile instead of removing it. Does not affect the Keycloak account or login.

@@ -1,12 +1,13 @@
 import { defineStore } from 'pinia'
-import { usersApi, type CreateUserPayload, type ProfileUpdate } from '../api/users'
-import type { User } from '../models'
+import { usersApi, type AdminUserUpdate, type CreateUserPayload, type ProfileUpdate } from '../api/users'
+import type { RealmRole, User } from '../models'
 
 export const useUsersStore = defineStore('users', {
   state: () => ({
     items: [] as User[],
     loading: false,
     me: null as User | null,
+    roles: [] as RealmRole[],
   }),
   actions: {
     async load() {
@@ -16,6 +17,9 @@ export const useUsersStore = defineStore('users', {
       } finally {
         this.loading = false
       }
+    },
+    async loadRoles() {
+      if (this.roles.length === 0) this.roles = await usersApi.roles()
     },
     async loadMe() {
       this.me = await usersApi.me()
@@ -27,7 +31,7 @@ export const useUsersStore = defineStore('users', {
       await usersApi.create(payload)
       await this.load()
     },
-    async update(id: string, payload: ProfileUpdate) {
+    async update(id: string, payload: AdminUserUpdate) {
       await usersApi.update(id, payload)
       await this.load()
     },

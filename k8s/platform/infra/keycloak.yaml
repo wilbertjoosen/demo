@@ -141,7 +141,7 @@ data:
           "enabled": true,
           "serviceAccountClientId": "user-service-admin-client",
           "clientRoles": {
-            "realm-management": ["view-users", "manage-users", "query-users"]
+            "realm-management": ["view-users", "manage-users", "query-users", "view-realm"]
           }
         }
       ]
@@ -260,7 +260,7 @@ data:
           "enabled": true,
           "serviceAccountClientId": "user-service-admin-client",
           "clientRoles": {
-            "realm-management": ["view-users", "manage-users", "query-users"]
+            "realm-management": ["view-users", "manage-users", "query-users", "view-realm"]
           }
         }
       ]

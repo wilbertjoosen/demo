@@ -67,12 +67,21 @@ spec:
           resources:
             requests: { cpu: "250m", memory: "448Mi" }
             limits: { cpu: "1", memory: "768Mi" }
+          # Gates livenessProbe until the app has finished starting, so a slow JVM start
+          # under CPU contention (e.g. a cluster-wide image bump restarting every pod at
+          # once) can't trip liveness and cascade the whole namespace into CrashLoopBackOff.
+          # 30 x 10s = 5 min startup budget; liveness/readiness take over once it passes.
+          startupProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8084 }
+            failureThreshold: 30
+            periodSeconds: 10
           readinessProbe:
             httpGet: { path: /actuator/health/readiness, port: 8084 }
             initialDelaySeconds: 25
             periodSeconds: 10
           livenessProbe:
             httpGet: { path: /actuator/health/liveness, port: 8084 }
+            timeoutSeconds: 5
             initialDelaySeconds: 35
             periodSeconds: 15
         - name: access-log-sidecar
