@@ -41,6 +41,14 @@ patches:
       - op: replace
         path: /spec/rules/0/host
         value: qa.demo.localhost
+  # order-service is a Rollout (CRD) — Kustomize can't strategic-merge a CRD's containers list, so
+  # its MONGO_DB override is a JSON6902 patch here rather than in patches/mongo-db-names.yaml. The
+  # `test` op fails the build loudly if env[1] ever stops being MONGO_DB, instead of silently
+  # rewriting the wrong var (env order comes from ../demo/order-service.yaml).
+  - target: { group: argoproj.io, version: v1alpha1, kind: Rollout, name: order-service }
+    patch: |
+      - { op: test, path: /spec/template/spec/containers/0/env/1/name, value: MONGO_DB }
+      - { op: replace, path: /spec/template/spec/containers/0/env/1/value, value: orders_qa }
 
 # images: is intentionally absent — QA and prod are on the same promoted tags today. CI's
 # update-manifests job (.github/workflows/ci-cd.yml) adds/updates entries here via

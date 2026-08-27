@@ -1,6 +1,8 @@
 # QA gets its own Mongo databases on the shared prod instance — one strategic-merge patch per
-# service, env list merges by `name` so only MONGO_DB is touched. order-service is a Rollout, the
-# rest Deployments; the container name equals the service name in every ../demo manifest.
+# Deployment, env list merges by `name` so only MONGO_DB is touched (container name == service
+# name in every ../demo manifest). order-service is a Rollout (a CRD) — Kustomize has no
+# merge-strategy for a CRD's containers list, so a strategic-merge patch would replace the whole
+# list and drop the image. It gets a JSON6902 patch in kustomization.yaml instead.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -56,20 +58,6 @@ spec:
           env:
             - name: MONGO_DB
               value: inventory_qa
----
-apiVersion: argoproj.io/v1alpha1
-kind: Rollout
-metadata:
-  name: order-service
-  namespace: demo
-spec:
-  template:
-    spec:
-      containers:
-        - name: order-service
-          env:
-            - name: MONGO_DB
-              value: orders_qa
 ---
 apiVersion: apps/v1
 kind: Deployment
