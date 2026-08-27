@@ -1,8 +1,10 @@
 server:
-  # Not 8095 (k8s/reporting-service.yaml's in-cluster port) — that collides with kafka-ui's own
-  # host port in this branch's docker-compose.yml. Not 8096 either anymore — that now collides
-  # with common-service's bundled default. 8097 is free of both.
-  port: 8097
+  # Local-dev default is 8097: 8095 collides with kafka-ui's host port in this branch's
+  # docker-compose.yml, 8096 with common-service's bundled default. In-cluster, k8s sets
+  # SERVER_PORT=8095 (k8s/demo/reporting-service.yaml) so it matches that manifest's
+  # containerPort/probes/Services and the frozen prod image (1.0.2-966aac3, built when this
+  # was hard-coded 8095). Keep the env override and the manifest port in lock-step.
+  port: ${SERVER_PORT:8097}
 
 spring:
   application:
