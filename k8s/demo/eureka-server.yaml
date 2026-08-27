@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eureka-server
+  namespace: demo
+  labels: { app: eureka-server, monitored: "true" }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: eureka-server } }
+  template:
+    metadata: { labels: { app: eureka-server, monitored: "true" } }
+    spec:
+      imagePullSecrets:
+        - name: ghcr-pull-secret
+      containers:
+        - name: eureka-server
+          image: ghcr.io/wilbertjoosen/demo-eureka-server:1.0.1-061a4a9
+          imagePullPolicy: Always
+          # No configMapRef here (unlike every other app service) — eureka-server doesn't need
+          # Kafka/MySQL/OTLP config, so it never picked up demo-common-config. It still needs the
+          # pyroscope-agent Secret below (imperatively created per-namespace via Rancher's Secrets
+          # UI, not committed — same pattern as grafana-admin/mysql-credentials) so its toggle stays
+          # in sync with every other service's.
+          envFrom:
+            - secretRef: { name: pyroscope-agent }
+          # PYROSCOPE_PROFILER_TYPE=JFR — see configmap-common.yaml's comment for why (ASYNC's
+          # bundled native library SIGSEGVs on this cluster's JDK 26 + linux/arm64).
+          # PYROSCOPE_SERVER_ADDRESS also has to be set here directly (2026-08-25 fix) — it only
+          # otherwise lives in demo-common-config, which this service doesn't reference, so the
+          # agent was silently defaulting to localhost:4040 and failing every upload.
+          env:
+            - { name: PYROSCOPE_PROFILER_TYPE, value: JFR }
+            - { name: PYROSCOPE_SERVER_ADDRESS, value: http://pyroscope.monitoring.svc.cluster.local:4040 }
+          ports: [{ containerPort: 8761 }]
+          # Memory bumped 384Mi -> 512Mi (2026-08-25) — the Pyroscope JFR agent's recording buffer
+          # adds enough overhead during JVM startup to occasionally OOMKill this service at the old
+          # limit (confirmed live in demo: exit 137, Reason: OOMKilled, twice before stabilizing).
+          resources:
+            requests: { cpu: "100m", memory: "256Mi" }
+            limits: { cpu: "500m", memory: "512Mi" }
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8761 }
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: 8761 }
+            initialDelaySeconds: 30
+            periodSeconds: 15
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: eureka-server
+  namespace: demo
+  labels: { monitored: "true" }
+spec:
+  selector: { app: eureka-server }
+  ports: [{ name: http, port: 8761, targetPort: 8761 }]

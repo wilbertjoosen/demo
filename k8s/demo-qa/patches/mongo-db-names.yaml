@@ -1,0 +1,170 @@
+# QA gets its own Mongo databases on the shared prod instance — one strategic-merge patch per
+# service, env list merges by `name` so only MONGO_DB is touched. order-service is a Rollout, the
+# rest Deployments; the container name equals the service name in every ../demo manifest.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chat-service
+  namespace: demo
+spec:
+  template:
+    spec:
+      containers:
+        - name: chat-service
+          env:
+            - name: MONGO_DB
+              value: chat_qa
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: common-service
+  namespace: demo
+spec:
+  template:
+    spec:
+      containers:
+        - name: common-service
+          env:
+            - name: MONGO_DB
+              value: reference_qa
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: delivery-service
+  namespace: demo
+spec:
+  template:
+    spec:
+      containers:
+        - name: delivery-service
+          env:
+            - name: MONGO_DB
+              value: deliveries_qa
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inventory-service
+  namespace: demo
+spec:
+  template:
+    spec:
+      containers:
+        - name: inventory-service
+          env:
+            - name: MONGO_DB
+              value: inventory_qa
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: order-service
+  namespace: demo
+spec:
+  template:
+    spec:
+      containers:
+        - name: order-service
+          env:
+            - name: MONGO_DB
+              value: orders_qa
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-service
+  namespace: demo
+spec:
+  template:
+    spec:
+      containers:
+        - name: payment-service
+          env:
+            - name: MONGO_DB
+              value: payments_qa
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: product-comment-service
+  namespace: demo
+spec:
+  template:
+    spec:
+      containers:
+        - name: product-comment-service
+          env:
+            - name: MONGO_DB
+              value: comments_qa
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: product-media-service
+  namespace: demo
+spec:
+  template:
+    spec:
+      containers:
+        - name: product-media-service
+          env:
+            - name: MONGO_DB
+              value: media_qa
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: product-review-service
+  namespace: demo
+spec:
+  template:
+    spec:
+      containers:
+        - name: product-review-service
+          env:
+            - name: MONGO_DB
+              value: reviews_qa
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: product-service
+  namespace: demo
+spec:
+  template:
+    spec:
+      containers:
+        - name: product-service
+          env:
+            - name: MONGO_DB
+              value: products_qa
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shipping-service
+  namespace: demo
+spec:
+  template:
+    spec:
+      containers:
+        - name: shipping-service
+          env:
+            - name: MONGO_DB
+              value: shipments_qa
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: user-service
+  namespace: demo
+spec:
+  template:
+    spec:
+      containers:
+        - name: user-service
+          env:
+            - name: MONGO_DB
+              value: users_qa

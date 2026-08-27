@@ -1,0 +1,52 @@
+# The QA environment, as a thin overlay of ../demo — NOT a second copy of every manifest.
+# ArgoCD's demo-qa Application (k8s-argocd/application-qa.yaml, targetRevision: testing) points here.
+#
+# Everything the app tier needs comes from ../demo; this overlay changes only what genuinely
+# differs between prod (namespace demo) and QA (namespace demo-qa):
+#   - namespace          → the `namespace:` transformer below rewrites every inherited manifest
+#   - configmap-common   → configmap-common.yaml patches the 8 keys that differ (Kafka/Keycloak/
+#                          Redis/Mail hostnames scoped in-namespace, demo-qa realm, demo_qa DB,
+#                          qa.demo.localhost CORS)
+#   - MONGO_DB per svc   → patches/mongo-db-names.yaml   (<name>_qa)
+#   - a couple of one-off env vars → patches/audit-es-index.yaml, patches/media-upload-dir.yaml
+#   - own kafka/redis/mailpit in this namespace (QA is deliberately isolated for those); MySQL,
+#     Mongo, Keycloak, Elasticsearch, Vault and ALL monitoring are the shared prod instances,
+#     reached cross-namespace — so k8s/platform/** is not referenced here.
+#
+# No `images:` block yet: QA and prod are on the same promoted tags today. When QA starts running
+# ahead, CI's update-manifests job adds/updates it here.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: demo-qa
+
+resources:
+  - namespace.yaml
+  - ../demo
+  - kafka.yaml
+  - redis.yaml
+  - mailpit.yaml
+
+# Patch bodies carry `namespace: demo` to match the inherited manifests at patch time — the
+# `namespace: demo-qa` transformer above runs afterwards and rewrites everything, patched or not.
+patches:
+  - path: configmap-common.yaml
+  - path: patches/mongo-db-names.yaml
+  - path: patches/audit-es-index.yaml
+  - path: patches/media-upload-dir.yaml
+  # JSON patch (not strategic merge): spec.rules has no merge key, so a strategic-merge patch would
+  # replace the whole rules list. QA is served from qa.demo.localhost instead of demo.localhost.
+  - target: { kind: Ingress, name: demo-ingress }
+    patch: |
+      - op: replace
+        path: /spec/rules/0/host
+        value: qa.demo.localhost
+
+# images: is intentionally absent — QA and prod are on the same promoted tags today. CI's
+# update-manifests job (.github/workflows/ci-cd.yml) adds/updates entries here via
+# .github/scripts/kustomize-images.py when a testing build produces a new tag, e.g.
+#   images:
+#     - name: ghcr.io/wilbertjoosen/demo-order-service
+#       newTag: 1.0.3-abc1234
+# Each entry overrides the image inherited from ../demo in the demo-qa render only; prod is
+# unaffected. This is how QA runs ahead of prod without k8s/demo/*.yaml ever diverging by branch.

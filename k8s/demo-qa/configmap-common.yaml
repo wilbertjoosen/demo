@@ -1,0 +1,23 @@
+# Strategic-merge patch on the ConfigMap inherited from ../demo. ConfigMap `data` merges key-wise,
+# so only the keys that differ for QA are listed here — every other key (CONFIG_SERVER_URI,
+# EUREKA_URI, MONGO_HOST, VAULT_*, OTLP_ENDPOINT, PYROSCOPE_*, TRACING_EXPORT_OTLP_ENABLED, …)
+# passes through from prod unchanged.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: demo-common-config
+  namespace: demo
+data:
+  # QA runs its own in-namespace Kafka/Redis/Mailpit (see this overlay's kafka/redis/mailpit.yaml),
+  # so these are bare service names, not the cross-namespace infra.svc.cluster.local form.
+  KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+  REDIS_HOST: redis
+  MAIL_HOST: mailpit
+  # Same shared Keycloak instance as prod, different realm.
+  KEYCLOAK_ISSUER_URI: http://localhost:8081/realms/demo-qa
+  KEYCLOAK_JWK_SET_URI: http://keycloak.infra.svc.cluster.local:8080/realms/demo-qa/protocol/openid-connect/certs
+  KEYCLOAK_TOKEN_URI: http://keycloak.infra.svc.cluster.local:8080/realms/demo-qa/protocol/openid-connect/token
+  KEYCLOAK_ADMIN_URI: http://keycloak.infra.svc.cluster.local:8080/admin/realms/demo-qa
+  # Same shared MySQL instance as prod, different database.
+  DB_NAME: demo_qa
+  CORS_ALLOWED_ORIGINS: http://qa.demo.localhost:18090

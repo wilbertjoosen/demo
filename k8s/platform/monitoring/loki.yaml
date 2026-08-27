@@ -1,0 +1,64 @@
+# In-cluster Loki, mirroring k8s/prometheus.yaml's split: a single shared instance for both demo
+# (prod) and demo-qa, living in the "monitoring" namespace, reached over in-cluster DNS by Grafana
+# (k8s/grafana.yaml) and Tempo's tracesToLogsV2 alike.
+#
+# docker-compose.yml no longer runs its own Loki/Promtail at all — k8s's own Promtail DaemonSet
+# (k8s/promtail-daemonset.yaml) is now the only log shipper, for both branches, and with Grafana
+# and Tempo also in-cluster (k8s/grafana.yaml, k8s/tempo.yaml) every trace's tracesToLogsV2 jump
+# resolves against this same Loki — no more host/cluster split to work around.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: loki
+  namespace: monitoring
+  labels: { app: loki }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: loki } }
+  template:
+    metadata: { labels: { app: loki } }
+    spec:
+      containers:
+        - name: loki
+          image: grafana/loki:latest
+          ports: [{ containerPort: 3100 }]
+          volumeMounts:
+            - { name: data, mountPath: /loki }
+          resources:
+            requests: { cpu: "100m", memory: "256Mi" }
+            limits: { cpu: "500m", memory: "512Mi" }
+          readinessProbe:
+            httpGet: { path: /ready, port: 3100 }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /ready, port: 3100 }
+            initialDelaySeconds: 20
+            periodSeconds: 20
+      volumes:
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: loki
+  namespace: monitoring
+spec:
+  selector: { app: loki }
+  ports: [{ port: 3100, targetPort: 3100 }]
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: loki-ingress
+  namespace: monitoring
+spec:
+  rules:
+    - host: loki.demo.localhost
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service: { name: loki, port: { number: 3100 } }

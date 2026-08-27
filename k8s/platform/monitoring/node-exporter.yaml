@@ -1,0 +1,59 @@
+# DaemonSet — one node-exporter per k3d node, exposing host-level CPU/memory/disk/network metrics.
+# Part of P2 (cluster-level metrics), alongside kube-state-metrics (k8s/kube-state-metrics.yaml).
+# hostNetwork/hostPID + host /proc,/sys,/ mounts are the standard node-exporter shape — it reports
+# on the NODE, not its own container, so it has to see the host's real namespaces. Single shared
+# instance across demo/demo-qa, same reasoning as k8s/prometheus.yaml's own header comment (one
+# DaemonSet per cluster, not per environment).
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: node-exporter
+  namespace: monitoring
+  labels: { app: node-exporter }
+spec:
+  selector: { matchLabels: { app: node-exporter } }
+  template:
+    metadata: { labels: { app: node-exporter } }
+    spec:
+      hostNetwork: true
+      hostPID: true
+      tolerations:
+        - operator: Exists
+      containers:
+        - name: node-exporter
+          image: quay.io/prometheus/node-exporter:v1.12.1
+          args:
+            - --path.procfs=/host/proc
+            - --path.sysfs=/host/sys
+            - --path.rootfs=/host/root
+            # Excludes container/overlay filesystem noise (every container's overlay mount would
+            # otherwise show up as its own "disk") — keeps filesystem metrics to the node's real
+            # mounts, which is what disk-pressure alerting actually needs.
+            - --collector.filesystem.mount-points-exclude=^/(dev|proc|sys|var/lib/docker/.+|var/lib/kubelet/.+)($|/)
+          ports:
+            - { containerPort: 9100, name: metrics }
+          volumeMounts:
+            - { name: proc, mountPath: /host/proc, readOnly: true }
+            - { name: sys, mountPath: /host/sys, readOnly: true }
+            - { name: root, mountPath: /host/root, readOnly: true, mountPropagation: HostToContainer }
+          resources:
+            requests: { cpu: "50m", memory: "64Mi" }
+            limits: { cpu: "200m", memory: "180Mi" }
+      volumes:
+        - name: proc
+          hostPath: { path: /proc }
+        - name: sys
+          hostPath: { path: /sys }
+        - name: root
+          hostPath: { path: / }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: node-exporter
+  namespace: monitoring
+  labels: { app: node-exporter, monitored: "true" }
+spec:
+  clusterIP: None
+  selector: { app: node-exporter }
+  ports: [{ port: 9100, targetPort: 9100, name: metrics }]

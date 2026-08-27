@@ -1,0 +1,649 @@
+# In-cluster Grafana — single shared instance for both demo (prod) and demo-qa, same reasoning as
+# k8s/prometheus.yaml/k8s/tempo.yaml: one instance, not one per environment, so demo-qa's ArgoCD
+# Application never fights demo's over the same objects.
+#
+# Replaces docker-compose.yml's own Grafana entirely (removed from both branches) rather than
+# keeping a host copy — unlike the datastores/broker, Grafana had no host-JVM dev-flow use case of
+# its own; it only ever existed to look at the in-cluster Prometheus/Loki/Tempo, reached through an
+# ingress hairpin (prometheus.demo.localhost:18090) from outside the cluster. Being in-cluster too
+# now means direct in-cluster DNS instead, and fully resolves the tracesToLogsV2 tradeoff
+# k8s/loki.yaml's comment used to document — trace and log now always come from the SAME Loki,
+# since nothing is split across the host/cluster boundary anymore.
+#
+# Admin login is NOT a plaintext env var (docker-compose's GF_SECURITY_ADMIN_USER/PASSWORD were) —
+# create it yourself via Rancher's Secrets UI (namespace "monitoring"):
+#
+#   kubectl create secret generic grafana-admin -n monitoring \
+#     --from-literal=GF_SECURITY_ADMIN_USER=admin \
+#     --from-literal=GF_SECURITY_ADMIN_PASSWORD=admin
+#
+# (shown as a kubectl command for reference only — create it through Rancher's own Secrets screen
+# rather than piping a real password through a shell history/AI session).
+#
+# PVC-backed (not emptyDir): losing dashboard/user state on every pod restart would defeat the
+# point of the persistent instance, same reasoning as MySQL/Keycloak/Prometheus's PVCs.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources
+  namespace: monitoring
+data:
+  datasources.yml: |
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        access: proxy
+        url: http://prometheus.monitoring.svc.cluster.local:9090
+        isDefault: true
+      - name: Loki
+        uid: loki
+        type: loki
+        access: proxy
+        url: http://loki.monitoring.svc.cluster.local:3100
+      - name: Tempo
+        type: tempo
+        access: proxy
+        url: http://tempo.monitoring.svc.cluster.local:3200
+        jsonData:
+          # Spring Boot auto-adds [traceId,spanId] to every log line once micrometer-tracing is on
+          # the classpath (common-security/gateway-service poms), and Promtail already ships every
+          # pod's stdout to this same Loki — so a trace can jump straight to its own log lines.
+          tracesToLogsV2:
+            datasourceUid: loki
+            filterByTraceID: true
+          # Same idea, trace -> profile instead of trace -> logs: jumps from a span to the exact CPU
+          # profile Pyroscope's Java agent was capturing during that request, matched by service
+          # name (agent's PYROSCOPE_APPLICATION_NAME, Dockerfile.service) since that's the one label
+          # both a span's resource.service.name and a profile share.
+          tracesToProfiles:
+            datasourceUid: pyroscope
+            tags: ["service.name"]
+            profileTypeId: "process_cpu:cpu:nanoseconds:cpu:nanoseconds"
+      - name: Pyroscope
+        uid: pyroscope
+        type: grafana-pyroscope-datasource
+        access: proxy
+        url: http://pyroscope.monitoring.svc.cluster.local:4040
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-provider
+  namespace: monitoring
+data:
+  dashboards.yml: |
+    apiVersion: 1
+    providers:
+      - name: demo-dashboards
+        orgId: 1
+        folder: ""
+        type: file
+        disableDeletion: false
+        updateIntervalSeconds: 30
+        allowUiUpdates: true
+        options:
+          path: /etc/grafana/dashboards
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards
+  namespace: monitoring
+data:
+  services-overview.json: |
+    {
+      "title": "Services Overview",
+      "uid": "demo-services-overview",
+      "timezone": "browser",
+      "schemaVersion": 39,
+      "version": 1,
+      "refresh": "30s",
+      "time": { "from": "now-1h", "to": "now" },
+      "tags": ["demo"],
+      "panels": [
+        {
+          "id": 1,
+          "title": "Services Up",
+          "type": "stat",
+          "datasource": "Prometheus",
+          "gridPos": { "h": 5, "w": 6, "x": 0, "y": 0 },
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "green", "value": 1 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            { "expr": "sum(up{job=~\".+-service|.+-server\"})", "legendFormat": "up", "refId": "A" }
+          ]
+        },
+        {
+          "id": 2,
+          "title": "Services Down",
+          "type": "stat",
+          "datasource": "Prometheus",
+          "gridPos": { "h": 5, "w": 6, "x": 6, "y": 0 },
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 1 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            { "expr": "count(up{job=~\".+-service|.+-server\"} == 0) OR vector(0)", "legendFormat": "down", "refId": "A" }
+          ]
+        },
+        {
+          "id": 3,
+          "title": "Total HTTP Request Rate",
+          "type": "stat",
+          "datasource": "Prometheus",
+          "gridPos": { "h": 5, "w": 6, "x": 12, "y": 0 },
+          "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+          "targets": [
+            { "expr": "sum(rate(http_server_requests_seconds_count[1m]))", "legendFormat": "req/s", "refId": "A" }
+          ]
+        },
+        {
+          "id": 4,
+          "title": "Total JVM Heap Used",
+          "type": "stat",
+          "datasource": "Prometheus",
+          "gridPos": { "h": 5, "w": 6, "x": 18, "y": 0 },
+          "fieldConfig": { "defaults": { "unit": "bytes" }, "overrides": [] },
+          "targets": [
+            { "expr": "sum(jvm_memory_used_bytes{area=\"heap\"})", "legendFormat": "heap", "refId": "A" }
+          ]
+        },
+        {
+          "id": 10,
+          "title": "JVM Heap Memory Used by Service",
+          "type": "timeseries",
+          "datasource": "Prometheus",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 5 },
+          "fieldConfig": { "defaults": { "unit": "bytes" }, "overrides": [] },
+          "targets": [
+            {
+              "expr": "sum(jvm_memory_used_bytes{area=\"heap\"}) by (job)",
+              "legendFormat": "{{job}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 11,
+          "title": "CPU Usage by Service",
+          "type": "timeseries",
+          "datasource": "Prometheus",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 5 },
+          "fieldConfig": { "defaults": { "unit": "percentunit", "max": 1, "min": 0 }, "overrides": [] },
+          "targets": [
+            {
+              "expr": "process_cpu_usage{job=~\".+\"}",
+              "legendFormat": "{{job}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 12,
+          "title": "HTTP Request Rate by Service",
+          "type": "timeseries",
+          "datasource": "Prometheus",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 13 },
+          "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+          "targets": [
+            {
+              "expr": "sum(rate(http_server_requests_seconds_count[1m])) by (job)",
+              "legendFormat": "{{job}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 13,
+          "title": "HTTP 5xx Error Rate by Service",
+          "type": "timeseries",
+          "datasource": "Prometheus",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 13 },
+          "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+          "targets": [
+            {
+              "expr": "sum(rate(http_server_requests_seconds_count{status=~\"5..\"}[1m])) by (job)",
+              "legendFormat": "{{job}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 14,
+          "title": "Average HTTP Latency by Service",
+          "type": "timeseries",
+          "datasource": "Prometheus",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 21 },
+          "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+          "targets": [
+            {
+              "expr": "sum(rate(http_server_requests_seconds_sum[1m])) by (job) / sum(rate(http_server_requests_seconds_count[1m])) by (job)",
+              "legendFormat": "{{job}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 15,
+          "title": "JVM Live Threads by Service",
+          "type": "timeseries",
+          "datasource": "Prometheus",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 21 },
+          "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+          "targets": [
+            {
+              "expr": "jvm_threads_live_threads",
+              "legendFormat": "{{job}}",
+              "refId": "A"
+            }
+          ]
+        }
+      ]
+    }
+
+  kubernetes-overview.json: |
+    {
+      "title": "Kubernetes Overview (prod vs QA)",
+      "uid": "demo-k8s-overview",
+      "timezone": "browser",
+      "schemaVersion": 39,
+      "version": 1,
+      "refresh": "30s",
+      "time": { "from": "now-1h", "to": "now" },
+      "tags": ["demo", "kubernetes"],
+      "templating": {
+        "list": [
+          {
+            "name": "namespace",
+            "type": "query",
+            "datasource": "Prometheus",
+            "query": "label_values(up, namespace)",
+            "multi": true,
+            "includeAll": true,
+            "current": { "text": "All", "value": "$__all" },
+            "refresh": 2
+          }
+        ]
+      },
+      "panels": [
+        {
+          "id": 1,
+          "title": "Services Up — demo (prod)",
+          "type": "stat",
+          "datasource": "Prometheus",
+          "gridPos": { "h": 5, "w": 6, "x": 0, "y": 0 },
+          "fieldConfig": {
+            "defaults": { "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] } },
+            "overrides": []
+          },
+          "targets": [{ "expr": "sum(up{namespace=\"demo\"})", "legendFormat": "up", "refId": "A" }]
+        },
+        {
+          "id": 2,
+          "title": "Services Up — demo-qa (QA)",
+          "type": "stat",
+          "datasource": "Prometheus",
+          "gridPos": { "h": 5, "w": 6, "x": 6, "y": 0 },
+          "fieldConfig": {
+            "defaults": { "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] } },
+            "overrides": []
+          },
+          "targets": [{ "expr": "sum(up{namespace=\"demo-qa\"})", "legendFormat": "up", "refId": "A" }]
+        },
+        {
+          "id": 3,
+          "title": "Services Down — demo (prod)",
+          "type": "stat",
+          "datasource": "Prometheus",
+          "gridPos": { "h": 5, "w": 6, "x": 12, "y": 0 },
+          "fieldConfig": {
+            "defaults": { "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] } },
+            "overrides": []
+          },
+          "targets": [{ "expr": "count(up{namespace=\"demo\"} == 0) OR vector(0)", "legendFormat": "down", "refId": "A" }]
+        },
+        {
+          "id": 4,
+          "title": "Services Down — demo-qa (QA)",
+          "type": "stat",
+          "datasource": "Prometheus",
+          "gridPos": { "h": 5, "w": 6, "x": 18, "y": 0 },
+          "fieldConfig": {
+            "defaults": { "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] } },
+            "overrides": []
+          },
+          "targets": [{ "expr": "count(up{namespace=\"demo-qa\"} == 0) OR vector(0)", "legendFormat": "down", "refId": "A" }]
+        },
+        {
+          "id": 5,
+          "title": "JVM Heap Memory Used by Service",
+          "type": "timeseries",
+          "datasource": "Prometheus",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 5 },
+          "targets": [{
+            "expr": "sum(jvm_memory_used_bytes{area=\"heap\", namespace=~\"$namespace\"}) by (namespace, app)",
+            "legendFormat": "{{namespace}}/{{app}}",
+            "refId": "A"
+          }]
+        },
+        {
+          "id": 6,
+          "title": "CPU Usage by Service",
+          "type": "timeseries",
+          "datasource": "Prometheus",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 5 },
+          "targets": [{
+            "expr": "process_cpu_usage{namespace=~\"$namespace\"}",
+            "legendFormat": "{{namespace}}/{{app}}",
+            "refId": "A"
+          }]
+        },
+        {
+          "id": 7,
+          "title": "HTTP Request Rate by Service",
+          "type": "timeseries",
+          "datasource": "Prometheus",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 13 },
+          "targets": [{
+            "expr": "sum(rate(http_server_requests_seconds_count{namespace=~\"$namespace\"}[1m])) by (namespace, app)",
+            "legendFormat": "{{namespace}}/{{app}}",
+            "refId": "A"
+          }]
+        },
+        {
+          "id": 8,
+          "title": "HTTP 5xx Error Rate by Service",
+          "type": "timeseries",
+          "datasource": "Prometheus",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 13 },
+          "targets": [{
+            "expr": "sum(rate(http_server_requests_seconds_count{status=~\"5..\", namespace=~\"$namespace\"}[1m])) by (namespace, app)",
+            "legendFormat": "{{namespace}}/{{app}}",
+            "refId": "A"
+          }]
+        },
+        {
+          "id": 9,
+          "title": "Average HTTP Latency by Service",
+          "type": "timeseries",
+          "datasource": "Prometheus",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 21 },
+          "targets": [{
+            "expr": "sum(rate(http_server_requests_seconds_sum{namespace=~\"$namespace\"}[1m])) by (namespace, app) / sum(rate(http_server_requests_seconds_count{namespace=~\"$namespace\"}[1m])) by (namespace, app)",
+            "legendFormat": "{{namespace}}/{{app}}",
+            "refId": "A"
+          }]
+        },
+        {
+          "id": 10,
+          "title": "JVM Live Threads by Service",
+          "type": "timeseries",
+          "datasource": "Prometheus",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 21 },
+          "targets": [{
+            "expr": "jvm_threads_live_threads{namespace=~\"$namespace\"}",
+            "legendFormat": "{{namespace}}/{{app}}",
+            "refId": "A"
+          }]
+        }
+      ]
+    }
+---
+# Grafana-managed (unified) alerting, provisioned the same file-based way as datasources/
+# dashboards above — see https://grafana.com/docs/grafana/latest/alerting/set-up/provision-alerting-resources/.
+# Three rules: instance-down and a 5xx-error-rate threshold (both P1), plus PVC disk pressure
+# (added once P2's kubernetes-nodes scrape job — k8s/prometheus.yaml — started exposing
+# kubelet_volume_stats_available_bytes/capacity_bytes; this rule couldn't exist before that data
+# did, since a rule with no matching series would just silently never fire).
+#
+# datasourceUid below is PBFA97CFB590B2093 — Prometheus's own already-existing UID in this cluster's
+# Grafana (queried directly from grafana.db, not guessed), NOT a name added to the datasource block
+# above. An earlier version of this change added an explicit `uid: prometheus` to that datasource
+# entry instead, on the theory that re-provisioning an existing datasource with an explicit uid
+# would just adopt it — it didn't: Grafana's datasource provisioning on an install that already has
+# this datasource (from grafana-data's PVC) rejected it with "Datasource provisioning error: data
+# source not found", which cascaded into every other module failing and took Grafana down entirely
+# for several minutes. Verified locally against a simulated existing-installation (same real UID,
+# same failure reproduced) before landing this corrected version, which touches the datasource
+# provisioning file not at all.
+#
+# Delivery is email via Mailpit (k8s/mailpit.yaml) — already in-cluster as a local SMTP catcher, no
+# auth, so no real credentials needed. View fired alert emails at mailpit.demo.localhost. Swap the
+# GF_SMTP_HOST/contact-point address below for a real SMTP relay when actual delivery is wanted.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-alerting
+  namespace: monitoring
+data:
+  contactpoints.yaml: |
+    apiVersion: 1
+    contactPoints:
+      - orgId: 1
+        name: email-alerts
+        receivers:
+          - uid: email-alerts-receiver
+            type: email
+            settings:
+              addresses: alerts@demo.local
+  notification-policies.yaml: |
+    apiVersion: 1
+    policies:
+      - orgId: 1
+        receiver: email-alerts
+        group_by: ["alertname"]
+        group_wait: 30s
+        group_interval: 5m
+        repeat_interval: 4h
+  rules.yaml: |
+    apiVersion: 1
+    groups:
+      - orgId: 1
+        name: demo-alerts
+        folder: Demo Alerts
+        interval: 1m
+        rules:
+          - uid: instance-down
+            title: Instance Down
+            condition: C
+            noDataState: NoData
+            execErrState: Alerting
+            for: 2m
+            labels:
+              severity: critical
+            annotations:
+              summary: "{{ $labels.app }} instance down in namespace {{ $labels.namespace }}"
+            data:
+              - refId: A
+                relativeTimeRange: { from: 300, to: 0 }
+                datasourceUid: PBFA97CFB590B2093
+                model:
+                  refId: A
+                  expr: up{job="kubernetes-pods"}
+                  instant: true
+                  intervalMs: 1000
+                  maxDataPoints: 43200
+              - refId: C
+                relativeTimeRange: { from: 300, to: 0 }
+                datasourceUid: "__expr__"
+                model:
+                  refId: C
+                  type: classic_conditions
+                  conditions:
+                    - evaluator: { type: lt, params: [1] }
+                      operator: { type: and }
+                      query: { params: ["A"] }
+                      reducer: { type: last, params: [] }
+          - uid: high-5xx-rate
+            title: High 5xx Error Rate
+            condition: C
+            noDataState: NoData
+            execErrState: Alerting
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "{{ $labels.app }} in {{ $labels.namespace }} has >5% 5xx error rate"
+            data:
+              - refId: A
+                relativeTimeRange: { from: 300, to: 0 }
+                datasourceUid: PBFA97CFB590B2093
+                model:
+                  refId: A
+                  expr: sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m])) by (app, namespace) / sum(rate(http_server_requests_seconds_count[5m])) by (app, namespace)
+                  instant: true
+                  intervalMs: 1000
+                  maxDataPoints: 43200
+              - refId: C
+                relativeTimeRange: { from: 300, to: 0 }
+                datasourceUid: "__expr__"
+                model:
+                  refId: C
+                  type: classic_conditions
+                  conditions:
+                    - evaluator: { type: gt, params: [0.05] }
+                      operator: { type: and }
+                      query: { params: ["A"] }
+                      reducer: { type: last, params: [] }
+          - uid: pvc-disk-pressure
+            title: PVC Disk Pressure
+            condition: C
+            noDataState: NoData
+            execErrState: Alerting
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "{{ $labels.persistentvolumeclaim }} in {{ $labels.namespace }} is over 85% full"
+            data:
+              - refId: A
+                relativeTimeRange: { from: 300, to: 0 }
+                datasourceUid: PBFA97CFB590B2093
+                model:
+                  refId: A
+                  expr: 1 - (kubelet_volume_stats_available_bytes / kubelet_volume_stats_capacity_bytes)
+                  instant: true
+                  intervalMs: 1000
+                  maxDataPoints: 43200
+              - refId: C
+                relativeTimeRange: { from: 300, to: 0 }
+                datasourceUid: "__expr__"
+                model:
+                  refId: C
+                  type: classic_conditions
+                  conditions:
+                    - evaluator: { type: gt, params: [0.85] }
+                      operator: { type: and }
+                      query: { params: ["A"] }
+                      reducer: { type: last, params: [] }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: monitoring
+  labels: { app: grafana }
+spec:
+  replicas: 1
+  strategy: { type: Recreate }
+  selector: { matchLabels: { app: grafana } }
+  template:
+    metadata: { labels: { app: grafana } }
+    spec:
+      containers:
+        - name: grafana
+          image: grafana/grafana:latest
+          ports: [{ containerPort: 3000 }]
+          envFrom:
+            - secretRef: { name: grafana-admin }
+          # SMTP via the in-cluster Mailpit (k8s/mailpit.yaml) — a local catcher, no auth, so no
+          # real credentials belong here. Alert emails land in Mailpit's own web UI
+          # (mailpit.demo.localhost), not a real inbox — swap GF_SMTP_HOST for a real relay (and add
+          # GF_SMTP_USER/PASSWORD via a Secret, same pattern as grafana-admin) for actual delivery.
+          env:
+            - { name: GF_SMTP_ENABLED, value: "true" }
+            - { name: GF_SMTP_HOST, value: "mailpit.infra.svc.cluster.local:1025" }
+            - { name: GF_SMTP_FROM_ADDRESS, value: "alerts@demo.local" }
+            - { name: GF_SMTP_FROM_NAME, value: "Grafana Alerting (demo)" }
+          volumeMounts:
+            - { name: datasources, mountPath: /etc/grafana/provisioning/datasources }
+            - { name: dashboard-provider, mountPath: /etc/grafana/provisioning/dashboards }
+            - { name: dashboards, mountPath: /etc/grafana/dashboards }
+            - { name: alerting, mountPath: /etc/grafana/provisioning/alerting }
+            - { name: data, mountPath: /var/lib/grafana }
+          resources:
+            requests: { cpu: "100m", memory: "256Mi" }
+            limits: { cpu: "500m", memory: "512Mi" }
+          readinessProbe:
+            httpGet: { path: /api/health, port: 3000 }
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /api/health, port: 3000 }
+            initialDelaySeconds: 30
+            periodSeconds: 20
+      volumes:
+        - name: datasources
+          configMap: { name: grafana-datasources }
+        - name: dashboard-provider
+          configMap: { name: grafana-dashboard-provider }
+        - name: dashboards
+          configMap: { name: grafana-dashboards }
+        - name: alerting
+          configMap: { name: grafana-alerting }
+        - name: data
+          persistentVolumeClaim: { claimName: grafana-data }
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: grafana-data
+  namespace: monitoring
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests: { storage: 1Gi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+  namespace: monitoring
+spec:
+  selector: { app: grafana }
+  ports: [{ port: 3000, targetPort: 3000 }]
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: grafana-ingress
+  namespace: monitoring
+spec:
+  rules:
+    - host: grafana.demo.localhost
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service: { name: grafana, port: { number: 3000 } }
