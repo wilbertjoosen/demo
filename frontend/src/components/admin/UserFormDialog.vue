@@ -6,7 +6,13 @@ import AddressForm from '../AddressForm.vue'
 import { useCommonStore } from '../../stores/common'
 import type { Address, RealmRole, User } from '../../models'
 
-const props = defineProps<{ modelValue: boolean; user: User | null; roles?: RealmRole[] }>()
+const props = defineProps<{
+  modelValue: boolean
+  user: User | null
+  roles?: RealmRole[]
+  /** The roles the user being edited currently holds — pre-fills the select. */
+  currentRoles?: string[]
+}>()
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]
   submit: [
@@ -63,11 +69,19 @@ watch(
     form.firstName = props.user?.firstName ?? ''
     form.lastName = props.user?.lastName ?? ''
     form.password = ''
-    form.roles = []
+    form.roles = props.user ? [...(props.currentRoles ?? [])] : []
     form.nationalId = props.user?.nationalId ?? ''
     form.phone = props.user?.phone ?? ''
     form.shippingAddress = props.user?.shippingAddress ? { ...props.user.shippingAddress } : { ...emptyAddress }
     formRef.value?.clearValidate()
+  },
+)
+
+// currentRoles is fetched async by the parent — apply it once it arrives while the edit dialog is open.
+watch(
+  () => props.currentRoles,
+  (roles) => {
+    if (props.modelValue && props.user) form.roles = [...(roles ?? [])]
   },
 )
 
@@ -79,7 +93,8 @@ async function submit() {
     email: form.email,
     firstName: form.firstName,
     lastName: form.lastName,
-    ...(isCreate.value ? { password: form.password, roles: form.roles } : {}),
+    roles: [...form.roles],
+    ...(isCreate.value ? { password: form.password } : {}),
     nationalId: form.nationalId,
     phone: form.phone,
     shippingAddress: form.shippingAddress,
@@ -111,7 +126,7 @@ async function submit() {
       <el-form-item v-if="isCreate" :label="t('admin.temporaryPassword')" prop="password">
         <el-input v-model="form.password" show-password />
       </el-form-item>
-      <el-form-item v-if="isCreate" :label="t('admin.roles')">
+      <el-form-item :label="t('admin.roles')">
         <el-select
           v-model="form.roles"
           multiple

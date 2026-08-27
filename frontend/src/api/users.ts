@@ -10,6 +10,15 @@ export interface ProfileUpdate {
   customAttributes?: Record<string, string>
 }
 
+/** Admin edit — a profile update plus optional realm-role sync (omit `roles` to leave them alone). */
+export interface AdminUserUpdate extends ProfileUpdate {
+  username?: string
+  email?: string
+  firstName?: string
+  lastName?: string
+  roles?: string[]
+}
+
 export interface CreateUserPayload extends ProfileUpdate {
   username: string
   email: string
@@ -33,9 +42,14 @@ export const usersApi = {
     const { data } = await http.get('/api/users')
     return unwrapCollection<User>(data)
   },
-  /** Realm roles assignable on the create-user form — read live from Keycloak. */
+  /** Realm roles assignable on the create/edit user form — read live from Keycloak. */
   async roles(): Promise<RealmRole[]> {
     const { data } = await http.get('/api/users/roles')
+    return data
+  },
+  /** The realm roles a specific user currently holds — for pre-filling the edit form. */
+  async userRoles(id: string): Promise<string[]> {
+    const { data } = await http.get(`/api/users/${id}/roles`)
     return data
   },
   /** Any authenticated user — minimal, PII-free list for picking someone to message. */
@@ -51,7 +65,7 @@ export const usersApi = {
     const { data } = await http.get(`/api/users/${id}`)
     return data
   },
-  async update(id: string, payload: ProfileUpdate): Promise<User> {
+  async update(id: string, payload: AdminUserUpdate): Promise<User> {
     const { data } = await http.put(`/api/users/${id}`, payload)
     return data
   },

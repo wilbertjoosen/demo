@@ -70,6 +70,11 @@ public class UserServiceImpl implements UserService {
         return keycloakAdminClient.listAssignableRealmRoles();
     }
 
+    @Override
+    public List<String> currentRoles(String id) {
+        return keycloakAdminClient.currentRealmRoleNames(findMongoUser(id).getKeycloakId());
+    }
+
     private void applyProfileFields(User user, ProfileFields fields) {
         if (fields.shippingAddress() != null) {
             user.setShippingAddress(fields.shippingAddress());
@@ -162,10 +167,13 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public UserProfileView updateUser(String id, ProfileFields fields, IdentityFields identity) {
+    public UserProfileView updateUser(String id, ProfileFields fields, IdentityFields identity, List<String> roles) {
         User user = findMongoUser(id);
         applyProfileFields(user, fields);
         user = saveChecked(user);
+        if (roles != null) {
+            keycloakAdminClient.syncRealmRoles(user.getKeycloakId(), roles);
+        }
         if (identity != null) {
             keycloakAdminClient.updateUser(user.getKeycloakId(), identity.username(), identity.email(),
                     identity.firstName(), identity.lastName());
