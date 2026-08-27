@@ -1,11 +1,4 @@
 package com.example.order;
-
-import com.example.common.events.EventContracts;
-import com.example.common.events.EventTypes;
-import com.example.common.events.Topics;
-import com.example.common.model.Address;
-import com.example.common.model.PaymentMethod;
-import com.example.common.model.ShippingCarrier;
 import com.example.order.enums.OrderStatus;
 import com.example.order.model.Order;
 import com.example.order.model.OrderView;
@@ -13,6 +6,13 @@ import com.example.order.repository.OrderRepository;
 import com.example.order.repository.OrderViewRepository;
 import com.example.order.service.InventoryServiceClient;
 import com.example.order.service.OrderServiceImpl;
+
+import com.example.common.events.EventContracts;
+import com.example.common.events.EventTypes;
+import com.example.common.events.Topics;
+import com.example.common.model.Address;
+import com.example.common.model.PaymentMethod;
+import com.example.common.model.ShippingCarrier;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

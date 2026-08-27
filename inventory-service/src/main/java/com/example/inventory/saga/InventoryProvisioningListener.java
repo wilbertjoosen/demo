@@ -1,9 +1,9 @@
 package com.example.inventory.saga;
+import com.example.inventory.service.InventoryService;
 
 import com.example.common.events.DomainEvent;
 import com.example.common.events.EventTypes;
 import com.example.common.events.Topics;
-import com.example.inventory.service.InventoryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;

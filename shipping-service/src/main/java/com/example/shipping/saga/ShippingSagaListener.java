@@ -1,10 +1,10 @@
 package com.example.shipping.saga;
+import com.example.shipping.service.ShippingService;
 
 import com.example.common.events.DomainEvent;
 import com.example.common.events.EventTypes;
 import com.example.common.events.Topics;
 import com.example.common.model.ShippingCarrier;
-import com.example.shipping.service.ShippingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;

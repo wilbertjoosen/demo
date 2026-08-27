@@ -1,6 +1,6 @@
 package com.example.delivery.model;
-
 import com.example.delivery.enums.DeliveryStatus;
+
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedBy;

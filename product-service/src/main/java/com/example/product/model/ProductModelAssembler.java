@@ -1,6 +1,6 @@
 package com.example.product.model;
-
 import com.example.product.controller.ProductController;
+
 import org.springframework.hateoas.CollectionModel;
 import org.springframework.hateoas.EntityModel;
 import org.springframework.hateoas.Link;

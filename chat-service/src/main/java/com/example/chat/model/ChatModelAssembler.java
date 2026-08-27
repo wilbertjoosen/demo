@@ -1,6 +1,6 @@
 package com.example.chat.model;
-
 import com.example.chat.controller.ChatController;
+
 import org.springframework.hateoas.CollectionModel;
 import org.springframework.hateoas.EntityModel;
 import org.springframework.hateoas.server.RepresentationModelAssembler;

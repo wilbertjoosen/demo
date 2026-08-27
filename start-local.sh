@@ -36,9 +36,9 @@ SERVICES=(
 # shellcheck source=local-infra.sh
 source "$ROOT_DIR/local-infra.sh"
 
-# NOT setting MONGO_HOST here, on purpose: the docker-compose `mongodb` container is a plain
-# standalone instance (no replica set on this branch), so every service's own application.yaml
-# default (localhost:27017) already points at it correctly with zero env vars needed.
+# NOT setting MONGO_HOST here, on purpose: the docker-compose `mongo` container is a plain
+# standalone instance (no replica set), so every service's own application.yaml default
+# (localhost:27017) already points at it correctly with zero env vars needed.
 
 # ================================================================
 # Argument parsing

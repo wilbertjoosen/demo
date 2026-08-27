@@ -1,6 +1,6 @@
 package com.example.comment.model;
-
 import com.example.comment.controller.CommentController;
+
 import org.springframework.hateoas.CollectionModel;
 import org.springframework.hateoas.EntityModel;
 import org.springframework.hateoas.server.RepresentationModelAssembler;

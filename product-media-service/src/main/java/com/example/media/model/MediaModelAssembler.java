@@ -1,6 +1,6 @@
 package com.example.media.model;
-
 import com.example.media.controller.MediaController;
+
 import org.springframework.hateoas.CollectionModel;
 import org.springframework.hateoas.EntityModel;
 import org.springframework.hateoas.server.RepresentationModelAssembler;

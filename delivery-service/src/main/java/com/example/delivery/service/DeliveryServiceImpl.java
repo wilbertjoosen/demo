@@ -1,11 +1,11 @@
 package com.example.delivery.service;
+import com.example.delivery.enums.DeliveryStatus;
+import com.example.delivery.model.Delivery;
+import com.example.delivery.repository.DeliveryRepository;
 
 import com.example.common.events.DomainEvent;
 import com.example.common.events.EventTypes;
 import com.example.common.events.Topics;
-import com.example.delivery.enums.DeliveryStatus;
-import com.example.delivery.model.Delivery;
-import com.example.delivery.repository.DeliveryRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
