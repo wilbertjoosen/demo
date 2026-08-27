@@ -1,5 +1,4 @@
 package com.example.audit.repository;
-
 import com.example.audit.model.AuditLogDocument;
 
 import org.springframework.data.domain.Page;

@@ -1,5 +1,4 @@
 package com.example.media.model;
-
 import com.example.media.controller.MediaController;
 
 import org.springframework.hateoas.CollectionModel;

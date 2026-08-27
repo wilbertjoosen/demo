@@ -5,7 +5,6 @@ import com.example.chat.model.Conversation;
 import com.example.chat.model.ConversationSummary;
 import com.example.chat.model.DirectMessage;
 import com.example.chat.service.ConversationService;
-
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;

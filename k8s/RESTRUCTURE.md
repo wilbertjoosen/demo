@@ -1,11 +1,8 @@
 # k8s manifest layout — folder split + Kustomize
 
-**Status:** live on all three branches. `main` — folder split (#74) + thin Kustomization / ArgoCD
-Kustomize mode (#75). `testing` — same tree + the `demo-qa` overlay + CI `images:` automation
-(#76). `develop` — adopts `k8s/demo/` + `k8s/platform/` (this PR), no `demo-qa/` (develop deploys
-the `demo` namespace, same as `main`). `k8s/demo/**` and `k8s/platform/**` are now byte-identical
-on every branch, so they never conflict on a merge. testing's `demo-qa` overlay details live in
-that branch's copy of this file until the next `testing → main` sync.
+**Status:** folder split done (#74, on `main`). Thin Kustomization files + ArgoCD switched to
+Kustomize mode — this file's PR. `demo-qa` overlay + propagation to `testing` / `develop` — see
+[Rollout](#rollout).
 
 ---
 

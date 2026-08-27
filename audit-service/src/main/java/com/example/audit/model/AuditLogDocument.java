@@ -11,7 +11,12 @@ import org.springframework.data.elasticsearch.annotations.FieldType;
 import java.time.Instant;
 import java.util.Map;
 
-@Document(indexName = "audit-log", createIndex = false)
+// SpEL (not a plain ${...} property placeholder — @Document(indexName=...) is parsed as a SpEL
+// template, whose default delimiter is #{...}; a bare ${...} string with no #{ is treated as a
+// literal and sent to Elasticsearch unresolved) so environments sharing one Elasticsearch instance
+// — see docker-compose.qa.yml — can still keep their audit trails apart, e.g.
+// AUDIT_ES_INDEX=audit-log-qa for the QA environment.
+@Document(indexName = "#{@environment.getProperty('AUDIT_ES_INDEX', 'audit-log')}", createIndex = false)
 @Getter
 @Setter
 @NoArgsConstructor

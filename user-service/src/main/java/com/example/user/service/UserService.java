@@ -1,5 +1,4 @@
 package com.example.user.service;
-
 import com.example.user.model.IdentityFields;
 import com.example.user.model.ProfileFields;
 import com.example.user.model.UserDirectoryEntry;

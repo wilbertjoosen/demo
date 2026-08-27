@@ -2,8 +2,8 @@
 # Config convention: a file literally named "application.yml" is global defaults, lower
 # precedence than each client's own {application-name}.yml below it).
 keycloak:
-  issuer-uri: ${KEYCLOAK_ISSUER_URI:http://keycloak.localhost:8181/realms/demo}
-  jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://keycloak.localhost:8181/realms/demo/protocol/openid-connect/certs}
+  issuer-uri: ${KEYCLOAK_ISSUER_URI:http://keycloak.localhost:8081/realms/demo}
+  jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://keycloak.localhost:8081/realms/demo/protocol/openid-connect/certs}
 
 notifications:
   mail:
@@ -33,6 +33,14 @@ spring:
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
         spring.json.trusted.packages: "*"
+    # Micrometer Observation instrumentation for producer sends / listener invocations — this is
+    # what propagates trace context through Kafka message headers, so a single trace can span the
+    # async saga boundary (order-service publishing ORDER_CREATED -> payment-service's listener
+    # picking it up) instead of tracing stopping dead at the synchronous order->inventory call.
+    template:
+      observation-enabled: true
+    listener:
+      observation-enabled: true
 
 eureka:
   client:
@@ -58,9 +66,9 @@ management:
     tags:
       application: ${spring.application.name}
   tracing:
+    # 100% sampling — this is a demo/dev environment where seeing every trace matters more than
+    # the overhead; a real production deployment would sample a small fraction (e.g. 0.1) instead.
     sampling:
-      # Demo-scale traffic — trace every request rather than tuning a sample rate. Drop this well
-      # below 1.0 before this ever carries real production load.
       probability: 1.0
     export:
       otlp:
@@ -68,7 +76,7 @@ management:
         # OTLP collector on this branch (see local-infra.sh's header), so with export on, every
         # service logs a java.net.ConnectException to localhost:4318 on each export interval.
         # k8s/configmap-common.yaml sets TRACING_EXPORT_OTLP_ENABLED=true — next to the
-        # OTEL_EXPORTER_OTLP_TRACES_ENDPOINT it already injects — so in-cluster export stays on.
+        # OTLP_ENDPOINT it already injects — so in-cluster export stays on.
         # Property name verified against Spring Boot 4.1 metadata (spring-boot-micrometer-tracing-
         # opentelemetry): management.tracing.export.otlp.enabled, default true.
         enabled: ${TRACING_EXPORT_OTLP_ENABLED:false}
@@ -76,9 +84,10 @@ management:
     tracing:
       export:
         otlp:
-          # Verified against the actual Spring Boot 4.1 OtlpTracingProperties class: this Boot
-          # version's tracing autoconfiguration (spring-boot-micrometer-tracing-opentelemetry, see
-          # common-security/pom.xml) exposes the endpoint under
-          # management.opentelemetry.tracing.export.otlp, not management.otlp.tracing — that prefix
-          # doesn't exist here and would silently bind nothing.
-          endpoint: ${OTEL_EXPORTER_OTLP_TRACES_ENDPOINT:http://localhost:4318/v1/traces}
+          # Tempo's OTLP/HTTP receiver — verified against the actual Spring Boot 4.1
+          # OtlpTracingProperties class (this project's Boot version splits tracing autoconfiguration
+          # into spring-boot-micrometer-tracing-opentelemetry, a different module than the
+          # micrometer-tracing-bridge-otel + opentelemetry-exporter-otlp pairing docs for older Boot
+          # versions describe) — the property prefix here is
+          # management.opentelemetry.tracing.export.otlp, not management.otlp.tracing.
+          endpoint: ${OTLP_ENDPOINT:http://localhost:4318/v1/traces}

@@ -1,5 +1,8 @@
 package com.example.user.service;
 
+import com.example.common.events.DomainEvent;
+import com.example.common.events.EventTypes;
+import com.example.common.events.Topics;
 import com.example.user.model.IdentityFields;
 import com.example.user.model.KeycloakUserSummary;
 import com.example.user.model.ProfileFields;
@@ -7,10 +10,6 @@ import com.example.user.model.User;
 import com.example.user.model.UserDirectoryEntry;
 import com.example.user.model.UserProfileView;
 import com.example.user.repository.UserRepository;
-
-import com.example.common.events.DomainEvent;
-import com.example.common.events.EventTypes;
-import com.example.common.events.Topics;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
@@ -22,6 +21,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -165,7 +165,7 @@ public class UserServiceImpl implements UserService {
         kafkaTemplate.send(Topics.USER_EVENTS, DomainEvent.of(EventTypes.USER_REGISTERED, null, Map.of(
                 "userId", user.getId(),
                 "username", jwt.getClaimAsString("preferred_username"),
-                "email", jwt.getClaimAsString("email") == null ? "" : jwt.getClaimAsString("email")
+                "email", jwt.getClaimAsString("email") == null ? "" : Objects.requireNonNull(jwt.getClaimAsString("email"))
         )));
         return user;
     }

@@ -38,7 +38,7 @@ public class ReportingTopology {
     public static final String PRODUCT_REFS_STORE = "product-refs-store";
     public static final String USER_REGISTRATIONS_STORE = "user-registrations-store";
 
-    private static final Set<String> ORDER_EVENT_TYPES = Set.of(EventTypes.ORDER_CREATED, EventTypes.ORDER_CANCELLED);
+    private static final Set<String> ORDER_EVENT_TYPES = Set.of(EventTypes.ORDER_CREATED, EventTypes.ORDER_STATUS_CHANGED);
     private static final Set<String> PRODUCT_EVENT_TYPES =
             Set.of(EventTypes.PRODUCT_CREATED, EventTypes.PRODUCT_UPDATED, EventTypes.PRODUCT_DELETED);
 

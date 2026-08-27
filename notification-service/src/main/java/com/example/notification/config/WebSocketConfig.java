@@ -1,5 +1,4 @@
 package com.example.notification.config;
-
 import com.example.notification.websocket.NotificationWebSocketHandler;
 
 import lombok.RequiredArgsConstructor;

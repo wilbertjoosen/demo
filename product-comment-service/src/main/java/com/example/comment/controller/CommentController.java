@@ -5,7 +5,6 @@ import com.example.comment.dto.UpdateCommentRequest;
 import com.example.comment.model.Comment;
 import com.example.comment.model.CommentModelAssembler;
 import com.example.comment.service.CommentService;
-
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.hateoas.CollectionModel;

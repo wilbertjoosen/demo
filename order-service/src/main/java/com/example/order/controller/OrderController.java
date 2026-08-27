@@ -29,7 +29,7 @@ public class OrderController {
 
     @PostMapping
     public ResponseEntity<EntityModel<OrderView>> placeOrder(@AuthenticationPrincipal Jwt jwt,
-                                                               @Valid @RequestBody PlaceOrderRequest request) {
+                                                             @Valid @RequestBody PlaceOrderRequest request) {
         Order order = orderService.placeOrder(jwt.getSubject(), jwt.getClaimAsString("email"),
                 request.productId(), request.quantity(), request.shippingAddress(),
                 request.paymentMethod(), request.shippingCarrier());

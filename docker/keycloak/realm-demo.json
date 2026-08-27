@@ -101,7 +101,10 @@
           "temporary": false
         }
       ],
-      "realmRoles": ["offline_access", "uma_authorization", "user", "finance", "product_manager", "shipping_manager", "inventory_manager", "warehouse", "delivery_agent"]
+      "realmRoles": [
+        "offline_access", "uma_authorization", "user", "finance", "product_manager",
+        "shipping_manager", "inventory_manager", "warehouse", "delivery_agent"
+      ]
     },
     {
       "username": "service-account-user-service-admin-client",

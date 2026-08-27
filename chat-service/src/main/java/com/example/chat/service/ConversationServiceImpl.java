@@ -1,5 +1,4 @@
 package com.example.chat.service;
-
 import com.example.chat.model.Conversation;
 import com.example.chat.model.ConversationSummary;
 import com.example.chat.model.DirectMessage;

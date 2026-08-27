@@ -1,5 +1,4 @@
 package com.example.product.config;
-
 import com.example.product.model.Product;
 import com.example.product.model.ProductCsvRow;
 
@@ -59,7 +58,8 @@ public class ProductImportJobConfig {
                 kafkaTemplate.send(Topics.PRODUCT_EVENTS, DomainEvent.of(EventTypes.PRODUCT_CREATED, null, Map.of(
                         "productId", saved.getId(),
                         "name", saved.getName(),
-                        "sku", saved.getSku()
+                        "sku", saved.getSku(),
+                        "price", saved.getPrice()
                 )));
             }
         };

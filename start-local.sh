@@ -36,9 +36,9 @@ SERVICES=(
 # shellcheck source=local-infra.sh
 source "$ROOT_DIR/local-infra.sh"
 
-# NOT setting MONGO_HOST here, on purpose: the docker-compose `mongodb` container is a plain
-# standalone instance (no replica set on this branch), so every service's own application.yaml
-# default (localhost:27017) already points at it correctly with zero env vars needed.
+# NOT setting MONGO_HOST here, on purpose: the docker-compose `mongo` container is a plain
+# standalone instance (no replica set), so every service's own application.yaml default
+# (localhost:27017) already points at it correctly with zero env vars needed.
 
 # ================================================================
 # Argument parsing
@@ -245,10 +245,10 @@ for service in \
     chat-service \
     product-comment-service \
     product-media-service \
+    reporting-service \
     user-service \
     product-review-service \
-    common-service \
-    reporting-service
+    common-service
 do
     start_service "$service"
 done
@@ -308,7 +308,7 @@ if $DO_SERVICES; then
 fi
 
 if $DO_INFRA; then
-    echo "Keycloak:       http://keycloak.localhost:8181"
+    echo "Keycloak:       http://keycloak.localhost:8081"
     echo "Mailpit:        http://localhost:8025"
     echo "Kafka UI:       http://localhost:8099"
     echo "Elasticsearch:  http://localhost:9200"

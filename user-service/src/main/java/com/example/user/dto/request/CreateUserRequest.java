@@ -14,5 +14,3 @@ public record CreateUserRequest(@NotBlank String username, @NotBlank @Email Stri
         return new ProfileFields(shippingAddress, nationalId, phone, customAttributes);
     }
 }
-
-

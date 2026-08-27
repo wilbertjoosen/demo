@@ -1,5 +1,4 @@
 package com.example.chat.controller;
-
 import com.example.chat.model.ChatMessage;
 import com.example.chat.model.ChatModelAssembler;
 import com.example.chat.service.ChatService;

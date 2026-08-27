@@ -1,24 +1,25 @@
 #!/usr/bin/env bash
 #
-# Starts/stops the local k3d cluster ("demo"). Wraps the manual sequence:
+# Starts/stops the local k3d cluster ("demo") together with the docker-compose infra it still
+# depends on (pods reach Grafana/Tempo via host.k3d.internal — see k8s/demo/configmap-common.yaml
+# and docker-compose.yml). Wraps the manual sequence:
 #
 #   k3d cluster stop demo && docker compose stop
 #   docker compose up -d && k3d cluster start demo && kubectl get pods -A -w
 #
-# Only starts the infra k8s pods actually need — which is none of docker-compose's infra at all
-# (K8S_INFRASTRUCTURE in local-infra.sh is empty). NOT docker-compose's app containers either
-# (Option B's full-docker-compose-stack mode — irrelevant here, the cluster runs its own pods) and
-# NOT the dev-only pieces docker-compose also happens to host: Kafka, Redis, MySQL, Keycloak,
-# Mailpit, MongoDB, and Elasticsearch all now run in-cluster (k8s/platform/infra/kafka.yaml, k8s/platform/infra/redis.yaml,
-# k8s/platform/infra/mysql.yaml, k8s/platform/infra/keycloak.yaml, k8s/platform/infra/mailpit.yaml, k8s/platform/infra/mongo.yaml, k8s/platform/infra/elasticsearch.yaml) — the
-# docker-compose versions stay for the host-JVM/compose-flow dev loop specifically, wired to
-# host.docker.internal/localhost targets, same as every dev-only piece. Grafana/Prometheus/Loki/
-# Promtail/Kibana aren't in docker-compose.yml at all any more — every one of them already has an
-# in-cluster equivalent (k8s/platform/monitoring/grafana.yaml, k8s/platform/monitoring/prometheus.yaml, k8s/platform/monitoring/loki.yaml,
-# k8s/platform/infra/promtail-daemonset.yaml, k8s/platform/monitoring/kibana.yaml), so the host-compose copies were pure duplication
-# regardless of which local dev flow you're using. Pass --with-dev to also start/stop the dev-only
-# set, e.g. if you're running start-local.sh's host-JVM services against the cluster at the same
-# time.
+# Only starts the infra k8s pods actually need, NOT docker-compose's app containers (Option B's
+# full-docker-compose-stack mode — irrelevant here, the cluster runs its own pods) and NOT the
+# dev-only pieces docker-compose also happens to host: Kafka, Redis, MySQL, Keycloak, Mailpit,
+# Vault, MongoDB, Elasticsearch, and Kibana all now run in-cluster (k8s/platform/infra/kafka.yaml, k8s/platform/infra/redis.yaml,
+# k8s/platform/infra/mysql.yaml, k8s/platform/infra/keycloak.yaml, k8s/platform/infra/mailpit.yaml, k8s/platform/infra/vault.yaml, k8s/platform/infra/mongo.yaml,
+# k8s/platform/infra/elasticsearch.yaml, k8s/platform/monitoring/kibana.yaml); kafka-ui only matters once kafka is reachable from the
+# host; this compose file's own Prometheus/Loki are the host-JVM/compose-flow instances
+# specifically — k8s has its own separate in-cluster ones (k8s/platform/monitoring/prometheus.yaml, k8s/platform/monitoring/loki.yaml);
+# its own Promtail only ships logs to this file's own Loki (k8s pods get their logs shipped by the
+# in-cluster k8s/platform/infra/promtail-daemonset.yaml instead). Rancher is also in-cluster now
+# (k8s-rancher/rancher.yaml), replacing the old docker-compose container entirely. Pass --with-dev
+# to also start/stop those, e.g. if you're running start-local.sh's host-JVM services against the
+# cluster at the same time.
 #
 # See start-local.sh/stop-local.sh for the non-k8s (mvnw/npm) local dev flow instead.
 
@@ -42,9 +43,9 @@ Usage: $(basename "$0") <start|stop|restart|status> [--with-dev] [--no-watch]
 
   --with-dev   Also start (or explicitly target on stop) the dev-only infra pieces docker-compose
                hosts but k8s pods don't use: Kafka, Redis, Kafka UI, MySQL, Keycloak, Mailpit,
-               MongoDB, Elasticsearch, and docker-compose's own Prometheus/Loki/Promtail.
-               Use this if you're also running start-local.sh's host-JVM services against the
-               same docker-compose stack.
+               Vault, MongoDB, Elasticsearch, and docker-compose's own Prometheus/Loki/Promtail.
+               Use this if you're also running start-local.sh's host-JVM services against the same
+               docker-compose stack.
   --no-watch   After "start" or "restart", don't tail pod status
                (by default, start/restart end with 'kubectl get pods -A -w')
 EOF
@@ -125,10 +126,7 @@ do_start() {
 
     if $WITH_DEV; then
         (cd "$ROOT_DIR" && docker compose up -d "${INFRASTRUCTURE[@]}")
-    elif [ ${#K8S_INFRASTRUCTURE[@]} -gt 0 ]; then
-        # "${K8S_INFRASTRUCTURE[@]}" directly would be an unbound-variable error under `set -u` on
-        # bash 3.2 (macOS's stock /bin/bash) when the array is empty, as it currently is — see
-        # local-infra.sh's comment on why. Guard with a length check instead of expanding it blind.
+    else
         (cd "$ROOT_DIR" && docker compose up -d "${K8S_INFRASTRUCTURE[@]}")
     fi
 

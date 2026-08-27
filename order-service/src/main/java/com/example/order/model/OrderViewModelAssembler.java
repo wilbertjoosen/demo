@@ -1,5 +1,4 @@
 package com.example.order.model;
-
 import com.example.order.controller.OrderController;
 
 import org.springframework.hateoas.CollectionModel;

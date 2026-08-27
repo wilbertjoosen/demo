@@ -1,5 +1,4 @@
 package com.example.chat.websocket;
-
 import com.example.chat.model.DirectMessage;
 import com.example.chat.model.TypingEvent;
 import com.example.chat.model.WsEnvelope;

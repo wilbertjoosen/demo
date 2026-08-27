@@ -5,7 +5,6 @@ import com.example.review.model.Review;
 import com.example.review.model.ReviewModelAssembler;
 import com.example.review.model.ReviewSummary;
 import com.example.review.service.ReviewService;
-
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.hateoas.CollectionModel;

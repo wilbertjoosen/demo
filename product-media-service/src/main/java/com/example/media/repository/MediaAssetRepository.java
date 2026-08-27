@@ -1,5 +1,4 @@
 package com.example.media.repository;
-
 import com.example.media.model.MediaAsset;
 
 import org.springframework.data.mongodb.repository.MongoRepository;
