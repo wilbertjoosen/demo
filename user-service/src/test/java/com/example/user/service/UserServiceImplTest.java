@@ -95,11 +95,35 @@ class UserServiceImplTest {
         when(userRepository.findByIdAndDeletedFalse("target")).thenReturn(Optional.of(target));
         when(userRepository.findByNationalIdAndDeletedFalse(NATIONAL_ID)).thenReturn(Optional.of(other));
 
-        assertThatThrownBy(() -> service.updateUser("target", fields(NATIONAL_ID), null))
+        assertThatThrownBy(() -> service.updateUser("target", fields(NATIONAL_ID), null, null))
                 .isInstanceOf(ResponseStatusException.class)
                 .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
 
         verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void updateUser_syncsRolesWhenProvided() {
+        User target = userWithId("target", "kc-target");
+        when(userRepository.findByIdAndDeletedFalse("target")).thenReturn(Optional.of(target));
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(keycloakAdminClient.findUser("kc-target")).thenReturn(Optional.empty());
+
+        service.updateUser("target", fields(null), null, List.of("admin", "finance"));
+
+        verify(keycloakAdminClient).syncRealmRoles("kc-target", List.of("admin", "finance"));
+    }
+
+    @Test
+    void updateUser_leavesRolesUntouchedWhenNull() {
+        User target = userWithId("target", "kc-target");
+        when(userRepository.findByIdAndDeletedFalse("target")).thenReturn(Optional.of(target));
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(keycloakAdminClient.findUser("kc-target")).thenReturn(Optional.empty());
+
+        service.updateUser("target", fields(null), null, null);
+
+        verify(keycloakAdminClient, never()).syncRealmRoles(any(), any());
     }
 
     @Test

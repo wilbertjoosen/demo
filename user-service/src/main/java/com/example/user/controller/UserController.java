@@ -44,11 +44,18 @@ public class UserController {
         return assembler.toCollectionModel(userService.list());
     }
 
-    /** Realm roles an admin can pick from on the create-user form — read live from Keycloak. */
+    /** Realm roles an admin can pick from on the create/edit user form — read live from Keycloak. */
     @GetMapping("/roles")
     @PreAuthorize("hasRole('ADMIN')")
     public List<RealmRole> roles() {
         return userService.assignableRoles();
+    }
+
+    /** The realm roles a specific user currently holds — pre-fills the edit form. */
+    @GetMapping("/{id}/roles")
+    @PreAuthorize("hasRole('ADMIN')")
+    public List<String> userRoles(@PathVariable String id) {
+        return userService.currentRoles(id);
     }
 
     /** Any authenticated user — a minimal, PII-free directory for picking someone to message. */
@@ -68,7 +75,7 @@ public class UserController {
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public EntityModel<UserProfileView> updateUser(@PathVariable String id, @Valid @RequestBody AdminUpdateUserRequest request) {
-        UserProfileView updated = userService.updateUser(id, request.toFields(), request.toIdentity());
+        UserProfileView updated = userService.updateUser(id, request.toFields(), request.toIdentity(), request.roles());
         return assembler.toModel(updated);
     }
 
