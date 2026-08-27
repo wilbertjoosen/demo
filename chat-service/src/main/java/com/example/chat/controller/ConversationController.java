@@ -1,9 +1,10 @@
 package com.example.chat.controller;
+
+import com.example.chat.dto.StartConversationRequest;
 import com.example.chat.model.Conversation;
 import com.example.chat.model.ConversationSummary;
 import com.example.chat.model.DirectMessage;
 import com.example.chat.service.ConversationService;
-
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -28,9 +29,6 @@ public class ConversationController {
     @GetMapping
     public List<ConversationSummary> myConversations(@AuthenticationPrincipal Jwt jwt) {
         return conversationService.myConversations(jwt.getSubject());
-    }
-
-    public record StartConversationRequest(String otherUserId, String otherUsername) {
     }
 
     /** Idempotent: returns the existing conversation with this user if one already exists. */
