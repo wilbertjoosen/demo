@@ -1,5 +1,4 @@
 package com.example.chat.config;
-
 import com.example.chat.websocket.ChatHandshakeInterceptor;
 import com.example.chat.websocket.ChatWebSocketHandler;
 import com.example.chat.websocket.DirectMessageHandshakeInterceptor;

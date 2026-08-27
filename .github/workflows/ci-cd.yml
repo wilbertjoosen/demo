@@ -2,9 +2,26 @@ name: CI/CD
 
 on:
   push:
-    branches: [main, develop]
+    # Build-once, promote-many: testing is the ONLY branch that ever builds images from source
+    # (see each job's `if:` below) — that's the "build once". Pushing to main never rebuilds; the
+    # promote-to-production job instead copies the exact image tags testing is already running into
+    # main's own k8s manifests, so what ships to prod is bit-for-bit what was already validated in
+    # QA, not a fresh build of the same source. develop's own copy of this workflow separately
+    # triggers on develop pushes/PRs for test-only validation — this file doesn't need to.
+    branches: [main, testing]
   pull_request:
-    branches: [main, develop]
+    # testing included so a PR into testing gets pre-merge validation (changes/backend-test/
+    # frontend-test) before it triggers testing's own real build-and-push on merge — previously
+    # missing, so PRs like #31 merged with zero CI signal beforehand. build-and-push itself still
+    # only runs on an actual push to testing (see its own `if:` below), so adding this doesn't
+    # start building images from a PR.
+    branches: [main, testing]
+  # Manual "rebuild + redeploy everything" — e.g. after a change that doesn't touch any single
+  # service's own path (a Dockerfile fix, a versioning-scheme change) but every service still needs
+  # picking up, OR a genuine hotfix committed directly to main that has no tested-in-QA artifact to
+  # promote. Run against whichever branch (main or testing) you want to rebuild — this is the one
+  # deliberate escape hatch that still builds directly from main.
+  workflow_dispatch: {}
 
 # Explicit rather than relying on repo-level defaults — GITHUB_TOKEN needs package-write to push
 # images to GHCR, and contents-write for the deploy job's auto-commit back to k8s/.
@@ -17,56 +34,42 @@ env:
   IMAGE_OWNER: ${{ github.repository_owner }}
 
 jobs:
-  backend-test:
-    name: Backend (Maven reactor)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '26'
-          cache: maven
-      # `verify` (not just `test`) so Checkstyle + SpotBugs run too — both are bound to the verify
-      # phase in the root pom, alongside the Testcontainers-backed integration tests (order-service,
-      # chat-service), which need real Docker; GitHub-hosted ubuntu-latest runners have it preinstalled.
-      - name: Run tests + static analysis
-        run: ./mvnw -B verify
-
-  frontend-test:
-    name: Frontend (typecheck + build)
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: frontend
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: frontend/.nvmrc
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-      - run: npm ci
-      - run: npm run lint
-      # npm run build already chains `vue-tsc -b && vite build` — one command covers both gates.
-      - run: npm run build
-
+  # Runs first, for every event (push to either branch, PR, workflow_dispatch) — backend-test and
+  # frontend-test both gate on its output so a docs/infra-only change (or a change scoped to one
+  # service) doesn't pay for a full reactor build. Previously this only ran for testing pushes,
+  # since it originally existed purely to drive the image-build matrix; now that it also drives
+  # test scoping, every event needs it.
   changes:
     name: Detect changed services
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     outputs:
       services: ${{ steps.matrix.outputs.services }}
-      frontend: ${{ steps.filter.outputs.frontend }}
+      frontend: ${{ steps.matrix.outputs.frontend }}
+      run-backend-tests: ${{ steps.matrix.outputs.run-backend-tests }}
+      run-frontend-tests: ${{ steps.matrix.outputs.run-frontend-tests }}
+      backend-test-modules: ${{ steps.matrix.outputs.backend-test-modules }}
     steps:
       - uses: actions/checkout@v4
         with:
-          # dorny/paths-filter diffs against the previous commit on the branch — needs real
-          # history, not the default shallow (fetch-depth: 1) checkout.
+          # dorny/paths-filter diffs against `base` below — needs real history, not the default
+          # shallow (fetch-depth: 1) checkout.
           fetch-depth: 0
+      # Manual dispatch has no "changed since" to diff against — every service is presumed
+      # changed, skipping the filter step entirely (its outputs would otherwise be empty/unset).
       - uses: dorny/paths-filter@v3
+        if: github.event_name != 'workflow_dispatch'
         id: filter
         with:
+          # Without an explicit base, dorny/paths-filter falls back to diffing against the
+          # repository's default branch (main) rather than this push's own previous commit — since
+          # main and testing have substantial permanent divergence (QA-only files, namespace-
+          # specific k8s manifests, unpromoted testing-only work), that made nearly every push to
+          # testing register as "everything changed," rebuilding all 17 services + frontend
+          # regardless of what the commit actually touched. github.event.before is the SHA the
+          # branch pointed at immediately before this push, so this now diffs against exactly that.
+          # pull_request has no "before" (it's a push-only field) — leave base empty there so the
+          # action falls back to its own default PR-base-branch diff, which is already correct.
+          base: ${{ github.event_name == 'push' && github.event.before || '' }}
           filters: |
             shared:
               - 'pom.xml'
@@ -95,26 +98,104 @@ jobs:
             product-media-service: [ 'product-media-service/**' ]
             product-review-service: [ 'product-review-service/**' ]
             chat-service: [ 'chat-service/**' ]
+            reporting-service: [ 'reporting-service/**' ]
             common-service: [ 'common-service/**' ]
       - name: Build service matrix
         id: matrix
         # A shared module (or the root pom/Dockerfile) changing can affect every service, since
-        # each image build runs `mvnw -pl <service> -am` — so it forces a full rebuild. Otherwise,
-        # only the services whose own directory changed go into the matrix.
+        # each image build runs `mvnw -pl <service> -am` — so it forces a full rebuild. Same result,
+        # deliberately, for a manual workflow_dispatch run — every service is presumed changed.
+        #
+        # backend-test-modules drives how much of the reactor Backend (Maven reactor) actually
+        # builds: empty means "run the full `mvnw verify`" (shared code changed, or nothing to scope
+        # to yet — always true for workflow_dispatch), a comma list means `mvnw -pl <list> -am
+        # verify` — just the touched service(s) plus whatever they depend on. run-backend-tests is
+        # false only when the diff touched no backend module at all (frontend-only, or docs/infra
+        # paths like k8s/**, docker/**, *.md, .github/** that no filter above matches) — that's the
+        # actual "don't run tests when we're not changing code" case.
         run: |
-          if [ "${{ steps.filter.outputs.shared }}" = "true" ]; then
-            SERVICES='["eureka-server","config-server","gateway-service","inventory-service","audit-service","user-service","product-service","order-service","payment-service","shipping-service","delivery-service","notification-service","product-comment-service","product-media-service","product-review-service","chat-service","common-service"]'
+          ALL_SERVICES='["eureka-server","config-server","gateway-service","inventory-service","audit-service","user-service","product-service","order-service","payment-service","shipping-service","delivery-service","notification-service","product-comment-service","product-media-service","product-review-service","chat-service","reporting-service","common-service"]'
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "${{ steps.filter.outputs.shared }}" = "true" ]; then
+            SERVICES="$ALL_SERVICES"
+            FRONTEND=true
+            RUN_BACKEND_TESTS=true
+            BACKEND_TEST_MODULES=""
           else
             SERVICES=$(echo '${{ steps.filter.outputs.changes }}' | jq -c '[.[] | select(. != "frontend")]')
+            FRONTEND=${{ steps.filter.outputs.frontend }}
+            if [ "$SERVICES" = "[]" ]; then
+              RUN_BACKEND_TESTS=false
+              BACKEND_TEST_MODULES=""
+            else
+              RUN_BACKEND_TESTS=true
+              BACKEND_TEST_MODULES=$(echo "$SERVICES" | jq -r 'join(",")')
+            fi
           fi
           echo "services=$SERVICES" >> "$GITHUB_OUTPUT"
+          echo "frontend=$FRONTEND" >> "$GITHUB_OUTPUT"
+          echo "run-backend-tests=$RUN_BACKEND_TESTS" >> "$GITHUB_OUTPUT"
+          echo "run-frontend-tests=$FRONTEND" >> "$GITHUB_OUTPUT"
+          echo "backend-test-modules=$BACKEND_TEST_MODULES" >> "$GITHUB_OUTPUT"
 
-  # Everything below here only runs on a genuine push to main (not PRs) — no point building/pushing
-  # images for a change that isn't merged yet.
+  backend-test:
+    name: Backend (Maven reactor)
+    needs: [changes]
+    if: needs.changes.outputs.run-backend-tests == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '26'
+          cache: maven
+      # `verify` (not just `test`) so Checkstyle + SpotBugs run too — both are bound to the verify
+      # phase in the root pom, alongside the Testcontainers-backed integration tests (order-service,
+      # chat-service), which need real Docker; GitHub-hosted ubuntu-latest runners have it preinstalled.
+      # Scoped to just the changed service(s) (+ whatever they depend on, via -am) when
+      # backend-test-modules is set — shared-module changes and workflow_dispatch leave it empty,
+      # which runs the full reactor instead, since a shared change can affect every service.
+      - name: Run tests + static analysis
+        run: |
+          if [ -z "${{ needs.changes.outputs.backend-test-modules }}" ]; then
+            ./mvnw -B verify
+          else
+            ./mvnw -B -pl "${{ needs.changes.outputs.backend-test-modules }}" -am verify
+          fi
+
+  frontend-test:
+    name: Frontend (typecheck + build)
+    needs: [changes]
+    if: needs.changes.outputs.run-frontend-tests == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      # npm run build already chains `vue-tsc -b && vite build` — one command covers both gates.
+      - run: npm run build
+
+  # Only testing pushes (or a manual workflow_dispatch) build images from source — see the
+  # build-once-promote-many note at the top of this file.
   build-and-push:
     name: Build & push images
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.changes.outputs.services != '[]'
-    needs: [backend-test, frontend-test, changes]
+    if: |
+      (
+        (github.event_name == 'push' && github.ref == 'refs/heads/testing') ||
+        github.event_name == 'workflow_dispatch'
+      ) &&
+      needs.changes.outputs.services != '[]'
+    # Deliberately not frontend-test — a backend-only change leaves frontend-test skipped (see
+    # run-frontend-tests above), and this shouldn't wait on or be gated by an unrelated job.
+    needs: [backend-test, changes]
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -124,11 +205,18 @@ jobs:
       - name: Read service version
         id: version
         # Each service's own <version> (not the parent reactor's) — the top-level /project/version,
-        # not the one inside <parent>. xmllint (preinstalled) beats a grep here since the parent
-        # block has its own <version> line earlier in the same file.
+        # not the one inside <parent>. python3 (always present on GitHub runners) beats a grep here
+        # since the parent block has its own <version> line earlier in the same file; xmllint is
+        # NOT preinstalled on ubuntu-latest, despite what you might expect.
         run: |
-          VERSION=$(xmllint --xpath 'string(/*[local-name()="project"]/*[local-name()="version"])' ${{ matrix.service }}/pom.xml)
+          VERSION=$(python3 -c "
+          import xml.etree.ElementTree as ET
+          ns = {'m': 'http://maven.apache.org/POM/4.0.0'}
+          root = ET.parse('${{ matrix.service }}/pom.xml').getroot()
+          print(root.find('m:version', ns).text)
+          ")
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "short_sha=${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
         with:
@@ -144,25 +232,41 @@ jobs:
           # nothing here targets amd64 today, and it'd need QEMU emulation for no payoff.
           platforms: linux/arm64
           push: true
-          # SHA tag is what k8s manifests actually deploy by (immutable, guarantees every push
-          # rolls out even if the version wasn't bumped); the semver tag rides along on the same
-          # image purely for human-readable release tracking.
+          # <version>-<short-sha> is what k8s manifests actually deploy by — human-readable (shows
+          # the app version, unlike a bare SHA) while still guaranteed to change on every commit
+          # that touches this service, same as the plain SHA tag did. This was briefly pure semver
+          # (46984c2), which silently left a service's running pod stale in production whenever a
+          # commit forgot to bump its version (hit user-service, payment-service, reporting-service,
+          # and the frontend more than once) — the short-sha suffix removes that failure mode
+          # structurally, same reasoning as the SHA-only scheme it replaces, without losing the
+          # human-readable version. The plain SHA and plain semver tags still ride along on the
+          # same image too, purely for lookup convenience — neither is what gets deployed.
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/demo-${{ matrix.service }}:${{ github.sha }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/demo-${{ matrix.service }}:${{ steps.version.outputs.version }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/demo-${{ matrix.service }}:${{ steps.version.outputs.version }}-${{ steps.version.outputs.short_sha }}
           cache-from: type=gha,scope=${{ matrix.service }}
           cache-to: type=gha,mode=max,scope=${{ matrix.service }}
 
   build-and-push-frontend:
     name: Build & push frontend image
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.changes.outputs.frontend == 'true'
-    needs: [backend-test, frontend-test, changes]
+    if: |
+      (
+        (github.event_name == 'push' && github.ref == 'refs/heads/testing') ||
+        github.event_name == 'workflow_dispatch'
+      ) &&
+      needs.changes.outputs.frontend == 'true'
+    # Deliberately not backend-test — a frontend-only change leaves backend-test skipped (see
+    # run-backend-tests above), and this shouldn't wait on or be gated by an unrelated job.
+    needs: [frontend-test, changes]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Read frontend version
         id: version
-        run: echo "version=$(jq -r .version frontend/package.json)" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "version=$(jq -r .version frontend/package.json)" >> "$GITHUB_OUTPUT"
+          echo "short_sha=${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
         with:
@@ -173,18 +277,14 @@ jobs:
         with:
           context: frontend
           file: frontend/Dockerfile
-          # MODE=k8s (frontend/.env.k8s, not .env.production/its own default) — docker-compose.yml's
-          # own frontend service always builds straight from source locally, never pulls this image,
-          # so this published image has exactly one consumer: k8s/frontend.yaml. It needs the
-          # ingress-routed URLs (relative API base, ws://.../ws/* through Traefik), not the
-          # localhost:* ones .env.production bakes in for the docker-compose/host-JVM dev flow,
-          # where the browser reaches every backend service on its own published host port instead.
-          build-args: MODE=k8s
           platforms: linux/arm64
           push: true
+          # <version>-<short-sha> is what gets deployed — see build-and-push's own tags comment for
+          # why (same reasoning applies here, frontend hit this exact staleness bug too).
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/demo-frontend:${{ github.sha }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/demo-frontend:${{ steps.version.outputs.version }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/demo-frontend:${{ steps.version.outputs.version }}-${{ steps.version.outputs.short_sha }}
           cache-from: type=gha,scope=frontend
           cache-to: type=gha,mode=max,scope=frontend
 
@@ -192,40 +292,72 @@ jobs:
     name: Update k8s manifests -> ArgoCD sync
     # Runs if either build job actually built something (not just "didn't fail" — a *skipped* job
     # also isn't 'failure', so this has to check for 'success' explicitly on at least one of them).
+    # A plain push to main never reaches here (build-and-push doesn't run for it any more — see
+    # promote-to-production below); workflow_dispatch can still target main as the manual rebuild
+    # escape hatch, and commits straight to whichever branch (github.ref_name) triggered it.
     if: |
       always() &&
-      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      (
+        (github.event_name == 'push' && github.ref == 'refs/heads/testing') ||
+        github.event_name == 'workflow_dispatch'
+      ) &&
       (needs.build-and-push.result == 'success' || needs.build-and-push-frontend.result == 'success')
     needs: [changes, build-and-push, build-and-push-frontend]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          # A later `git push` needs a real ref, not the detached HEAD checkout actions/checkout leaves by default.
-          ref: main
+          # Commit the manifest bump back to whichever branch triggered this run (main -> prod,
+          # testing -> QA) — a later `git push` needs a real ref, not the detached HEAD checkout
+          # actions/checkout leaves by default.
+          ref: ${{ github.ref_name }}
       - name: Point manifests at this commit's images
         run: |
           # Only touch manifests for services that were actually rebuilt this run — touching every
-          # k8s/*.yaml unconditionally would bump untouched services to a SHA tag that was never
-          # pushed to GHCR, breaking their next ArgoCD sync.
-          FILES=$(echo '${{ needs.changes.outputs.services }}' | jq -r '.[] | "k8s/" + . + ".yaml"')
+          # manifest unconditionally would bump untouched services to a tag that was never pushed
+          # to GHCR, breaking their next ArgoCD sync.
+          #
+          # Since the k8s/ folder split (k8s/RESTRUCTURE.md) app manifests live under k8s/demo/ (main)
+          # or k8s/demo-qa/ (testing); before the split they were flat in k8s/. Resolve each changed
+          # service to wherever its manifest actually is, so this job works on any branch — including
+          # mid-migration.
+          resolve() { find k8s -maxdepth 3 -name "$1.yaml" -not -path 'k8s/platform/*' -print -quit; }
+          FILES=$(echo '${{ needs.changes.outputs.services }}' | jq -r '.[]' | while read -r s; do resolve "$s"; done)
           if [ "${{ needs.changes.outputs.frontend }}" = "true" ]; then
             FILES="$FILES
-          k8s/frontend.yaml"
+          $(resolve frontend)"
           fi
-          # Handles both the steady state (already ghcr.io/.../demo-<service>:<old-sha>, bump the tag)
-          # and the one-time first run (still demo/<service>:<local tag> from before CI/CD existed,
-          # or from manual local iteration — e.g. demo/frontend:1.0.0 built straight from
-          # package.json's version, demo/order-service:1.0.3 from pom.xml's) — either way, by the
-          # time this step runs the SHA-tagged image already exists in GHCR (build-and-push ran
-          # first), so ArgoCD never syncs a manifest pointing at an image that isn't pullable yet.
+          # Deploys by <version>-<short-sha> (also tagged on every image in build-and-push above),
+          # not each service's bare semver — every commit that touches a service therefore produces
+          # a genuinely new tag and a real manifest diff, so ArgoCD always has something to sync even
+          # if nobody remembered to bump that service's version. This was briefly semver-only
+          # (46984c2) on the theory that "each service's own version" should drive its own deploys;
+          # in practice that meant any commit which forgot the version bump left the running pod
+          # silently stale (hit user-service, payment-service, reporting-service, and the frontend
+          # more than once). The short-sha suffix removes that failure mode structurally while still
+          # keeping the version human-readable in the tag, unlike the bare-SHA scheme this replaces.
           # The local-tag pattern matches ANY tag under the demo/ prefix, not just a literal
-          # ":local" — the point is "this manifest still points at a locally-built image, not
-          # ghcr.io yet", regardless of what that local tag's value actually is.
+          # ":local" — local iteration tags now match each service's real version (package.json/
+          # pom.xml, e.g. demo/frontend:1.0.0, demo/order-service:1.0.3) rather than a placeholder;
+          # the point is "this manifest still points at a locally-built image, not ghcr.io yet",
+          # regardless of what that local tag's value actually is.
+          SHORT_SHA=${GITHUB_SHA:0:7}
           echo "$FILES" | while IFS= read -r f; do
             [ -f "$f" ] || continue
-            sed -i -E "s#image: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/demo-([a-z-]+):[a-zA-Z0-9._-]+#image: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/demo-\1:${{ github.sha }}#g" "$f"
-            sed -i -E "s#image: demo/([a-z-]+):[a-zA-Z0-9._-]+#image: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/demo-\1:${{ github.sha }}#g" "$f"
+            SERVICE=$(basename "$f" .yaml)
+            if [ "$SERVICE" = "frontend" ]; then
+              VERSION=$(jq -r .version frontend/package.json)
+            else
+              VERSION=$(python3 -c "
+          import xml.etree.ElementTree as ET
+          ns = {'m': 'http://maven.apache.org/POM/4.0.0'}
+          root = ET.parse('$SERVICE/pom.xml').getroot()
+          print(root.find('m:version', ns).text)
+          ")
+            fi
+            TAG="${VERSION}-${SHORT_SHA}"
+            sed -i -E "s#image: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/demo-([a-z-]+):[a-zA-Z0-9._-]+#image: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/demo-\1:${TAG}#g" "$f"
+            sed -i -E "s#image: demo/([a-z-]+):[a-zA-Z0-9._-]+#image: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/demo-\1:${TAG}#g" "$f"
           done
       - name: Commit and push
         run: |
@@ -235,6 +367,63 @@ jobs:
             echo "No manifest changes (first run, or images already referenced by SHA some other way) — nothing to commit."
             exit 0
           fi
-          git add k8s/*.yaml
+          git add k8s/
           git commit -m "Deploy ${{ github.sha }} [skip ci]"
+          git push
+
+  # Build-once, promote-many: a plain push to main never builds a new image (see the narrowed
+  # `if:` on build-and-push/build-and-push-frontend above) — it just copies the exact image tags
+  # testing is already running into main's own k8s manifests, so production always runs the
+  # identical, already-validated-in-QA artifact rather than a fresh rebuild of the same source.
+  # A genuine hotfix committed directly to main (with no corresponding tested build on testing)
+  # has nothing to promote from — use workflow_dispatch against main for that case instead.
+  #
+  # No `needs:` on the test jobs — this job doesn't compile or run anything from source, it only
+  # copies image references that were already validated by testing's own CI run before they were
+  # ever pushed to GHCR, so re-running tests here again would just be redundant delay.
+  promote-to-production:
+    name: Promote testing's images to production
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Fetch testing branch
+        run: git fetch origin testing:refs/remotes/origin/testing
+      - name: Copy testing's image tags into main's manifests
+        run: |
+          REGISTRY_PREFIX="${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/demo-"
+          # main's app manifests live under k8s/demo/ since the folder split (k8s/RESTRUCTURE.md);
+          # pre-split they were flat in k8s/. testing's equivalent is k8s/demo-qa/<name> post-split,
+          # k8s/<name> pre-split — try both. Platform manifests (infra/monitoring/namespaces) have
+          # nothing to promote and aren't under these globs anyway.
+          for f in k8s/demo/*.yaml k8s/*.yaml; do
+            [ -f "$f" ] || continue
+            base=$(basename "$f")
+            tf=""
+            for cand in "k8s/demo-qa/$base" "k8s/$base"; do
+              if git cat-file -e "origin/testing:$cand" 2>/dev/null; then tf="$cand"; break; fi
+            done
+            [ -n "$tf" ] || continue
+            TESTING_LINE=$(git show "origin/testing:$tf" | grep -m1 -E "image: ${REGISTRY_PREFIX}" || true)
+            if [ -z "$TESTING_LINE" ]; then
+              continue
+            fi
+            TESTING_IMAGE=$(echo "$TESTING_LINE" | sed -E 's/^[[:space:]]*image:[[:space:]]*//')
+            # Only the app container's own image — a sidecar (e.g. order-service's nginx:alpine
+            # access-log sidecar) never matches the demo registry prefix, so it's left alone.
+            sed -i -E "s#image: ${REGISTRY_PREFIX}[a-zA-Z0-9._-]+:[a-zA-Z0-9._-]+#image: $TESTING_IMAGE#" "$f"
+          done
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet; then
+            echo "main already matches testing's images — nothing to promote."
+            exit 0
+          fi
+          TESTING_SHA=$(git rev-parse --short origin/testing)
+          git add k8s/
+          git commit -m "Promote testing (${TESTING_SHA}) to production [skip ci]"
           git push

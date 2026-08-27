@@ -1,6 +1,7 @@
 import { ElNotification } from 'element-plus'
 import type { NotificationHandle } from 'element-plus'
 import { useNotificationsStore, type NotificationEvent } from '../stores/notifications'
+import { resolveWsUrl } from '../lib/ws'
 
 let socket: WebSocket | null = null
 
@@ -14,7 +15,7 @@ export function useNotifications() {
 
   function connect() {
     if (socket) return
-    const url = import.meta.env.VITE_NOTIFICATIONS_WS_URL
+    const url = resolveWsUrl(import.meta.env.VITE_NOTIFICATIONS_WS_URL, '/ws/notifications')
     socket = new WebSocket(url)
 
     socket.onmessage = (event) => {

@@ -1,5 +1,4 @@
 package com.example.comment.model;
-
 import com.example.comment.controller.CommentController;
 
 import org.springframework.hateoas.CollectionModel;

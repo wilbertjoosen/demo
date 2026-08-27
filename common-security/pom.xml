@@ -30,12 +30,15 @@
             <version>3.1.0</version>
         </dependency>
         <dependency>
-            <!-- The autoconfiguration that actually wires up a Tracer/OTLP span exporter in Boot 4.x
-                 lives specifically in this artifact — micrometer-tracing-bridge-otel +
-                 opentelemetry-exporter-otlp alone register no autoconfiguration (verified: neither
-                 jar's META-INF/spring/...AutoConfiguration.imports lists anything OTLP-related).
-                 One place to add it for every service behind common-security, same as
-                 gateway-service getting it directly since it doesn't depend on this module. -->
+            <!-- Same reasoning as springdoc above: every consuming service already has
+                 spring-boot-starter-actuator on its own classpath, so this alone is enough for Boot
+                 to auto-configure a Tracer/ObservationRegistry and export spans via OTLP — no
+                 per-service config beyond the OTLP endpoint (set once, centrally, in config-server's
+                 config-repo/application.yml). This isn't the more obvious micrometer-tracing-bridge-otel
+                 + opentelemetry-exporter-otlp pairing — in Spring Boot 4.x those are just the
+                 underlying libraries; the actual autoconfiguration classes that wire them together
+                 live specifically in this artifact (verified against the resolved classpath —
+                 neither of the two "obvious" deps alone registers any autoconfiguration). -->
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-micrometer-tracing-opentelemetry</artifactId>
         </dependency>
@@ -61,6 +64,32 @@
             <groupId>io.opentelemetry</groupId>
             <artifactId>opentelemetry-exporter-otlp</artifactId>
         </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-devtools</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <!-- EndUserIdTracingFilter (an OncePerRequestFilter) needs jakarta.servlet types to
+                 compile — common-security has no spring-boot-starter-web dependency of its own, only
+                 spring-security-web (transitively, via spring-boot-starter-security), which doesn't
+                 expose the servlet API at this module's own compile time. `provided` scope: every
+                 consuming service already supplies the real servlet container via its own
+                 spring-boot-starter-web, so this isn't bundled into the runtime jar, just needed here
+                 for common-security to compile against the types at all. Version comes from Spring
+                 Boot's own dependency management (spring-boot-starter-parent), same as every other
+                 dependency in this file. -->
+            <groupId>jakarta.servlet</groupId>
+            <artifactId>jakarta.servlet-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <!-- common-security had no test dependencies at all before EndUserIdTracingFilter —
+                 added specifically to cover it (a filter running on every authenticated request
+                 across all 9 services is worth a regression test). -->
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
-
 </project>

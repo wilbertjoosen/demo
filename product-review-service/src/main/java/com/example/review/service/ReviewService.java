@@ -1,5 +1,4 @@
 package com.example.review.service;
-
 import com.example.review.model.Review;
 import com.example.review.model.ReviewSummary;
 

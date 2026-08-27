@@ -1,5 +1,4 @@
 package com.example.comment.service;
-
 import com.example.comment.model.Comment;
 import com.example.comment.repository.CommentRepository;
 

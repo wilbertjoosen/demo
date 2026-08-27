@@ -1,5 +1,4 @@
 package com.example.user.model;
-
 import com.example.user.controller.UserController;
 
 import org.springframework.hateoas.CollectionModel;

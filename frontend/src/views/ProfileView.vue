@@ -33,8 +33,8 @@ watch(
 async function load() {
   loading.value = true
   try {
-    await users.loadMe();
-    await common.loadCountries();
+    await users.loadMe()
+    await common.loadCountries()
   } finally {
     loading.value = false
   }

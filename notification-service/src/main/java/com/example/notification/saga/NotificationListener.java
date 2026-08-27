@@ -1,9 +1,9 @@
 package com.example.notification.saga;
 
-import com.example.notification.websocket.NotificationWebSocketHandler;
-
 import com.example.common.events.DomainEvent;
+import com.example.common.events.EventTypes;
 import com.example.common.events.Topics;
+import com.example.notification.websocket.NotificationWebSocketHandler;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -51,12 +51,48 @@ public class NotificationListener {
 
     private void emailFor(DomainEvent event) {
         String recipient = recipientEmail(event);
+        SimpleMailMessage message = EventTypes.PAYMENT_INSTRUCTIONS_REQUIRED.equals(event.eventType())
+                ? paymentInstructionsMessage(event, recipient)
+                : genericMessage(event, recipient);
+        mailSender.send(message);
+    }
+
+    private SimpleMailMessage genericMessage(DomainEvent event, String recipient) {
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(fromEmail);
         message.setTo(recipient);
         message.setSubject("[demo] " + event.eventType() + (event.orderId() != null ? " (order " + event.orderId() + ")" : ""));
         message.setText("Event: " + event.eventType() + "\nOrder: " + event.orderId() + "\nPayload: " + event.payload());
-        mailSender.send(message);
+        return message;
+    }
+
+    /** BANK_TRANSFER/CASH-specific payment instructions, richer than the generic status-update email every other event gets. */
+    private SimpleMailMessage paymentInstructionsMessage(DomainEvent event, String recipient) {
+        String method = event.payload() instanceof Map<?, ?> payload ? String.valueOf(payload.get("method")) : "";
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setFrom(fromEmail);
+        message.setTo(recipient);
+        message.setSubject("[demo] Payment instructions for order " + event.orderId());
+        message.setText("BANK_TRANSFER".equals(method) ? bankTransferInstructions(event.orderId()) : cashInstructions(event.orderId()));
+        return message;
+    }
+
+    private String bankTransferInstructions(String orderId) {
+        return "Thanks for your order " + orderId + "!\n\n"
+                + "To complete your payment by bank transfer, use the following details:\n"
+                + "  Bank: Demo Bank\n"
+                + "  Account holder: Demo Store Inc.\n"
+                + "  IBAN: DE00 0000 0000 0000 0000 00\n"
+                + "  Reference: " + orderId + "\n\n"
+                + "Please include the reference above so we can match your payment. Your order will be "
+                + "reviewed once the transfer is confirmed.\n";
+    }
+
+    private String cashInstructions(String orderId) {
+        return "Thanks for your order " + orderId + "!\n\n"
+                + "To complete your payment in cash, please visit any of our stores within 3 business days "
+                + "and mention your order number " + orderId + " to the cashier.\n\n"
+                + "Your order will be reviewed once the payment is confirmed.\n";
     }
 
     private String recipientEmail(DomainEvent event) {

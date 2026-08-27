@@ -1,5 +1,4 @@
 package com.example.media.model;
-
 import com.example.media.enums.MediaType;
 
 import lombok.Getter;

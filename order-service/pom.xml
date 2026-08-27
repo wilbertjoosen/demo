@@ -74,6 +74,13 @@
             <artifactId>spring-cloud-starter-config</artifactId>
         </dependency>
         <dependency>
+            <!-- Task #75, real secrets management — DB credentials + the inventory-service client
+                 secret come from Vault at startup (spring.config.import: optional:vault://) instead
+                 of a plaintext env var or a committed k8s Secret. -->
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-vault-config</artifactId>
+        </dependency>
+        <dependency>
             <groupId>com.example</groupId>
             <artifactId>common-security</artifactId>
             <version>${project.parent.version}</version>

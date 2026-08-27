@@ -1,5 +1,4 @@
 package com.example.inventory.service;
-
 import com.example.inventory.model.InventoryItem;
 import com.example.inventory.repository.InventoryRepository;
 

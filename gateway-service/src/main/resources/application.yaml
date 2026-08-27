@@ -202,6 +202,14 @@ cors:
   # regardless of which origin served the page itself, so both need to be allowed here.
   allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://demo.localhost:18090}
 
+# Per-client-IP token bucket (see RateLimitFilter) — sustained 20 req/s with a burst of 20 comfortably
+# covers a normal page load (several concurrent panel/table fetches) while still meaningfully
+# throttling a single client hammering the gateway.
+rate-limit:
+  capacity: ${RATE_LIMIT_CAPACITY:20}
+  refill-tokens: ${RATE_LIMIT_REFILL_TOKENS:20}
+  refill-period-seconds: ${RATE_LIMIT_REFILL_PERIOD_SECONDS:1}
+
 eureka:
   client:
     service-url:

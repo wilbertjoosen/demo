@@ -6,7 +6,6 @@ import com.example.inventory.dto.ReserveRequest;
 import com.example.inventory.model.InventoryItem;
 import com.example.inventory.model.InventoryModelAssembler;
 import com.example.inventory.service.InventoryService;
-
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.hateoas.CollectionModel;

@@ -1,5 +1,4 @@
 package com.example.review.model;
-
 import com.example.review.controller.ReviewController;
 
 import org.springframework.hateoas.CollectionModel;

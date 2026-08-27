@@ -1,6 +1,5 @@
 package com.example.order;
 
-
 import com.example.order.support.AbstractIntegrationTest;
 import com.example.order.support.TestOAuth2ClientConfig;
 import com.fasterxml.jackson.databind.ObjectMapper;

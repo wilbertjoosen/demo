@@ -1,5 +1,4 @@
 package com.example.inventory.model;
-
 import com.example.inventory.controller.InventoryController;
 
 import org.springframework.hateoas.CollectionModel;

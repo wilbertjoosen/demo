@@ -1,5 +1,4 @@
 package com.example.inventory.saga;
-
 import com.example.inventory.service.InventoryService;
 
 import com.example.common.events.DomainEvent;

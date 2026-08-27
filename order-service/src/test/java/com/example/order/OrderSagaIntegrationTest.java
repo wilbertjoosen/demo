@@ -1,5 +1,4 @@
 package com.example.order;
-
 import com.example.order.saga.OrderSagaListener;
 
 import com.example.common.events.DomainEvent;

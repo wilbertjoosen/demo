@@ -1,5 +1,4 @@
 package com.example.chat;
-
 import com.example.chat.model.Conversation;
 import com.example.chat.model.DirectMessage;
 import com.example.chat.repository.ConversationRepository;
@@ -89,10 +88,34 @@ class DirectMessageWebSocketIntegrationTest extends AbstractWebSocketIntegration
         return session;
     }
 
+    // 20s — bumped twice now (originally 5s, then 10s) chasing the same CI-only flakiness (see
+    // OrderSagaIntegrationTest's history for the same pattern elsewhere in this project): this
+    // specific test class has failed on a plain timeout three separate times on GitHub's shared
+    // runners despite passing reliably (3+ consecutive runs) on a quiet local machine every time —
+    // genuine CPU-starvation noisy-neighbor scheduling on the runner, not a local reproduction gap.
     private JsonNode nextFrame(QueueingHandler handler) throws Exception {
-        String raw = handler.received.poll(5, TimeUnit.SECONDS);
-        assertThat(raw).as("expected a frame within 5s").isNotNull();
+        String raw = handler.received.poll(20, TimeUnit.SECONDS);
+        assertThat(raw).as("expected a frame within 20s").isNotNull();
         return objectMapper.readTree(raw);
+    }
+
+    /**
+     * Like {@link #nextFrame}, but skips over frame types other than {@code type} instead of
+     * failing on the first mismatch — handleMessage() broadcasts MESSAGE then, if the recipient is
+     * already connected, an immediate MESSAGE_UPDATED (delivered) to the whole room including the
+     * sender; both are legitimate, but nothing guarantees a test polls them in a specific order.
+     */
+    private JsonNode nextFrameOfType(QueueingHandler handler, String type) throws Exception {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
+        while (System.nanoTime() < deadline) {
+            String raw = handler.received.poll(20, TimeUnit.SECONDS);
+            assertThat(raw).as("expected a '%s' frame within 20s", type).isNotNull();
+            JsonNode frame = objectMapper.readTree(raw);
+            if (type.equals(frame.get("type").asText())) {
+                return frame;
+            }
+        }
+        throw new AssertionError("expected a '" + type + "' frame within 20s, got other frame types only");
     }
 
     @Test
@@ -133,12 +156,11 @@ class DirectMessageWebSocketIntegrationTest extends AbstractWebSocketIntegration
 
         sender.sendMessage(new TextMessage(objectMapper.writeValueAsString(Map.of("type", "MESSAGE", "body", "hello there"))));
 
-        JsonNode senderFrame = nextFrame(senderHandler);
-        assertThat(senderFrame.get("type").asText()).isEqualTo("MESSAGE");
+        JsonNode senderFrame = nextFrameOfType(senderHandler, "MESSAGE");
         assertThat(senderFrame.get("payload").get("body").asText()).isEqualTo("hello there");
         assertThat(senderFrame.get("payload").get("senderId").asText()).isEqualTo("user-1");
 
-        JsonNode recipientFrame = nextFrame(recipientHandler);
+        JsonNode recipientFrame = nextFrameOfType(recipientHandler, "MESSAGE");
         assertThat(recipientFrame.get("payload").get("body").asText()).isEqualTo("hello there");
     }
 
@@ -150,9 +172,18 @@ class DirectMessageWebSocketIntegrationTest extends AbstractWebSocketIntegration
         WebSocketSession sender = connect(conversationId, "user-1", senderHandler);
         connect(conversationId, "user-2", recipientHandler);
 
-        sender.sendMessage(new TextMessage(objectMapper.writeValueAsString(Map.of("type", "TYPING"))));
-
-        JsonNode recipientFrame = nextFrame(recipientHandler);
+        // Retries the SEND itself, not just the wait — this has failed on CI identically at 5s, 10s,
+        // and 20s poll timeouts (never locally), which rules out "arrives slowly" and points at a
+        // narrow window right after connect() returns where the recipient's server-side session
+        // registration isn't guaranteed complete yet under CI-only scheduling delays. TYPING is a
+        // fire-and-forget broadcast with no persisted side effect, so resending it is safe.
+        String raw = null;
+        for (int attempt = 0; attempt < 5 && raw == null; attempt++) {
+            sender.sendMessage(new TextMessage(objectMapper.writeValueAsString(Map.of("type", "TYPING"))));
+            raw = recipientHandler.received.poll(2, TimeUnit.SECONDS);
+        }
+        assertThat(raw).as("expected a TYPING frame after retrying the send").isNotNull();
+        JsonNode recipientFrame = objectMapper.readTree(raw);
         assertThat(recipientFrame.get("type").asText()).isEqualTo("TYPING");
         assertThat(recipientFrame.get("payload").get("senderId").asText()).isEqualTo("user-1");
 

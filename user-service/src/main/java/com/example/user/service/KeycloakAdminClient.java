@@ -1,7 +1,6 @@
 package com.example.user.service;
 
 import com.example.user.model.KeycloakUserSummary;
-
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.oauth2.client.OAuth2AuthorizeRequest;
@@ -32,7 +31,7 @@ public class KeycloakAdminClient {
     private final RestClient keycloakAdminRestClient;
     private final OAuth2AuthorizedClientManager authorizedClientManager;
 
-    List<KeycloakUserSummary> listUsers() {
+    public List<KeycloakUserSummary> listUsers() {
         KeycloakUserRepresentation[] users = keycloakAdminRestClient.get()
                 .uri("/users?max=1000")
                 .headers(h -> h.setBearerAuth(fetchAccessToken()))
@@ -41,7 +40,7 @@ public class KeycloakAdminClient {
         return users == null ? List.of() : List.of(users).stream().map(this::toSummary).toList();
     }
 
-    Optional<KeycloakUserSummary> findUser(String keycloakId) {
+    public Optional<KeycloakUserSummary> findUser(String keycloakId) {
         try {
             KeycloakUserRepresentation user = keycloakAdminRestClient.get()
                     .uri("/users/{id}", keycloakId)
@@ -55,7 +54,7 @@ public class KeycloakAdminClient {
     }
 
     /** Creates a real Keycloak account (enabled, email pre-verified, given temporary-false password) and returns its id. */
-    String createUser(String username, String email, String firstName, String lastName, String password) {
+    public String createUser(String username, String email, String firstName, String lastName, String password) {
         Map<String, Object> body = Map.of(
                 "username", username,
                 "email", email,
@@ -88,7 +87,7 @@ public class KeycloakAdminClient {
      * everything else Keycloak already has on the account intact.
      */
     @SuppressWarnings("unchecked")
-    void updateUser(String keycloakId, String username, String email, String firstName, String lastName) {
+    public void updateUser(String keycloakId, String username, String email, String firstName, String lastName) {
         Map<String, Object> current = keycloakAdminRestClient.get()
                 .uri("/users/{id}", keycloakId)
                 .headers(h -> h.setBearerAuth(fetchAccessToken()))
