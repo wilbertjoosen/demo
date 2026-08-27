@@ -1,10 +1,10 @@
 # Demo — Full-Stack Microservices Reference Architecture
 
-**A monolith, deliberately taken apart — 18 Spring Boot services, a Vue 3 frontend, and the entire
+**A monolith, deliberately taken apart — 17+ Spring Boot services, a Vue 3 frontend, and the entire
 production toolchain around them (CI/CD, GitOps, Kubernetes, observability) — built to show not just
 *how* each piece works, but *why* it exists.**
 
-[![CI/CD](https://github.com/wilbertjoosen/demo/actions/workflows/ci-cd.yml/badge.svg?branch=testing)](https://github.com/wilbertjoosen/demo/actions/workflows/ci-cd.yml)
+[![CI/CD](https://github.com/wilbertjoosen/demo/actions/workflows/ci-cd.yml/badge.svg?branch=develop)](https://github.com/wilbertjoosen/demo/actions/workflows/ci-cd.yml)
 ![Java](https://img.shields.io/badge/Java-26-ED8B00?logo=openjdk&logoColor=white)
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4-6DB33F?logo=springboot&logoColor=white)
 ![Vue](https://img.shields.io/badge/Vue-3-4FC08D?logo=vuedotjs&logoColor=white)
@@ -13,13 +13,12 @@ production toolchain around them (CI/CD, GitOps, Kubernetes, observability) — 
 ![ArgoCD](https://img.shields.io/badge/GitOps-ArgoCD-EF7B4D?logo=argo&logoColor=white)
 ![Kafka](https://img.shields.io/badge/Kafka-Streams-231F20?logo=apachekafka&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
-![Environments](https://img.shields.io/badge/Environments-prod%20%2B%20QA-6f42c1)
 
-This is `testing` — the **QA environment**: the only branch that ever builds a container image
-from source (see [The path to production](#the-path-to-production-every-gate-explained)). Two other
-branches complete the picture: `develop` (day-to-day feature work, single local environment) and
-`main` (production, which *promotes* whatever `testing` already validated rather than rebuilding).
-See [Branch model & release flow](#branch-model--release-flow) for how a change moves between them.
+This is `develop` — day-to-day feature work, on a single local environment. It isn't wired to any
+deployed environment today; see [Release workflow: local → testing → production](#release-workflow-local--testing--production)
+for the honest account of what's automated and what isn't. Two other branches complete the release
+picture: `testing` (the QA environment, the only branch that builds a container image from source)
+and `main` (production, which promotes whatever `testing` already validated rather than rebuilding).
 
 ---
 
@@ -30,10 +29,9 @@ See [Branch model & release flow](#branch-model--release-flow) for how a change 
 - [The services](#the-services)
 - [Patterns demonstrated](#patterns-demonstrated)
 - [Quick start](#quick-start)
-- [The path to production, every gate explained](#the-path-to-production-every-gate-explained)
-- [Branch model & release flow](#branch-model--release-flow)
+- [Release workflow: local → testing → production](#release-workflow-local--testing--production)
+- [CI/CD & versioning](#cicd--versioning)
 - [Kubernetes / GitOps](#kubernetes--gitops)
-- [QA / testing environment](#qa--testing-environment)
 - [Observability](#observability)
 - [Config profiles: local / testing / production](#config-profiles-local--testing--production)
 - [Default credentials](#default-credentials)
@@ -81,9 +79,7 @@ flowchart TB
         REDIS[("Redis<br/>response cache")]
     end
 
-    subgraph ops["GitOps & CI/CD"]
-        GHA["GitHub Actions<br/>test → build → push"]
-        GHCR[["GHCR<br/>container images"]]
+    subgraph ops["GitOps"]
         ARGO["ArgoCD<br/>auto-sync + self-heal"]
     end
 
@@ -91,7 +87,6 @@ flowchart TB
         PROM["Prometheus"]
         GRAF["Grafana"]
         LOKI["Loki"]
-        TEMPO["Tempo"]
     end
 
     FE -->|HTTPS / JWT| GW
@@ -107,12 +102,10 @@ flowchart TB
     OTH --> ES
     GW -.->|cache| REDIS
 
-    GHA -->|push images| GHCR
-    ARGO -.->|pulls| GHCR
     ARGO ==>|deploys| domain
 
-    domain -.->|metrics/logs/traces| PROM & LOKI & TEMPO
-    GRAF --> PROM & LOKI & TEMPO
+    domain -.->|metrics/logs| PROM & LOKI
+    GRAF --> PROM & LOKI
 
     classDef edgeStyle fill:#7e14ff,color:#fff,stroke:#5c0fc7
     classDef busStyle fill:#231F20,color:#fff,stroke:#000
@@ -120,15 +113,14 @@ flowchart TB
     classDef obsStyle fill:#F46800,color:#fff,stroke:#c65500
     class GW,KC edgeStyle
     class KAFKA busStyle
-    class GHA,GHCR,ARGO opsStyle
-    class PROM,GRAF,LOKI,TEMPO obsStyle
+    class ARGO opsStyle
+    class PROM,GRAF,LOKI obsStyle
 ```
 
 **The one-sentence version:** a browser talks to a gateway, the gateway routes to one of 18
 independently-deployable services, those services choreograph a Kafka saga instead of calling each
-other directly, everything ships through CI/CD to GHCR and gets pulled into Kubernetes by ArgoCD
-without a human running `kubectl apply`, and every hop is observable end-to-end (metrics, logs,
-traces, continuous profiling, alerting) across both a production and a QA environment.
+other directly, and everything runs identically whether you launch it with a couple of `mvnw`
+commands, one `docker compose up`, or a real (if locally-simulated) Kubernetes + GitOps loop.
 
 ---
 
@@ -141,73 +133,70 @@ and the tool picked to solve it — click through to the real file.
 
 | Technology | What it does here | Why this, not something else | Where |
 |---|---|---|---|
-| ![Java 26](https://img.shields.io/badge/-%20-000000?style=flat-square&logo=openjdk&logoColor=white) **Java&nbsp;26** | Runtime for every backend service | Latest LTS-track JDK — modern language features (records, pattern matching, virtual threads available) without legacy baggage | every service's `pom.xml` |
-| ![Spring Boot 4](https://img.shields.io/badge/-%20-6DB33F?style=flat-square&logo=springboot&logoColor=white) **Spring&nbsp;Boot&nbsp;4** | Application framework | The de-facto standard for JVM microservices — auto-configuration, embedded Tomcat, and first-class support for everything else in this stack (Data, Security, Kafka, Actuator) | every service module |
-| ![Spring Cloud Gateway](https://img.shields.io/badge/-%20-6DB33F?style=flat-square&logo=spring&logoColor=white) **Spring&nbsp;Cloud&nbsp;Gateway** | API gateway / reverse proxy | One public entry point instead of 17 — routes `/api/**` by path, centralizes CORS, hides internal service topology from the browser | `gateway-service/` |
-| ![Netflix Eureka](https://img.shields.io/badge/-%20-E50914?style=flat-square&logo=netflix&logoColor=white) **Netflix&nbsp;Eureka** | Service discovery | Services register themselves and discover each other by name, not hardcoded IPs — essential once you have more than a couple of services that scale independently | `eureka-server/` |
-| ![Spring Cloud Config](https://img.shields.io/badge/-%20-6DB33F?style=flat-square&logo=spring&logoColor=white) **Spring&nbsp;Cloud&nbsp;Config** | Centralized configuration | One place for config that's shared across services (currently light use — most config is per-service, see [Config profiles](#config-profiles-local--testing--production)) | `config-server/` |
-| ![Spring Data (JPA + MongoDB)](https://img.shields.io/badge/-%20-6DB33F?style=flat-square&logo=spring&logoColor=white) **Spring&nbsp;Data** | Persistence abstraction (JPA + MongoDB) | Repository pattern out of the box — service code never touches a driver or `EntityManager` directly | every service's `repository/` package |
-| ![Spring Kafka + Kafka Streams](https://img.shields.io/badge/-%20-231F20?style=flat-square&logo=apachekafka&logoColor=white) **Spring&nbsp;Kafka** | Event-driven messaging & stream processing (+ Kafka Streams) | The backbone of the choreographed saga (see [Patterns demonstrated](#patterns-demonstrated)); Kafka Streams specifically powers `reporting-service`'s live materialized-view aggregates | every `saga/` package; `reporting-service/` |
-| ![Spring Security (OAuth2 Resource Server)](https://img.shields.io/badge/-%20-6DB33F?style=flat-square&logo=springsecurity&logoColor=white) **Spring&nbsp;Security** | JWT validation (OAuth2 Resource Server) | Every service independently validates the same Keycloak-issued JWT — no shared session state, no service trusting another service's say-so | `common-security/` |
-| **Resilience4j** | Circuit breaker | Wraps the *one* synchronous inter-service call in the system (`order-service → inventory-service`) so a slow/down `inventory-service` can't cascade-fail the order flow | `order-service/.../config/Resilience4jConfig.java` |
-| **AspectJ (AOP)** | Cross-cutting audit logging | One `@Around` advice captures every REST call's request/response across every service — no per-controller instrumentation | `common-audit/` |
-| ![springdoc-openapi](https://img.shields.io/badge/-%20-85EA2D?style=flat-square&logo=swagger&logoColor=black) **springdoc-openapi** | API documentation | Auto-generated Swagger UI per service, aggregated at the gateway into one browsable surface | every service; aggregated at `:8080/swagger-ui.html` |
-| **Micrometer + Prometheus registry** | Metrics instrumentation | Every service exposes `/actuator/prometheus` for free — the entire [Observability](#observability) stack builds on this one dependency | every service |
-| **Micrometer Tracing (OTel bridge)** | Distributed tracing | Auto-injects `[traceId,spanId]` into every log line and exports spans over OTLP — a request across 4 services becomes one traceable timeline | `common-security/`, `gateway-service/` |
-| **Pyroscope Java agent** | Continuous profiling | Answers "where is the CPU actually going" without attaching a profiler by hand — always-on, low-overhead JFR sampling | see [Observability](#observability) |
+| ![Java 26](https://img.shields.io/badge/-%20-000000?style=flat-square&logo=openjdk&logoColor=white) **Java&nbsp;26** | Runtime for every backend service | Latest LTS-track JDK — modern language features without legacy baggage | every service's `pom.xml` |
+| ![Spring Boot 4](https://img.shields.io/badge/-%20-6DB33F?style=flat-square&logo=springboot&logoColor=white) **Spring&nbsp;Boot&nbsp;4** | Application framework | The de-facto standard for JVM microservices — auto-configuration, embedded Tomcat, first-class support for everything else in this stack | every service module |
+| ![Spring Cloud Gateway](https://img.shields.io/badge/-%20-6DB33F?style=flat-square&logo=spring&logoColor=white) **Spring&nbsp;Cloud&nbsp;Gateway** | API gateway / reverse proxy | One public entry point instead of 18 — routes `/api/**` by path, centralizes CORS | `gateway-service/` |
+| ![Netflix Eureka](https://img.shields.io/badge/-%20-E50914?style=flat-square&logo=netflix&logoColor=white) **Netflix&nbsp;Eureka** | Service discovery | Services register and discover each other by name, not hardcoded IPs | `eureka-server/` |
+| ![Spring Cloud Config](https://img.shields.io/badge/-%20-6DB33F?style=flat-square&logo=spring&logoColor=white) **Spring&nbsp;Cloud&nbsp;Config** | Centralized configuration | One place for config shared across services (currently light use) | `config-server/` |
+| ![Spring Data](https://img.shields.io/badge/-%20-6DB33F?style=flat-square&logo=spring&logoColor=white) **Spring&nbsp;Data** | Persistence abstraction (JPA + MongoDB) | Repository pattern out of the box — no service code touches a driver or `EntityManager` directly | every service's `repository/` package |
+| ![Spring Kafka](https://img.shields.io/badge/-%20-231F20?style=flat-square&logo=apachekafka&logoColor=white) **Spring&nbsp;Kafka** | Event-driven messaging & stream processing (+ Kafka Streams) | The backbone of the choreographed saga; Kafka Streams powers `reporting-service`'s live aggregates | every `saga/` package; `reporting-service/` |
+| ![Spring Security](https://img.shields.io/badge/-%20-6DB33F?style=flat-square&logo=springsecurity&logoColor=white) **Spring&nbsp;Security** | JWT validation (OAuth2 Resource Server) | Every service independently validates the same Keycloak-issued JWT — no shared session state | `common-security/` |
+| **Resilience4j** | Circuit breaker | Wraps the *one* synchronous inter-service call in the system so a slow `inventory-service` can't cascade-fail order flow | `order-service/.../config/Resilience4jConfig.java` |
+| **AspectJ (AOP)** | Cross-cutting audit logging | One `@Around` advice captures every REST call's request/response across every service | `common-audit/` |
+| ![springdoc-openapi](https://img.shields.io/badge/-%20-85EA2D?style=flat-square&logo=swagger&logoColor=black) **springdoc-openapi** | API documentation | Auto-generated Swagger UI per service, aggregated at the gateway | every service; `:8080/swagger-ui.html` |
+| **Micrometer + Prometheus registry** | Metrics instrumentation | Every service exposes `/actuator/prometheus` for free | every service |
+| ![spring-boot-devtools](https://img.shields.io/badge/-%20-6DB33F?style=flat-square&logo=spring&logoColor=white) **spring-boot-devtools** | Fast local restarts | A rebuild while a service is running (from `start-local.sh` or an IDE run) triggers an in-process restart, not a full relaunch — the fastest inner loop this project has | every service module |
 | **spring-cloud-aws** | S3 + Secrets Manager client | `product-media-service`'s file storage backend | `product-media-service/` |
 
 ### Frontend
 
 | Technology | What it does here | Why this, not something else | Where |
 |---|---|---|---|
-| ![Vue 3 (Composition API)](https://img.shields.io/badge/-%20-4FC08D?style=flat-square&logo=vuedotjs&logoColor=white) **Vue&nbsp;3** | SPA framework (Composition API) | Smaller learning curve than React for the same reactivity model, first-class TypeScript support | `frontend/src/` |
-| ![TypeScript](https://img.shields.io/badge/-%20-3178C6?style=flat-square&logo=typescript&logoColor=white) **TypeScript** | Type safety | Catches wiring mistakes (wrong DTO shape, typo'd prop) at build time instead of in a browser console | `frontend/` — `vue-tsc` runs in CI |
-| ![Element Plus](https://img.shields.io/badge/-%20-0DBD8B?style=flat-square&logo=element&logoColor=white) **Element&nbsp;Plus** | Component library | Production-grade tables/forms/modals without hand-building them — the admin screens (users, products, orders, reports) lean on this heavily | `frontend/src/` |
+| ![Vue 3](https://img.shields.io/badge/-%20-4FC08D?style=flat-square&logo=vuedotjs&logoColor=white) **Vue&nbsp;3** | SPA framework (Composition API) | Smaller learning curve than React for the same reactivity model, first-class TypeScript support | `frontend/src/` |
+| ![TypeScript](https://img.shields.io/badge/-%20-3178C6?style=flat-square&logo=typescript&logoColor=white) **TypeScript** | Type safety | Catches wiring mistakes at build time instead of in a browser console | `frontend/` — `vue-tsc` runs in CI |
+| ![Element Plus](https://img.shields.io/badge/-%20-0DBD8B?style=flat-square&logo=element&logoColor=white) **Element&nbsp;Plus** | Component library | Production-grade tables/forms/modals without hand-building them | `frontend/src/` |
 | ![Pinia](https://img.shields.io/badge/-%20-FFD859?style=flat-square&logo=pinia&logoColor=black) **Pinia** | State management | Vue's official Vuex successor — simpler API, full TypeScript inference | `frontend/src/stores/` |
 | **Vue Router** | Client-side routing | Role-gated routes (`/admin` for `admin`, `/queues` for `admin`/`finance`/`warehouse`/`delivery_agent`) map directly to Keycloak realm roles | `frontend/src/router/` |
-| **vue-i18n** | Internationalization | Multi-language support baked in from the start, not retrofitted | `frontend/src/i18n/locales/` |
-| ![ECharts (`vue-echarts`)](https://img.shields.io/badge/-%20-AA344D?style=flat-square&logo=apacheecharts&logoColor=white) **ECharts** | Data visualization (`vue-echarts`) | Powers the reporting dashboard's charts (revenue, top products, saga health) — richer and faster than SVG-by-hand for real-time aggregates | `frontend/src/components/admin/reports/` |
-| ![Tailwind CSS](https://img.shields.io/badge/-%20-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white) **Tailwind&nbsp;CSS** | Utility-first styling | Fast iteration without hand-rolled CSS files sprawling across components | `frontend/src/` |
-| ![Vite](https://img.shields.io/badge/-%20-9135FF?style=flat-square&logo=vite&logoColor=white) **Vite** | Build tool / dev server | Near-instant HMR for the dev inner loop; production builds are what CI ships | `frontend/vite.config.ts` |
-| ![keycloak-js](https://img.shields.io/badge/-%20-4D4D4D?style=flat-square&logo=keycloak&logoColor=white) **keycloak-js** | Auth adapter | Handles the OAuth2/PKCE dance with Keycloak directly from the browser — no custom login-flow code | `frontend/src/auth/keycloak.ts` |
+| **vue-i18n** | Internationalization | Multi-language support baked in from the start | `frontend/src/i18n/locales/` |
+| ![ECharts](https://img.shields.io/badge/-%20-AA344D?style=flat-square&logo=apacheecharts&logoColor=white) **ECharts** | Data visualization (`vue-echarts`) | Powers the reporting dashboard's charts (revenue, top products, saga health) | `frontend/src/components/admin/reports/` |
+| ![Tailwind CSS](https://img.shields.io/badge/-%20-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white) **Tailwind&nbsp;CSS** | Utility-first styling | Fast iteration without hand-rolled CSS sprawling across components | `frontend/src/` |
+| ![Vite](https://img.shields.io/badge/-%20-9135FF?style=flat-square&logo=vite&logoColor=white) **Vite** | Build tool / dev server | Near-instant HMR for the dev inner loop | `frontend/vite.config.ts` |
+| ![Keycloak](https://img.shields.io/badge/-%20-4D4D4D?style=flat-square&logo=keycloak&logoColor=white) **keycloak-js** | Auth adapter | Handles the OAuth2/PKCE dance with Keycloak directly from the browser | `frontend/src/auth/keycloak.ts` |
 
 ### Data & messaging
 
 | Technology | Role | Why | Where |
 |---|---|---|---|
-| ![MySQL](https://img.shields.io/badge/-%20-4479A1?style=flat-square&logo=mysql&logoColor=white) **MySQL** | `order-service`'s write model | Orders need real ACID transactions (create order + reserve stock atomically) — the one place in the system that isn't eventually-consistent by design | `order-service/`, `k8s/mysql.yaml` |
-| ![MongoDB](https://img.shields.io/badge/-%20-47A248?style=flat-square&logo=mongodb&logoColor=white) **MongoDB** | Every other service's store, + `order-service`'s read model | Schema flexibility fits domain objects that evolve fast (product attributes, chat messages); the read-model side of CQRS doesn't need MySQL's guarantees, just fast reads | every other service, `k8s/mongo.yaml` |
-| ![Apache Kafka](https://img.shields.io/badge/-%20-231F20?style=flat-square&logo=apachekafka&logoColor=white) **Apache&nbsp;Kafka** | Event backbone | Decouples the saga's steps completely — `payment-service` doesn't call `shipping-service`, it reacts to an event; consumer replay gives resilience largely for free | every `saga/` package, `k8s/kafka.yaml` |
+| ![MySQL](https://img.shields.io/badge/-%20-4479A1?style=flat-square&logo=mysql&logoColor=white) **MySQL** | `order-service`'s write model | Orders need real ACID transactions — the one place in the system that isn't eventually-consistent by design | `order-service/`, `k8s/mysql.yaml` |
+| ![MongoDB](https://img.shields.io/badge/-%20-47A248?style=flat-square&logo=mongodb&logoColor=white) **MongoDB** | Every other service's store, + `order-service`'s read model | Schema flexibility fits domain objects that evolve fast | every other service, `k8s/mongo.yaml` |
+| ![Apache Kafka](https://img.shields.io/badge/-%20-231F20?style=flat-square&logo=apachekafka&logoColor=white) **Apache&nbsp;Kafka** | Event backbone | Decouples the saga's steps completely — consumer replay gives resilience largely for free | every `saga/` package, `k8s/kafka.yaml` |
 | ![Redis](https://img.shields.io/badge/-%20-FF4438?style=flat-square&logo=redis&logoColor=white) **Redis** | Response caching | Backs Resilience4j's cache annotations for read-heavy, slow-changing data | `k8s/redis.yaml` |
-| ![Elasticsearch](https://img.shields.io/badge/-%20-005571?style=flat-square&logo=elasticsearch&logoColor=white) **Elasticsearch** | Audit trail store | Full-text/structured search over every REST call ever made, across every service — a relational table would make this kind of ad-hoc querying painful | `audit-service/`, `k8s/elasticsearch.yaml` |
+| ![Elasticsearch](https://img.shields.io/badge/-%20-005571?style=flat-square&logo=elasticsearch&logoColor=white) **Elasticsearch** | Audit trail store | Full-text/structured search over every REST call ever made | `audit-service/`, `k8s/elasticsearch.yaml` |
 
 ### Identity, infra & delivery
 
 | Technology | Role | Why | Where |
 |---|---|---|---|
-| ![Keycloak](https://img.shields.io/badge/-%20-4D4D4D?style=flat-square&logo=keycloak&logoColor=white) **Keycloak** | OAuth2/OIDC identity provider | Centralized auth, roles, and (via its own Admin REST API) user management — services never store passwords | `k8s/keycloak.yaml`, `docker/keycloak/` |
-| ![HashiCorp Vault](https://img.shields.io/badge/-%20-FFEC6E?style=flat-square&logo=vault&logoColor=black) **HashiCorp&nbsp;Vault** | Secrets management | Real secrets engine instead of plaintext env vars or committed `.env` files | `k8s/vault.yaml` |
-| ![Docker Compose](https://img.shields.io/badge/-%20-2496ED?style=flat-square&logo=docker&logoColor=white) **Docker&nbsp;Compose** | Local infra & full-stack dev | Fastest path to "everything running" without touching Kubernetes at all — see [Quick start](#quick-start) Option B | `docker-compose.yml` |
-| ![k3d (Kubernetes in Docker)](https://img.shields.io/badge/-%20-326CE5?style=flat-square&logo=kubernetes&logoColor=white) **k3d** | Local Kubernetes cluster (Kubernetes in Docker) | A real multi-node cluster on a laptop, no cloud account needed — every k8s concept below (Deployments, Services, Ingress, RBAC) behaves exactly like it would in production | [Quick start](#quick-start) Option C |
-| ![ArgoCD](https://img.shields.io/badge/-%20-EF7B4D?style=flat-square&logo=argo&logoColor=white) **ArgoCD** | GitOps continuous delivery | The cluster's actual state is *reconciled from git*, not pushed to by a human running `kubectl apply` — see [Kubernetes / GitOps](#kubernetes--gitops) | `k8s-argocd/` |
-| ![GitHub Actions](https://img.shields.io/badge/-%20-2088FF?style=flat-square&logo=githubactions&logoColor=white) **GitHub&nbsp;Actions** | CI/CD | Free, tightly integrated with GHCR, no separate CI system to run — see [The path to production](#the-path-to-production-every-gate-explained) | `.github/workflows/ci-cd.yml` |
-| ![GHCR (GitHub Container Registry)](https://img.shields.io/badge/-%20-181717?style=flat-square&logo=github&logoColor=white) **GHCR** | Image registry (GitHub Container Registry) | Private, free for this project's usage, one less external account to manage | referenced in every `k8s/*.yaml`'s `image:` field |
-| ![Rancher](https://img.shields.io/badge/-%20-0075A8?style=flat-square&logo=rancher&logoColor=white) **Rancher** | Kubernetes management UI | A GUI for the cluster (Secrets, pod logs, resource usage) alongside the CLI — runs in-cluster itself | main branch's `k8s-rancher/rancher.yaml` |
+| ![Keycloak](https://img.shields.io/badge/-%20-4D4D4D?style=flat-square&logo=keycloak&logoColor=white) **Keycloak** | OAuth2/OIDC identity provider | Centralized auth, roles, and user management — services never store passwords | `k8s/keycloak.yaml`, `docker/keycloak/` |
+| ![Docker](https://img.shields.io/badge/-%20-2496ED?style=flat-square&logo=docker&logoColor=white) **Docker&nbsp;Compose** | Local infra & full-stack dev | Fastest path to "everything running" without touching Kubernetes at all | `docker-compose.yml` |
+| ![Kubernetes](https://img.shields.io/badge/-%20-326CE5?style=flat-square&logo=kubernetes&logoColor=white) **k3d** | Local Kubernetes cluster (Kubernetes in Docker) | A real multi-node cluster on a laptop, no cloud account needed | [Quick start](#quick-start) Option C |
+| ![Argo](https://img.shields.io/badge/-%20-EF7B4D?style=flat-square&logo=argo&logoColor=white) **ArgoCD** | GitOps continuous delivery | The cluster's actual state is *reconciled from git* — see [Kubernetes / GitOps](#kubernetes--gitops) | `k8s-argocd/` |
+| ![GitHub Actions](https://img.shields.io/badge/-%20-2088FF?style=flat-square&logo=githubactions&logoColor=white) **GitHub&nbsp;Actions** | CI (test-only on this branch) | See [CI/CD & versioning](#cicd--versioning) for exactly what runs where | `.github/workflows/ci-cd.yml` |
+| ![Rancher](https://img.shields.io/badge/-%20-0075A8?style=flat-square&logo=rancher&logoColor=white) **Rancher** | Kubernetes management UI | A GUI for the cluster (Secrets, pod logs, resource usage) alongside the CLI — runs in-cluster | `k8s-rancher/rancher.yaml` |
 
 ### Observability
 
 | Technology | Signal | Why | Where |
 |---|---|---|---|
-| ![Prometheus](https://img.shields.io/badge/-%20-E6522C?style=flat-square&logo=prometheus&logoColor=white) **Prometheus** | Metrics | Pull-based scraping fits Kubernetes service discovery naturally — no per-service push config | `k8s/prometheus.yaml` |
-| ![Grafana](https://img.shields.io/badge/-%20-F46800?style=flat-square&logo=grafana&logoColor=white) **Grafana** | Dashboards + alerting | One pane of glass across metrics/logs/traces, plus file-provisioned alert rules (no UI clicking, git-reviewable) | `k8s/grafana.yaml` |
-| **Loki** | Logs | Prometheus's label model applied to logs — cheap to run, and queries feel identical to PromQL | `k8s/loki.yaml` |
-| **Tempo** | Distributed traces | Pairs natively with Grafana's `tracesToLogsV2` — click a trace, jump straight to its logs | `k8s/tempo.yaml` |
-| **Pyroscope** | Continuous CPU profiling | Answers performance questions Prometheus metrics can't — literally which method is burning CPU, live | `k8s/pyroscope.yaml` |
-| **kube-state-metrics + node-exporter** | Cluster/host metrics | Object-level (pod phase, PVC status) and host-level (CPU/disk) visibility Prometheus's own app-metrics scraping doesn't cover | `k8s/kube-state-metrics.yaml`, `k8s/node-exporter.yaml` |
-| ![k6](https://img.shields.io/badge/-%20-7D64FF?style=flat-square&logo=k6&logoColor=white) **k6** | Load testing | Scriptable load generation that pushes results straight into the same Prometheus everything else uses | `k8s/k6.yaml` |
-| ![Kibana](https://img.shields.io/badge/-%20-005571?style=flat-square&logo=kibana&logoColor=white) **Kibana** | Audit-trail search UI | Purpose-built for exploring Elasticsearch documents — the audit trail's natural home | `k8s/kibana.yaml` |
-| **Mailpit** | Mock SMTP inbox | Catches every email the system sends (order confirmations, Grafana alerts) without a real mail provider | `k8s/mailpit.yaml` |
+| ![Prometheus](https://img.shields.io/badge/-%20-E6522C?style=flat-square&logo=prometheus&logoColor=white) **Prometheus** | Metrics | Pull-based scraping fits Kubernetes service discovery naturally | `k8s/prometheus.yaml` |
+| ![Grafana](https://img.shields.io/badge/-%20-F46800?style=flat-square&logo=grafana&logoColor=white) **Grafana** | Dashboards | One pane of glass over metrics and logs | `k8s/grafana.yaml` |
+| **Loki** | Logs | Prometheus's label model applied to logs — cheap to run, PromQL-like queries | `k8s/loki.yaml` |
+| ![Kibana](https://img.shields.io/badge/-%20-005571?style=flat-square&logo=kibana&logoColor=white) **Kibana** | Audit-trail search UI | Purpose-built for exploring Elasticsearch documents | `k8s/kibana.yaml` |
+| **Mailpit** | Mock SMTP inbox | Catches every email the system sends without a real mail provider | `k8s/mailpit.yaml` |
+
+> `main`/`testing` additionally run Grafana alerting, continuous profiling (Pyroscope), cluster-level
+> metrics (kube-state-metrics/node-exporter), distributed tracing (Tempo), and k6 load testing — none
+> of that exists on `develop` yet. See main's own README for those.
 
 ---
 
@@ -232,11 +221,11 @@ k8s Deployment.
 | `notification-service` | 8085 | — | Kafka consumer on every topic → WebSocket broadcast (`/ws/notifications`) + email via Mailpit |
 | `audit-service` | 8090 | Elasticsearch | Consumes the audit trail every service emits; reconstructs field-level diffs and full record history |
 | `chat-service` | 8094 | MongoDB | Public per-product chat rooms **and** private user-to-user direct messages (JWT-authenticated WebSocket, delivery/read receipts, typing indicators) |
-| `reporting-service` | 8095 | Kafka Streams (materialized state stores) | Consumes every domain event and maintains live aggregates (top products, order revenue, user growth, saga health) for the frontend's reporting dashboard |
 | `product-comment-service` | 8091 | MongoDB | Product comments, ownership-enforced editing |
 | `product-media-service` | 8092 | MongoDB + local disk | Product photos/videos/documents, file upload |
 | `product-review-service` | 8093 | MongoDB | Product ratings/reviews |
-| `common-service` | 8096 | MongoDB | Deployed reference-data service (countries today) shared by other services over REST — not to be confused with the `common-*` compile-time library modules below |
+| `common-service` | 8097 | MongoDB | Deployed reference-data service (countries today) shared by other services over REST — not to be confused with the `common-*` compile-time library modules below |
+| `reporting-service` | 8096 | Kafka Streams (materialized state stores) | Consumes every domain event and maintains live aggregates (top products, order revenue, user growth, saga health) for the frontend's reporting dashboard. **Not fully wired into this branch's tooling yet**: absent from `docker-compose.yml`, absent from CI's build matrix, and its `k8s/reporting-service.yaml` still points at a hand-pushed image tag rather than the `ghcr.io`/commit-SHA pattern every other service uses. Runs fine via `./mvnw -pl reporting-service spring-boot:run` against the same Kafka/Eureka/config-server as everything else |
 | `common-security` | — | — | Shared JWT resource-server config, reused by every service |
 | `common-audit` | — | — | Shared aspect that captures every REST call's request/response for the audit trail |
 | `common-model` | — | — | Shared DTOs (e.g. `Address`) |
@@ -279,9 +268,13 @@ is a partial or pragmatic fit rather than textbook.
 - **Repository** — every persistence-facing interface (17 `*Repository` interfaces across the reactor)
   is a Spring Data abstraction over MongoDB or JPA; service code never touches a driver or
   `EntityManager` directly.
-- **Adapter** — one `*ModelAssembler` per service (`UserModelAssembler`, `OrderViewModelAssembler`, 12
-  in total) converts a persistence/domain object into its HATEOAS-linked API representation, keeping
-  wire format decoupled from storage format.
+- **Adapter** — one `*ModelAssembler` per resource (`UserModelAssembler`, `OrderViewModelAssembler`, 12
+  in total, including `common-service`'s `CountryModelAssembler`) converts a persistence/domain object
+  into its HATEOAS-linked API representation, keeping wire format decoupled from storage format.
+- **Strategy** — `user-service`'s national-ID validation (`NationalIdStrategy`): one `@Component` per
+  country (`BrazilianCpfStrategy`, `DutchBsnStrategy`, `GermanNationalIdStrategy`), collected by Spring
+  into a `Map<countryCode, strategy>` and dispatched by `NationalIdValidationService`. Adding a country
+  means adding a class, not editing the dispatcher — a genuine OCP win, see below.
 - **Template Method** — `ChatWebSocketHandler`, `DirectMessageWebSocketHandler`, and
   `NotificationWebSocketHandler` all extend Spring's `TextWebSocketHandler`, overriding only the
   lifecycle hooks each one needs (`afterConnectionEstablished`, `handleTextMessage`); the
@@ -304,9 +297,10 @@ is a partial or pragmatic fit rather than textbook.
   without touching any caller.
 - **ISP** — those service interfaces stay narrow and use-case-shaped rather than one god interface per
   service — `ConversationService` is 7 methods, all conversation-lifecycle operations, nothing else.
-- **OCP is the weakest fit here, honestly** — extension mostly happens by adding an enum constant plus
+- **OCP is a mixed fit here, honestly** — most extension still happens by adding an enum constant plus
   an `if`/`switch` (`PaymentMethod`, `MediaType`) rather than a polymorphic strategy class per variant.
-  Worth knowing as a limitation of this codebase, not a pattern to go looking for.
+  The clean counter-example is `user-service`'s `NationalIdStrategy` (see Strategy, above): don't
+  assume the rest of the codebase follows that shape just because one corner of it does.
 
 **Domain-Driven Design**
 
@@ -336,13 +330,13 @@ is a partial or pragmatic fit rather than textbook.
 |---|---|---|
 | **A — local JVM + npm** | Fastest inner loop, debugging one service in an IDE | Infra in Docker, everything else runs directly on your machine |
 | **B — full Docker Compose** | "Just show me the whole thing working" | Everything, containers only, one command |
-| **C — Kubernetes (k3d) + GitOps** | Understanding how production actually deploys | The full production topology, locally |
+| **C — Kubernetes (k3d) + GitOps** | Understanding how production actually deploys | The full topology, locally |
 
 ### Option A — local JVM + npm (fastest inner loop)
 
 ```bash
 docker compose up -d mysql mongodb kafka keycloak mailpit elasticsearch redis
-./mvnw -pl user-service,product-service,order-service,payment-service,shipping-service,delivery-service,inventory-service,notification-service,gateway-service,eureka-server,config-server,audit-service,chat-service,product-comment-service,product-media-service,product-review-service -am install -DskipTests
+./mvnw -pl user-service,product-service,order-service,payment-service,shipping-service,delivery-service,inventory-service,notification-service,gateway-service,eureka-server,config-server,audit-service,chat-service,product-comment-service,product-media-service,product-review-service,common-service -am install -DskipTests
 # then in separate terminals, per service:
 ./mvnw -pl <service> spring-boot:run
 cd frontend && npm install && npm run dev
@@ -350,371 +344,215 @@ cd frontend && npm install && npm run dev
 
 Frontend: http://localhost:5173
 
+> **Startup ordering — matters when you launch services by hand (separate terminals or IDE run
+> configs).** Bring them up in this order, waiting for each stage to be healthy before the next:
+>
+> 1. **Infra** (the `docker compose up -d` line above) — wait for the containers to be up.
+> 2. **`eureka-server`** — wait for its dashboard at http://localhost:8761 to respond.
+> 3. **`config-server`** (8888) — services read shared config (`config-repo/application.yml`) from
+>    it; the `spring.config.import` is `optional:`, so they'll start without it but fall back to
+>    their bundled `application.yaml` defaults.
+> 4. **Everything else**, `gateway-service` last.
+>
+> If a business service starts before `eureka-server` is reachable you'll see
+> `Connect to http://localhost:8761 failed: Connection refused` and, at the gateway,
+> `503 Unable to find instance for <service>` / `No servers available for service: <service>` —
+> the gateway routes purely by Eureka discovery (`uri: lb://<service>`). The Netflix client retries
+> registration on a ~30s schedule so it can self-heal, but the reliable fix is to start
+> `eureka-server` first and **restart any service that came up before it**.
+>
+> `./start-local.sh` already does this — it starts `eureka-server`, then `config-server`, then the
+> rest, blocking on a health check between stages. The ordering caveat only applies when you bypass
+> it.
+
+`./start-local.sh` / `./stop-local.sh` automate the above (build, start every service + infra
+container in the background, tear down again). Both take `--infra` and/or `--services` to start or
+stop just one half. With no flags, both do everything. `stop-local.sh` also takes `-y` to skip its
+"stop infra too?" prompt. Every backend module has `spring-boot-devtools` on the classpath, so a
+rebuild while a service from these scripts (or an IDE run) is running triggers a fast in-process
+restart instead of a full relaunch.
+
 ### Option B — full Docker Compose stack
 
 ```bash
 docker compose up -d --build
 ```
 
-Everything (infra + all 18 backend services + frontend) runs in containers on one network.
+Everything (infra + all 19 backend services + frontend) runs in containers on one network.
 
 ### Option C — Kubernetes (k3d) + GitOps
 
 ```bash
-k3d cluster create demo --servers 1 --agents 2 -p "18090:80@loadbalancer" -p "18453:443@loadbalancer" -p "8081:8081@loadbalancer" --api-port 6550
+k3d cluster create demo --servers 1 --agents 2 -p "18090:80@loadbalancer" -p "18453:443@loadbalancer" -p "8081:8081@loadbalancer" -p "9080:9080@loadbalancer" -p "9443:9443@loadbalancer" --api-port 6550
 kubectl apply -f k8s/
 ```
 
+> If you already have a local `demo` cluster from before Rancher moved in-cluster, the two new
+> `9080`/`9443` port mappings can only be set at cluster creation — `k3d cluster delete demo` and
+> recreate with the command above (this re-seeds all in-cluster PVC data: MySQL, Mongo, Keycloak
+> users, etc.).
+
+**One-time secrets you have to create yourself after the first `kubectl apply -f k8s/`** — none of
+these are committed (same "imperative, not in git" pattern as every other credential in this repo),
+so every pod that needs one sits in `ImagePullBackOff`/`CreateContainerConfigError` until it exists.
+Easiest done through Rancher's own **Storage → Secrets** UI (see [Useful URLs](#useful-urls) for the
+login) once it's up, so the actual values never pass through a shell/AI session — or via `kubectl`
+directly if you'd rather:
+
+| Secret | Namespace | Type | Why | Details |
+|---|---|---|---|---|
+| `ghcr-pull-secret` | `demo` | Registry (`kubernetes.io/dockerconfigjson`) | all 17 app-service images are private `ghcr.io/wilbertjoosen/demo-*` packages | registry `ghcr.io`, your GitHub username, a PAT with `read:packages` scope as the password |
+| `mysql-credentials` | `infra` | Opaque | `k8s/mysql.yaml`'s StatefulSet | keys `MYSQL_ROOT_PASSWORD`/`MYSQL_USER`/`MYSQL_PASSWORD`/`MYSQL_DATABASE` |
+| `grafana-admin` | `monitoring` | Opaque | `k8s/grafana.yaml`'s Deployment | keys `GF_SECURITY_ADMIN_USER`/`GF_SECURITY_ADMIN_PASSWORD` |
+
+No pod restart is required after creating `mysql-credentials`/`grafana-admin` (those pods are just
+waiting to be scheduled). `ghcr-pull-secret` pods retry on their own kubelet backoff schedule too,
+but `kubectl rollout restart deployment -n demo <name>` picks it up immediately instead of waiting
+out the backoff.
+
 App: http://demo.localhost:18090. Here's what's actually running where:
 
-| Runs | Where |
-|---|---|
-| Kafka, Redis, Mailpit | In-cluster, own instance per namespace (`k8s/kafka.yaml`, `k8s/redis.yaml`, `k8s/mailpit.yaml`) — see [QA / testing environment](#qa--testing-environment) |
-| MySQL, Keycloak, Vault, MongoDB, Elasticsearch | In-cluster, shared cross-namespace from the `demo` (prod) namespace |
-| Prometheus, Grafana, Loki, Tempo | In-cluster, shared `monitoring` namespace (main branch's manifests) |
-| Kibana | Still on host (Docker Compose), reached via `host.k3d.internal` — see [Observability](#observability) for why |
-
-<details>
-<summary><b>Why the port mapping and image-import details matter</b> (click to expand)</summary>
-
-- **`-p "8081:8081@loadbalancer"` is load-bearing, not optional**: every service's
-  `KEYCLOAK_ISSUER_URI` (and the frontend's) is hardcoded to `http://localhost:8081`, so in-cluster
-  Keycloak has to keep answering there too — see `k8s/keycloak.yaml`'s comment (main branch) for the
-  full reasoning.
-- **`kubectl apply -f k8s/` here is a one-time bootstrap** — from then on, ArgoCD watches the repo
-  and CI/CD (see [The path to production](#the-path-to-production-every-gate-explained)) handles
-  building, pushing to GHCR, and bumping the manifests ArgoCD syncs; there's no `k3d image import`
-  step in the normal flow, since images live in a real registry now.
-- **`k3d image import` is still the right tool** if you want to test a *local, unpushed* code change
-  without going through CI.
-
-</details>
-
-### Local dev scripts
-
-| Script | Flag | What it does |
+| Runs | Where | Namespace |
 |---|---|---|
-| `start-local.sh` / `stop-local.sh` | *(none)* | Build + start (or stop) every service and infra container — Option A, end to end |
-| | `--infra` | Just the Docker Compose infra containers |
-| | `--services` | Just the backend services + frontend dev server |
-| `k8s-local.sh start\|stop\|restart\|status` | *(none)* | The k3d cluster together with the host infra it depends on (`stop` also runs `docker compose stop`, `start` runs `docker compose up -d` first) |
-| | `--no-watch` | Skip the post-start `kubectl get pods -A -w` tail |
-| | `--with-dev` | Also start/stop dev-only pieces (e.g. running `start-local.sh`'s host-JVM services against the same docker-compose stack at the same time) |
+| Kafka, Redis, MySQL, Keycloak, Mailpit, MongoDB, Elasticsearch | In-cluster | `infra` |
+| App microservices + frontend | In-cluster | `demo` |
+| Grafana, Prometheus, Loki, Kibana | In-cluster | `monitoring` |
 
-`start`/`stop` only touch the infra pods actually still needed on the host now — just Kibana (used
-for host-JVM debugging; not a live view into k8s environment data, see
-[Observability](#observability)). Not docker-compose's own app containers (Option B, irrelevant when
-using k8s), and not Prometheus/Grafana/Loki/Promtail/Tempo — those run fully in-cluster
-(`k8s/prometheus.yaml`/`k8s/grafana.yaml`/`k8s/loki.yaml`/`k8s/tempo.yaml` on the main branch,
-`k8s/promtail-daemonset.yaml`), a single shared instance for both prod and QA.
+> The `-p "8081:8081@loadbalancer"` mapping is load-bearing, not optional: every service's
+> `KEYCLOAK_ISSUER_URI` (and the frontend's) is hardcoded to `http://localhost:8081`. See
+> [Kubernetes / GitOps](#kubernetes--gitops) for how ArgoCD takes over from here.
+
+Day-to-day cluster start/stop is wrapped by `./k8s-local.sh {start|stop|restart|status}`.
 
 ---
 
-## The path to production, every gate explained
+## Release workflow: local → testing → production
+
+The honest, step-by-step version of what happens to a change — deliberately not glossed over, even
+where the answer is "this part isn't automated yet."
 
 ```mermaid
 flowchart LR
-    DEV["👤 Developer\npushes code"] --> PR{"Pull Request\nto testing"}
-    PR -->|"Gate 1"| TEST["🧪 Test\nMaven verify +\nfrontend lint/build"]
-    TEST -->|fail| BLOCK1["❌ Blocked\nnothing downstream runs"]
-    TEST -->|pass| DIFF["🔍 Gate 2\nDetect changed services\n(path-filter the diff)"]
-    DIFF --> BUILD["📦 Gate 3\nBuild & push images\n→ GHCR, 3 tags each"]
-    BUILD -->|"Gate 4"| MANIFEST["✏️ Update k8s/*.yaml\n(only if image exists in GHCR)"]
-    MANIFEST --> COMMIT["📝 Commit back to testing\n[skip ci]"]
-    COMMIT --> ARGOQA["🔄 ArgoCD: demo-qa\nauto-sync + self-heal"]
-    ARGOQA --> QA["✅ Live in QA\nqa.demo.localhost"]
+    LOCAL["👤 Local dev\nOptions A/B/C above"] --> FB["Feature branch"]
+    FB -->|"PR (undocumented process —\nno CONTRIBITING.md/template)"| DEV["develop\n(you are here)"]
+    DEV -.->|"⚠️ manual/ad-hoc,\nnot automated"| TEST["testing"]
+    TEST -->|"build once\n(real pipeline)"| QA["🧪 QA environment"]
+    TEST -->|"promote\n(no rebuild)"| MAIN["main"]
+    MAIN --> PROD["🚀 Production"]
 
-    QA -.->|"validated, ready to ship"| PROMOTE{"Push to main"}
-    PROMOTE -->|"Gate 5"| COPY["📋 Promote job:\ncopy testing's exact\nimage tags into main"]
-    COPY --> COMMIT2["📝 Commit to main\n[skip ci]"]
-    COMMIT2 --> ARGOPROD["🔄 ArgoCD: demo\nauto-sync + self-heal"]
-    ARGOPROD --> PROD["✅ Live in production\ndemo.localhost"]
-
-    classDef gate fill:#7e14ff,color:#fff,stroke:#5c0fc7
-    classDef block fill:#d32f2f,color:#fff,stroke:#8f1c1c
+    classDef current fill:#7e14ff,color:#fff,stroke:#5c0fc7
+    classDef gap fill:#d32f2f,color:#fff,stroke:#8f1c1c,stroke-dasharray: 5 5
     classDef live fill:#2e7d32,color:#fff,stroke:#1b4d1e
-    class TEST,DIFF,BUILD,MANIFEST,COPY gate
-    class BLOCK1 block
+    class DEV current
+    class TEST gap
     class QA,PROD live
 ```
 
-**The core idea — build once, promote many:** `testing` is the *only* branch that ever builds an
-image from source. A push to `main` never rebuilds anything; it copies whichever image tags
-`testing` already validated in QA into `main`'s own manifests. Production always runs the exact
-bits that were already tested in QA — never a fresh, unvalidated build of the same source.
+1. **Local dev** — Quick Start Options A/B/C above, entirely on your machine.
+2. **Feature branch → `develop`** — genuinely undocumented, and not just here: there's no
+   `CONTRIBUTING.md` or PR template anywhere in this repo. In practice this is "open a PR, get it
+   merged," with no enforced process behind that.
+3. **`develop` → `testing`** — also undocumented, and unlike step 2 this isn't just a missing-docs
+   gap: `develop` isn't wired to any deployed environment at all. `main`'s own
+   `.github/workflows/ci-cd.yml` says so directly, in its own comment: *"develop/feature branches
+   aren't wired to any environment yet."* Work reaches `testing` by some manual/ad-hoc path, not a
+   repeatable, documented one. **If you're picking this project back up, this is the actual gap to
+   close, not a wording fix.**
+4. **Push to `testing` → build once, deploy to QA** — `testing`'s copy of `.github/workflows/ci-cd.yml`
+   (a different file than the one on `develop` — see [CI/CD & versioning](#cicd--versioning)) runs
+   the real pipeline: test, detect changed services, build + push images to GHCR, bump `testing`'s
+   own `k8s/*.yaml`, ArgoCD syncs the `demo-qa` namespace. This is the **only** branch that ever
+   builds an image from source.
+5. **`testing` → `main` (production)** — a push to `main` never rebuilds. A dedicated
+   `promote-to-production` job instead copies the exact image tags `testing` is already running
+   straight into `main`'s own `k8s/*.yaml` and commits — so whatever ships to production is
+   bit-for-bit what was already validated in QA.
+6. **ArgoCD takes it from there** — ArgoCD's own `selfHeal`/`automated` sync picks up the manifest
+   commit from step 4 or 5 and reconciles the cluster; nothing further is manual once a commit lands
+   on `testing` or `main`.
 
-| Gate | What happens | Why it exists | File |
-|---|---|---|---|
-| **1. Test** | Full Maven reactor `verify` (unit + Testcontainers-backed integration tests, Checkstyle, SpotBugs) + frontend `lint`/typecheck/build | Nothing downstream runs if this fails — a broken build never reaches an image, let alone a cluster | `.github/workflows/ci-cd.yml` |
-| **2. Detect changed services** | Path-filters the diff between this push and the branch's own previous commit | Rebuilding all 18 services on every commit would be slow and wasteful — only touched services (or anything depending on a shared module) get rebuilt. A manual `workflow_dispatch` skips the filter when everything needs picking up | same file, `changes` job |
-| **3. Build & push** | Each changed service's image → GHCR, tagged 3 ways: commit SHA, semver (from `pom.xml`/`package.json`), and `<version>-<sha>` combined | The combined tag guarantees every commit produces a real manifest diff (so a rollout always happens) while still showing the human-readable version at a glance — a version-only tag once left a service silently stale when someone forgot to bump it | same file, `build` job |
-| **4. Update manifests** | Bumps the changed services' `image:` lines in `k8s/*.yaml`, commits back to `testing` | Gated behind the image actually existing in GHCR — ArgoCD's `selfHeal` never sees a manifest pointing at something unpullable | same file, `update-manifests` job |
-| **5. Promote (main only)** | Copies `testing`'s exact `image:` lines into `main`'s manifests — no rebuild | This *is* the "promote-many" half — production gets the QA-validated artifact, bit-for-bit | same file, `promote-to-production` job |
-| **6. ArgoCD sync** | Each Application (`demo`, `demo-qa`) notices the manifest commit and reconciles the cluster automatically | No human runs `kubectl apply` after bootstrap — the cluster's state is *pulled* from git, not pushed to it | [Kubernetes / GitOps](#kubernetes--gitops) |
-
-GHCR packages are private, so every Deployment references `imagePullSecrets: ghcr-pull-secret` — a
-`kubernetes.io/dockerconfigjson` Secret created directly in each namespace (`demo`, `demo-qa`) via
-`kubectl create secret docker-registry`, never committed to git.
+`develop` (this branch) sits entirely outside that automated chain — its own `ci-cd.yml` (see
+[CI/CD & versioning](#cicd--versioning)) only tests and, on push to `main`, builds — a leftover from
+before `testing`/`main` grew the promotion pipeline above, not something `develop` itself deploys
+anywhere.
 
 ---
 
-## Branch model & release flow
+## CI/CD & versioning
 
-| Branch | Role | Deploys to |
+`.github/workflows/ci-cd.yml` on **this branch** is single-environment, build-on-push: a push to
+`main` runs the full pipeline straight from source — there's no `testing` → `main` promotion step
+here (that more mature build-once/promote-many model exists on the `main`/`testing` branches' own
+`ci-cd.yml` — see [Release workflow](#release-workflow-local--testing--production)). `develop` hasn't
+picked that pipeline up yet; treat this section as "what actually runs if you push this branch's own
+workflow file," not as a description of `main`'s.
+
+On a push to `main` (or a PR against it, test-only — nothing downstream runs for a PR):
+
+| Gate | What happens | File |
 |---|---|---|
-| `develop` | Feature work, single local environment | Nothing automated (own copy of the pipeline, test-only) |
-| `testing` | QA — the only branch that builds images from source | `demo-qa` namespace, `qa.demo.localhost` |
-| `main` | Production — promotes `testing`'s already-validated images | `demo` namespace, `demo.localhost` |
+| **1. Test** | Full Maven reactor `verify` (Checkstyle, SpotBugs, Testcontainers-backed integration tests) + frontend `lint`/typecheck/build. Nothing downstream runs if this fails | `.github/workflows/ci-cd.yml` |
+| **2. Detect changed services** | Path-filters the diff against the previous commit on `main` (`fetch-depth: 0`) so only services whose own directory changed get rebuilt; a shared module or `Dockerfile.service` changing forces a full rebuild | same file |
+| **3. Build & push** | Each changed service's image → GHCR, tagged with the commit SHA (what the k8s manifests actually deploy by) and the service's own semver version | same file |
+| **4. Update manifests** | Bumps the changed services' `image:` lines in `k8s/*.yaml`, commits back to `main` (`[skip ci]`), gated behind the build succeeding | same file |
 
-```mermaid
-flowchart LR
-    F["feature branch"] -->|PR| D["develop"]
-    D -->|PR| T["testing"]
-    T -->|"build once\n(Gates 1-4)"| QA_ENV["🧪 QA environment"]
-    T -->|PR / push| M["main"]
-    M -->|"promote\n(Gate 5)"| PROD_ENV["🚀 Production"]
-
-    classDef branch fill:#161b22,color:#fff,stroke:#7e14ff
-    classDef env fill:#2e7d32,color:#fff,stroke:#1b4d1e
-    class F,D,T,M branch
-    class QA_ENV,PROD_ENV env
-```
+GHCR packages are private, so every Deployment references `imagePullSecrets: ghcr-pull-secret` — a
+`kubernetes.io/dockerconfigjson` Secret created directly in the `demo` namespace via `kubectl create
+secret docker-registry`, never committed to git.
 
 ---
 
 ## Kubernetes / GitOps
 
-`k8s/` holds every application manifest for **production** (namespace `demo`, branch `main`); the same
-path on the **`testing`** branch holds QA's manifests (namespace `demo-qa`) — see
-[QA / testing environment](#qa--testing-environment). Once bootstrapped, it's push-to-deploy: CI/CD
-handles build/push/manifest-bump, ArgoCD picks up the commit on its own — no one runs `kubectl apply`
-day to day.
-
-**Where everything lives:**
-
-| Namespace | What's there | Shared across environments? |
-|---|---|---|
-| `demo` | Production app microservices + frontend | No — prod only |
-| `demo-qa` | QA app microservices + frontend | No — QA only (this branch) |
-| `infra` | Kafka, Redis, MySQL, Keycloak, Mailpit, Vault, MongoDB, Elasticsearch | Yes — one instance, both environments |
-| `monitoring` | Prometheus, Loki, Kibana, Grafana, Tempo, Pyroscope | Yes — one instance, both environments |
-| `argocd` | ArgoCD itself | Manages both `demo` and `demo-qa` Applications |
-| `cattle-system` | Rancher | Cluster-wide management UI |
-
-Pods reach `infra`/`monitoring` via cross-namespace DNS (`<service>.infra.svc.cluster.local`, see
-`k8s/configmap-common.yaml`) rather than `host.k3d.internal`. The corresponding `demo-*` containers
-in `docker-compose.yml` are still used by the local mvnw/IDE dev flow, but the cluster itself no
-longer depends on them.
-
-<details>
-<summary><b>Bootstrap mechanics and why ArgoCD/Rancher aren't GitOps-managed themselves</b> (click to expand)</summary>
-
-ArgoCD itself is installed once
+`k8s/` holds every application manifest. ArgoCD itself is installed once into an `argocd` namespace
 (`kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml`),
-then both `k8s-argocd/application.yaml` (tracks `main` → `demo`) and `k8s-argocd/application-qa.yaml`
-(tracks `testing` → `demo-qa`) are applied, each with auto-sync + self-heal enabled — both files live
-in this branch's own `k8s-argocd/`. Rancher is bootstrapped the same manual, one-time way, but from
-**main branch's** `k8s-rancher/` (this directory doesn't exist on `testing` — Rancher is a
-cluster-wide tool, bootstrapped once regardless of which branch you're checked out on): `kubectl
-apply -f k8s-rancher/` (see `k8s-rancher/rancher.yaml`'s comment for why it's plain YAML, not the
-Helm chart, and for the RBAC it needs to self-register the cluster it's running in as "local").
-`k8s-argocd/` and `k8s-rancher/` hold the manifests applied once by hand, not GitOps-managed — a tool
-shouldn't be managed by the thing it manages, and (for ArgoCD specifically) nothing can sync it into
-existence before it's already watching anything.
+then `k8s-argocd/application.yaml` is applied to point it at this repo's `k8s/` path with auto-sync +
+self-heal enabled. From there ArgoCD watches `main` on its own. Rancher is bootstrapped the same
+manual, one-time way: `kubectl apply -f k8s-rancher/` brings up an in-cluster Rancher in the
+`cattle-system` namespace. Like ArgoCD, it's deliberately kept outside ArgoCD's own sync path — a
+tool shouldn't be managed by the thing it manages.
+
+**On this branch specifically, the local iteration loop is more manual than `main`/`testing`'s
+CI-driven one** — there's no registry step here for a purely local change:
+
+1. Edit a manifest in `k8s/`, or push code that needs a new image
+2. If code changed, build+import locally, tagged with that service's own real version number:
+   - Backend: `docker build -f Dockerfile.service --build-arg SERVICE=<name> -t demo/<name>:<version-from-pom.xml> .`
+     then `k3d image import demo/<name>:<version> -c demo`
+   - Frontend: `docker build --build-arg MODE=k8s -t demo/frontend:<version-from-package.json> frontend/`
+     then `k3d image import demo/frontend:<version> -c demo` — `MODE=k8s` matters (see
+     `frontend/Dockerfile`'s comment): the default `production` mode bakes in `localhost:*` URLs for
+     the docker-compose/host-JVM dev flow, which don't work through the k8s Traefik ingress
+3. Update the manifest's `image:` field to match the tag you just imported
+4. `git push` — ArgoCD picks up manifest changes on its own; a changed image still needs
+   `kubectl -n demo rollout restart deployment/<name>` to actually pick up the freshly-imported image
 
 `Dockerfile.service` (repo root) is a single parameterized Dockerfile (`--build-arg SERVICE=<module>`)
-shared by every backend service — build context is the repo root so the multi-module Maven build can
-see sibling modules. Its build stage is pinned to `--platform=$BUILDPLATFORM` (the jar it produces is
-architecture-independent bytecode) so cross-compiling for the cluster's arm64 nodes on an amd64 CI
-runner needs no QEMU emulation — only the final runtime layer (`COPY`, no execution) is actually
-arm64.
-
-</details>
+shared by every backend service. CI's own bootstrap-correction step rewrites any manifest still
+pointing at a local `demo/<name>:<tag>` image to the real `ghcr.io` SHA tag automatically, the first
+time that service's CI build succeeds after being deployed this way.
 
 ---
-## QA / testing environment
-
-You're looking at it. A second, fully independent deploy target — same cluster, same shared
-stateful infra, separate namespace and separate ArgoCD Application from production:
-
-```mermaid
-flowchart LR
-    subgraph GIT["GitHub"]
-        MAIN["main branch"]
-        TEST["testing branch (this one)"]
-    end
-
-    subgraph K8S["k3d cluster"]
-        subgraph DEMO["namespace: demo (prod)"]
-            APPS_PROD["18 services\n+ frontend"]
-            MYSQL[("MySQL (in-cluster)\ndb: demo / demo_qa")]
-            MONGO[("MongoDB (in-cluster, 3-node rs)\ndb: <svc> / <svc>_qa")]
-            ES[("Elasticsearch (in-cluster)\nindex: audit-log / audit-log-qa")]
-            KC["Keycloak (in-cluster)\nrealm: demo / demo-qa"]
-            VAULT["Vault (in-cluster)"]
-            MAILPIT_PROD["Mailpit (in-cluster)"]
-        end
-        subgraph DEMOQA["namespace: demo-qa (QA, this branch)"]
-            APPS_QA["18 services\n+ frontend"]
-            KAFKA_QA["Kafka (in-cluster)\nk8s/kafka.yaml"]
-            REDIS_QA["Redis (in-cluster)\nk8s/redis.yaml"]
-            MAILPIT_QA["Mailpit (in-cluster)"]
-        end
-        subgraph MON["namespace: monitoring — cluster-wide, shared by both"]
-            PROM_K8S["Prometheus"]
-            LOKI_K8S["Loki"]
-            TEMPO_K8S["Tempo"]
-            GRAFANA["Grafana"]
-        end
-        ARGO_PROD["ArgoCD app: demo"]
-        ARGO_QA["ArgoCD app: demo-qa"]
-    end
-
-    subgraph ISO_PROD["Prod-only host infra — dev/host-debug only, cluster doesn't depend on these"]
-        KAFKA_PROD["Kafka :9092/:9094"]
-        REDIS_PROD["Redis :6379"]
-    end
-
-    MAIN -- "CI/CD: promote (Gate 5)" --> ARGO_PROD
-    TEST -- "CI/CD: build, push, bump k8s/ (Gates 1-4)" --> ARGO_QA
-    ARGO_PROD --> APPS_PROD
-    ARGO_QA --> APPS_QA
-
-    APPS_PROD --> MYSQL & MONGO & ES & KC & VAULT & MAILPIT_PROD & TEMPO_K8S
-    APPS_QA --> KAFKA_QA & REDIS_QA & MAILPIT_QA & TEMPO_K8S
-    APPS_QA -. "cross-namespace Service DNS" .-> MYSQL & MONGO & ES & KC & VAULT
-    APPS_PROD --> KAFKA_PROD & REDIS_PROD
-    GRAFANA --> PROM_K8S & LOKI_K8S & TEMPO_K8S
-
-    classDef prod fill:#2e7d32,color:#fff,stroke:#1b4d1e
-    classDef qa fill:#f9a825,color:#000,stroke:#c17900
-    classDef shared fill:#7e14ff,color:#fff,stroke:#5c0fc7
-    class APPS_PROD,ARGO_PROD,MYSQL,MONGO,ES,KC,VAULT,MAILPIT_PROD prod
-    class APPS_QA,ARGO_QA,KAFKA_QA,REDIS_QA,MAILPIT_QA qa
-    class PROM_K8S,LOKI_K8S,TEMPO_K8S,GRAFANA shared
-```
-
-- **Branch model**: `main` is production (bugfixes branch from here); `develop` is where feature
-  branches merge; `testing` is the QA environment itself — merging `develop` → `testing` and pushing
-  deploys to QA the same way pushing to `main` deploys to prod.
-- **k8s**: namespace `demo-qa`, ArgoCD Application `demo-qa` (tracks this branch's own `k8s/` path),
-  ingress at `qa.demo.localhost` — same port (`18090`) as prod, routed by hostname.
-- **Infra**: which stateful pieces are shared between `demo`/`demo-qa` vs. genuinely separate:
-
-  | Shared (one instance, both environments) | Separate per environment |
-  |---|---|
-  | MySQL, MongoDB, Elasticsearch, Keycloak, Vault | Kafka, Redis, Mailpit |
-  | QA reaches these cross-namespace (`mysql.infra.svc.cluster.local`, etc.) | Each namespace has its own — `k8s/kafka.yaml`, `k8s/redis.yaml`, `k8s/mailpit.yaml` |
-  | QA is scoped by name instead: `demo_qa` database, `<service>_qa` Mongo databases, `audit-log-qa` index, `demo-qa` Keycloak realm | Kafka/Redis: shared topics would mean QA traffic triggering prod's saga. Mailpit: was always separate, even on the host |
-
-  Grafana, Prometheus, Loki, and Tempo also run in-cluster, shared by both environments in their own
-  `monitoring` namespace (main branch's manifests) — see [Observability](#observability).
-  `docker-compose.yml`/`docker-compose.qa.yml`'s equivalent containers for everything now in-cluster
-  still exist for host-JVM debugging — the k8s namespaces themselves just don't depend on them
-  anymore.
-- **One frontend image, two Keycloak realms**: Vite bakes `VITE_KEYCLOAK_REALM` in at build time, but
-  the same built image is deployed to both `demo` and `demo-qa` — a build-time value can't vary per
-  environment. `frontend/src/auth/keycloak.ts` instead resolves the realm at runtime from the
-  hostname (`qa.` prefix → `demo-qa`, anything else → the build-time default), matching the
-  `demo.localhost` / `qa.demo.localhost` ingress split above.
-- **`demo_qa` database creation** on the shared in-cluster MySQL is handled automatically by a Job
-  (`mysql-create-qa-db` in main's `k8s/mysql.yaml`) rather than a manual step now. The equivalent
-  manual command still applies if you're instead running the shared MySQL on the host (see
-  `docker-compose.qa.yml`'s header comment) — e.g. for the plain host-JVM/`start-local.sh` flow.
-  MongoDB and Elasticsearch need no equivalent step — both auto-create on first write.
-- **Excluded from QA on purpose**: `promtail-daemonset.yaml`, `prometheus.yaml`, `loki.yaml`,
-  `grafana.yaml`, and `tempo.yaml` are cluster-wide, single-shared-instance resources (see
-  [Observability](#observability)) — duplicating them per environment would just make the `demo`
-  and `demo-qa` Applications fight over the same ClusterRole/ClusterRoleBinding names
-  (`promtail-daemonset.yaml`, `prometheus.yaml`) or the same `monitoring` Namespace object.
 
 ## Observability
 
-```mermaid
-flowchart LR
-    SVC["Every service\n(demo + demo-qa)"] -->|"/actuator/prometheus"| PROM["Prometheus\n(main branch, shared)"]
-    SVC -->|stdout| PROMTAIL["Promtail"] --> LOKI["Loki"]
-    SVC -->|OTLP spans| TEMPO["Tempo"]
-    SVC -->|JFR samples| PYRO["Pyroscope"]
-    SVC -->|audit events| ES["Elasticsearch"]
+- **Metrics**: every service exposes `/actuator/prometheus`. `k8s/prometheus.yaml` scrapes it via
+  native Kubernetes service discovery (no Operator, no Helm) — every Service labeled
+  `monitored: "true"`. Feeds a Grafana (`k8s/grafana.yaml`) with a pre-provisioned "Services
+  Overview" dashboard.
+- **Logs**: services log to stdout. In k8s, Promtail (`k8s/promtail-daemonset.yaml`) ships every
+  pod's logs to Loki (`k8s/loki.yaml`) — query through Grafana's Explore tab. In the host-JVM dev
+  flow, logs just go to the terminal.
+- **Audit trail**: every REST call across every service is captured (who, what, when, request/response
+  bodies with secrets redacted) and shipped to Elasticsearch, viewable in Kibana (`k8s/kibana.yaml`).
+  The admin UI's history icons (Users, Products, Media, Chat) show the full change timeline with
+  before/after diffs per field, powered by `audit-service`'s `RecordHistoryService`.
 
-    PROM & LOKI & TEMPO --> GRAF["Grafana"]
-    GRAF -->|"3 alert rules"| MAILPIT["Mailpit inbox"]
-    ES --> KIBANA["Kibana\n(host-based)"]
+> This branch doesn't yet have alerting, distributed tracing, continuous profiling, cluster-level
+> metrics, or load testing — all of that lives on `main`/`testing` only, since it's a shared
+> `monitoring` namespace those two branches maintain. See main's own README for the details.
 
-    classDef signal fill:#7e14ff,color:#fff,stroke:#5c0fc7
-    classDef sink fill:#F46800,color:#fff,stroke:#c65500
-    class PROM,LOKI,TEMPO,PYRO,ES signal
-    class GRAF,KIBANA,MAILPIT sink
-```
-
-| Signal | Source → Sink | Key fact |
-|---|---|---|
-| **Metrics** | Every service's `/actuator/prometheus` → Prometheus → Grafana | Shared `main` branch instance; also runs alerting, cluster metrics, and profiling for both environments |
-| **Load testing** | k6 script → Prometheus | Suspended `CronJob` template (main branch) — trigger on demand |
-| **Logs** | stdout → Promtail → Loki | Query via Grafana Explore, e.g. `{namespace="demo-qa"}` |
-| **Traces** | OTLP spans → Tempo | `enduser.id` span tag is unique to **this branch** — not on `main`/`develop` |
-| **Audit trail** | Every REST call → Elasticsearch → Kibana | Index `audit-log` (prod) / `audit-log-qa` (QA); Kibana stays host-based here |
-
-<details>
-<summary><b>Metrics, alerting & load testing — the full detail</b> (click to expand)</summary>
-
-A single Prometheus runs *inside* the k3d cluster (`k8s/prometheus.yaml`, namespace `monitoring`,
-main branch), covering the k8s-deployed services in **both** `demo` and `demo-qa`, discovered via
-`kubernetes_sd_configs` (`role: pod`, opted in by the `monitored: "true"` label most manifests
-already carry) and labeled by `namespace`. `docker-compose.yml` has no Prometheus of its own — pod
-IPs on the k3d overlay network aren't reachable from outside the cluster at all. Grafana has this as
-its default datasource, plus two pre-provisioned dashboards: "Services Overview" and
-**"Kubernetes Overview (prod vs QA)"** — the latter has a `namespace` filter variable and puts
-prod/QA side by side in the top row. The same shared instance also runs **alerting** (three rules:
-instance-down, high-5xx-rate, pvc-disk-pressure — delivered by email through Mailpit), scrapes
-**cluster-level metrics** (`kube-state-metrics`, `node-exporter`), and receives every service's
-**continuous-profiling** data (Pyroscope — toggle per-namespace via the `PYROSCOPE_AGENT_ENABLED`
-key) — all `main` branch manifests, since this is one shared `monitoring` namespace for both
-environments; see main's own README for the details.
-
-A k6 smoke-test script exists as a suspended `CronJob` template (`k8s/k6.yaml`, main branch, shared
-`monitoring` namespace) — trigger on demand with `kubectl create job
---from=cronjob/k6-load-test <name> -n monitoring`, results push to the shared Prometheus.
-
-</details>
-
-<details>
-<summary><b>Logs & traces — the full detail</b> (click to expand)</summary>
-
-Promtail (one shared instance, not per-environment) ships every pod's logs — from both namespaces —
-to the in-cluster Loki, labeled by `namespace`. Query through Grafana's Explore tab against the
-**Loki** datasource.
-
-Every service exports spans over OTLP to the in-cluster Tempo — Spring Boot auto-adds
-`[traceId,spanId]` to every log line once `micrometer-tracing` is on the classpath, and since
-Grafana, Loki, and Tempo are all the same in-cluster instances for both environments, a trace's
-`tracesToLogsV2` jump always resolves against the exact Loki that received its originating service's
-logs. **Every JWT-authenticated request's span is also tagged with the OTel semantic convention
-`enduser.id`** — this is the one piece of observability that's unique to *this* branch, not shared
-from `main` (the Keycloak subject claim, `common-security`'s `EndUserIdTracingFilter`, not yet
-ported to `main`/`develop`) — filter Tempo search with `{ span.enduser.id = "<user-id>" }` to pull
-every trace for one user across every service. Keycloak's own OTel tracing (`KC_TRACING_ENABLED`,
-`main` branch's `k8s/keycloak.yaml`) covers the same shared instance both realms use, so `demo-qa`
-logins are traced too even though that config lives on `main`.
-
-</details>
-
-<details>
-<summary><b>Audit trail — the full detail</b> (click to expand)</summary>
-
-Every REST call across every service is captured (who, what, when, request/response bodies with
-secrets redacted) and shipped to Elasticsearch — index `audit-log` for prod, `audit-log-qa` for QA
-(same shared in-cluster ES instance). The admin UI's history icons (Users, Products, Media, Chat)
-show the full change timeline with before/after diffs per field, powered by `audit-service`'s
-`RecordHistoryService`. Three Kibana dashboards cover the same data for ad-hoc querying —
-**Kibana itself stays host-based** (`docker-compose.yml`), pointed at `docker-compose.yml`'s own
-dev-only Elasticsearch, not the in-cluster one — not a live view into k8s environment data. All
-auto-imported on startup: **"Audit Trail"** (both environments together, for cross-environment
-searching), and **"Audit Trail — Production"** / **"Audit Trail — QA"**, each pinned to its own
-exact index instead of relying on a filter.
-
-</details>
+---
 
 ## Config profiles: local / testing / production
 
@@ -732,9 +570,9 @@ every time.
 wins over a YAML default regardless of which profile is active — so `SPRING_PROFILES_ACTIVE` is
 never set anywhere in `k8s/`, and doesn't need to be. The profile files exist so the three branches
 can carry one identical `application.yaml`, with the environment-specific values isolated
-somewhere a merge never has to touch — and so `SPRING_PROFILES_ACTIVE=testing` is available if you
-ever want to run a service host-JVM style against QA-shaped defaults (there's no `docker-compose`
-QA-flavored Mongo today, so this is currently a documented capability more than a used one).
+somewhere a merge never has to touch.
+
+---
 
 ## Default credentials
 
@@ -744,67 +582,66 @@ QA-flavored Mongo today, so this is currently a documented capability more than 
 | `admin` | `admin` | `user`, `admin` |
 | `manager` | `manager` | `finance`, `product_manager`, `shipping_manager`, `inventory_manager` |
 
-Realm: `demo` (prod) / `demo-qa` (QA) — same users/passwords in both. Client: `demo-spa` (public, PKCE).
+Realm: `demo`. Client: `demo-spa` (public, PKCE).
 
 The login page itself uses a custom "demo" theme (`docker/keycloak/themes/demo`) instead of stock
 Keycloak branding — purple accent/button matching the frontend's own palette, realm `displayName`
-("Demo" / "Demo QA") shown in place of the Keycloak wordmark. See the theme's own `styles.css`
-comment for why it extends `keycloak.v2` via `@import` rather than the more obvious-looking
-`styles=` override (the latter silently drops the base theme's layout rules).
+("Demo") shown in place of the Keycloak wordmark. See the theme's own `styles.css` comment for why
+it extends `keycloak.v2` via `@import` rather than the more obvious-looking `styles=` override
+(the latter silently drops the base theme's layout rules).
+
+> **Two separate Keycloak instances, deliberately different hostnames:** docker-compose's own
+> Keycloak (used by both local-dev flows — Option A host-JVM and Option B full-compose) answers on
+> `http://keycloak.localhost:8181`, while the k3d/k8s cluster's Keycloak answers on
+> `http://localhost:8081`. They used to both be bare `localhost`, differing only by port — but
+> browser cookies are scoped by domain, not port, so the two instances shared one cookie jar and
+> stomped on each other's `KC_RESTART`/session cookies the moment you used both in the same browser
+> (reproducible: log into one, and the other's in-flight login breaks with "Restart login cookie not
+> found"). `keycloak.localhost` resolves to loopback with zero setup, so this isolates the two
+> instances' cookies for free and lets you run both environments in the same browser at once.
 
 ## Useful URLs
 
 | Tool | URL | Credentials |
 |---|---|---|
 | Frontend (dev) | http://localhost:5173 | — |
-| Frontend (k8s, prod) | http://demo.localhost:18090 | — |
-| Frontend (k8s, QA) | http://qa.demo.localhost:18090 | — (realm `demo-qa`, same users as above) |
-| Keycloak admin | http://localhost:8081 | `admin` / `admin` (realm: **`demo`** for prod, **`demo-qa`** for QA — not `master`, see note below) |
+| Frontend (k8s) | http://demo.localhost:18090 | — |
+| Keycloak admin | http://localhost:8081 | `admin` / `admin` (realm: **`demo`**, not `master` — see note below) |
 | Swagger UI (aggregated) | http://localhost:8080/swagger-ui.html | — |
-| Grafana (prod + QA) | http://grafana.demo.localhost:18090 | Secret `grafana-admin` in the `monitoring` namespace (main branch, shared by both) — datasources: **Prometheus**, **Loki**, **Tempo** |
-| Prometheus (prod + QA) | http://prometheus.demo.localhost:18090 | — |
-| Loki (prod + QA) | http://loki.demo.localhost:18090 | — |
-| Tempo (prod + QA) | http://tempo.demo.localhost:18090 | — |
-| Kibana | http://localhost:5601 | — |
-| Kafka UI | http://localhost:8099 | prod Kafka only — QA's Kafka has no UI wired up |
-| Mailpit (SMTP inbox, prod) | http://localhost:8025 | — |
-| Mailpit (SMTP inbox, QA) | http://localhost:8026 | — |
-| Rancher (k8s, in-cluster) | https://localhost:9443 | bootstrap password `rancherdemo123` (set via `CATTLE_BOOTSTRAP_PASSWORD` in main branch's `k8s-rancher/rancher.yaml`) |
-| ArgoCD | http://argocd.localhost:18090 (via `k8s-argocd/ingress.yaml`) | `admin` / `kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' \| base64 -d` — manages two Applications, `demo` (prod) and `demo-qa` |
+| Grafana (k8s, in-cluster) | http://grafana.demo.localhost:18090 | `GF_SECURITY_ADMIN_USER`/`PASSWORD` from the `grafana-admin` Secret (create via Rancher's Secrets UI) |
+| Prometheus (k8s, in-cluster) | http://prometheus.demo.localhost:18090 | — |
+| Kibana (k8s, in-cluster) | http://kibana.demo.localhost:18090 | — |
+| Kafka UI | http://localhost:8095 | — |
+| Mailpit (SMTP inbox) | http://localhost:8025 | — |
+| Rancher (k8s, in-cluster) | https://localhost:9443 | bootstrap password `rancherdemo123` (set via `CATTLE_BOOTSTRAP_PASSWORD` in `k8s-rancher/rancher.yaml`) |
+| ArgoCD | http://argocd.localhost:18090 (via `k8s-argocd/ingress.yaml`) | `admin` / `kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' \| base64 -d` |
 
 > **Keycloak gotcha:** the admin console defaults to the `master` realm, which only ever contains the
 > bootstrap admin. Application users (`demo`, `admin`, `manager`, everyone created through the app)
-> live in the **`demo`** realm (prod) or **`demo-qa`** realm (QA) — switch realms via the dropdown in
-> the top-left before looking for them. Same one Keycloak server hosts both.
+> live in the **`demo`** realm — switch realms via the dropdown in the top-left before looking for them.
 
 ### Infrastructure connection ports
 
-For connecting a DB client, `redis-cli`, `kcat`, etc. directly rather than through a UI. All of the
-rows below marked **dev-only** are host containers that k8s no longer depends on — QA and prod k8s
-pods use their own in-cluster instances instead (`k8s/kafka.yaml`, `k8s/redis.yaml`,
-`k8s/mysql.yaml`, `k8s/keycloak.yaml`, `k8s/mailpit.yaml`, `k8s/vault.yaml`, `k8s/mongo.yaml`,
-`k8s/elasticsearch.yaml`); the host containers still exist purely for host-JVM/`start-local.sh`
-debugging.
+For connecting a DB client, `redis-cli`, `kcat`, etc. directly rather than through a UI. These host
+ports back the Docker Compose containers used by the local JVM dev flow and host-tool debugging
+only — k8s pods reach their own **in-cluster** Kafka, Redis, MySQL, Keycloak, Mailpit, MongoDB, and
+Elasticsearch instead, addressed via `k8s/configmap-common.yaml`, not the ports below:
 
 | Service | Host:Port | Notes |
 |---|---|---|
-| MySQL (host / dev) | `localhost:3306` | `demo-mysql` — `order-service`'s write model, db `demo` (prod) / `demo_qa` (QA), user/pass `demo`/`demo`; **dev-only**, in-cluster instance is shared cross-namespace from the `infra` namespace (`mysql.infra.svc.cluster.local`) |
-| MongoDB (host / dev) | `localhost:27017` | `demo-mongo` — a single standalone instance, every other service's store; **dev-only**, in-cluster is a proper 3-node replica set (`k8s/mongo.yaml`) shared cross-namespace |
-| Kafka (host clients / dev, prod) | `localhost:9092` | `PLAINTEXT` listener for local JVM services / host tools — **dev-only**; QA and prod k8s pods use their own in-cluster Kafka (`kafka:9092` inside the cluster, `k8s/kafka.yaml`), not this container |
-| Kafka (host clients / dev, QA) | `localhost:9192` | separate broker — shared topics would mean QA test traffic triggering prod's saga; host-JVM debugging only, same in-cluster-Kafka caveat as above |
-| Redis (host / dev, prod) | `localhost:6379` | `demo-redis` — Resilience4j response caching for the local `mvnw`/IDE flow; **dev-only**, QA and prod k8s pods use their own in-cluster Redis (`redis:6379` inside the cluster, `k8s/redis.yaml`) |
-| Redis (host / dev, QA) | `localhost:6380` | same caveat — host-JVM debugging only, QA's k8s namespace has its own in-cluster Redis |
-| Elasticsearch (host / dev) | `localhost:9200` | `demo-elasticsearch` — `audit-service`'s store, index `audit-log` (prod) / `audit-log-qa` (QA); **dev-only**, in-cluster instance is shared cross-namespace |
-| Mailpit SMTP (host / dev, prod) | `localhost:1025` | `demo-mailpit`; **dev-only**, prod's in-cluster Mailpit (`k8s/mailpit.yaml`, `demo` namespace) is what `notification-service` actually sends to when running in k8s |
-| Mailpit SMTP (host / dev, QA) | `localhost:1026` | same caveat — QA's k8s namespace has its own in-cluster Mailpit |
-| Vault (host / dev) | `localhost:8200` | `demo-vault`, fixed dev root token; **dev-only**, in-cluster instance is shared cross-namespace the same way MySQL is |
+| MySQL | `localhost:3306` | `order-service`'s write model (db `demo`, user/pass `demo`/`demo`); dev-only |
+| MongoDB | `localhost:27017` | every other service's store, one logical DB per service; dev-only |
+| Kafka (host clients) | `localhost:9092` | `PLAINTEXT` listener for local JVM services / host tools; dev-only |
+| Redis | `localhost:6379` | Resilience4j response caching (host-JVM/IDE dev flow, `redis-cli`); dev-only |
+| Elasticsearch | `localhost:9200` | `audit-service`'s store; dev-only |
+| Mailpit SMTP | `localhost:1025` | what `notification-service` actually sends to; `:8025` above is its web inbox; dev-only |
 
-k3d cluster ports (`k3d cluster create`, see [Kubernetes / GitOps](#kubernetes--gitops)): `18090` →
-Traefik HTTP (routes every `*.demo.localhost` ingress by hostname — frontend, ArgoCD, Prometheus, both
-environments), `18453` → Traefik HTTPS, `8081` → in-cluster Keycloak specifically (load-bearing, not
-a convenience port — see `k8s/keycloak.yaml`'s comment on the main branch), `6550` → the k8s API
-server (`kubectl` uses this automatically via your kubeconfig context, not something you visit
-directly).
+k3d cluster ports: `18090` → Traefik HTTP (frontend, ArgoCD, Loki, Grafana, Prometheus, and Kibana
+ingresses), `18453` → Traefik HTTPS, `8081` → in-cluster Keycloak specifically (load-bearing, not a
+convenience port), `9080`/`9443` → in-cluster Rancher specifically, `6550` → the k8s API server
+(`kubectl` uses this automatically via your kubeconfig context, not something you visit directly).
+
+---
 
 ## Repo layout
 
@@ -815,18 +652,15 @@ demo/
 ├── user-service/, product-service/, order-service/, payment-service/,
 │   shipping-service/, delivery-service/, inventory-service/,
 │   notification-service/, audit-service/, chat-service/,
-│   product-comment-service/, product-media-service/, product-review-service/
+│   product-comment-service/, product-media-service/, product-review-service/,
+│   common-service/
 ├── frontend/                # Vue 3 SPA
-├── docker/                  # Keycloak realms (demo + demo-qa), Grafana/Kibana/Prometheus provisioning
-├── k8s/                     # Kubernetes manifests — prod content on main, QA content on testing
-│                             #   (includes kafka.yaml/redis.yaml — in-cluster infra, QA namespace)
-├── k8s-argocd/              # ArgoCD Application CRs + ingress, applied once by hand, not GitOps-synced
-├── docker-compose.yml       # full local stack (dev-only Kafka/Redis + every service + frontend)
-├── docker-compose.qa.yml    # QA host-debug infra (Kafka/Redis/Mailpit) — Mailpit's real dependency;
-│                             #   Kafka/Redis here are for host-JVM debugging only, not used by k8s
+├── docker/                  # Keycloak realm, Grafana/Kibana/Prometheus provisioning
+├── k8s/                     # Kubernetes manifests (ArgoCD-synced), incl. kafka.yaml/redis.yaml
+│                             #   for the in-cluster infra those pods depend on
+├── docker-compose.yml       # full local stack (infra + every service + frontend)
 ├── start-local.sh, stop-local.sh  # host-JVM/npm dev flow — each takes --infra and/or --services
-├── k8s-local.sh              # k3d cluster + its host infra: start/stop/restart/status
-├── .github/workflows/       # CI/CD: test -> build & push to GHCR -> bump k8s manifests
+├── k8s-local.sh             # k3d cluster + its host infra: start/stop/restart/status
 └── pom.xml                  # Maven reactor parent
 ```
 
@@ -836,9 +670,10 @@ Each backend service module follows the same internal package layout under its b
 `repository/` (Spring Data repositories), `saga/` (`@KafkaListener` domain-event consumers,
 including the choreographed-saga participants), `service/` (business logic, external clients).
 Modules with a WebSocket surface (`chat-service`, `notification-service`) add a `websocket/`
-package for handlers/interceptors; `gateway-service` adds a `filter/` package for its servlet
-filter. The `*ServiceApplication` bootstrap class stays directly in the base package, not in any
-sub-package.
+package for handlers/interceptors. The `*ServiceApplication` bootstrap class stays directly in the
+base package, not in any sub-package.
+
+---
 
 ## Glossary — jargon, decoded
 
@@ -847,27 +682,24 @@ systems background.
 
 | Term | In one sentence |
 |---|---|
-| **Microservice** | A small, independently-deployable application that owns one piece of the business (e.g. just orders, or just payments) instead of one giant program doing everything |
+| **Microservice** | A small, independently-deployable application that owns one piece of the business instead of one giant program doing everything |
 | **Monolith** | The opposite of microservices — one single application containing all the logic, deployed as one unit |
 | **API Gateway** | The single "front door" that every external request goes through before being routed to the right internal service |
 | **Service discovery** | How services find each other's network address automatically, instead of that address being hardcoded |
 | **Event-driven architecture** | Services communicate by announcing "this happened" (an event) rather than directly calling each other and waiting for a response |
-| **Saga** | A way to keep data consistent across multiple services without a single database transaction spanning all of them — each step reacts to the previous one, and failures trigger compensating actions (refunds, releases) |
+| **Saga** | A way to keep data consistent across multiple services without a single database transaction spanning all of them — each step reacts to the previous one, and failures trigger compensating actions |
 | **Choreography vs. orchestration** | Choreography: each service reacts independently to events, no one's in charge (used here). Orchestration: one central coordinator tells every other service what to do next |
-| **CQRS** (Command Query Responsibility Segregation) | Using a different, optimized data model for writing data than for reading it |
+| **CQRS** | Using a different, optimized data model for writing data than for reading it |
 | **Circuit breaker** | A safety mechanism that stops calling a struggling downstream service for a while, instead of hammering it with requests that will just fail anyway |
-| **Eventual consistency** | Different parts of the system will agree on the current state *eventually*, not necessarily the instant something changes — the tradeoff microservices make in exchange for independence |
-| **JWT (JSON Web Token)** | A signed, tamper-proof token that proves who a user is and what they're allowed to do, without the server needing to look anything up |
+| **Eventual consistency** | Different parts of the system will agree on the current state *eventually*, not necessarily the instant something changes |
+| **JWT (JSON Web Token)** | A signed, tamper-proof token that proves who a user is and what they're allowed to do |
 | **OAuth2 / OIDC** | Industry-standard protocols for "let a user log in once, and have every service trust that login" |
-| **GitOps** | Deploying software by having a system continuously match a live environment to what's declared in a git repository, instead of a human running deploy commands |
-| **CI/CD** (Continuous Integration / Continuous Delivery) | Automatically testing every code change (CI) and automatically getting validated changes into an environment (CD), instead of manual builds and deploys |
-| **Container** | A packaged application plus everything it needs to run, isolated from the host machine — the same container runs identically anywhere |
-| **Kubernetes (k8s)** | A system that runs and manages containers across a cluster of machines — restarting crashed ones, scaling up/down, routing traffic |
-| **Namespace (k8s)** | A way to partition one Kubernetes cluster into isolated sections — this project uses separate namespaces for production vs. QA |
+| **GitOps** | Deploying software by having a system continuously match a live environment to what's declared in a git repository |
+| **CI/CD** | Automatically testing every code change (CI) and automatically getting validated changes into an environment (CD) |
+| **Container** | A packaged application plus everything it needs to run, isolated from the host machine |
+| **Kubernetes (k8s)** | A system that runs and manages containers across a cluster of machines |
+| **Namespace (k8s)** | A way to partition one Kubernetes cluster into isolated sections |
 | **Pod (k8s)** | The smallest deployable unit in Kubernetes — usually one container, sometimes a container plus a small helper ("sidecar") |
-| **Observability** | The general ability to understand what's happening inside a running system from the outside — usually broken into metrics, logs, and traces |
-| **Metrics** | Numbers over time (request count, CPU usage, error rate) — good for "is something wrong right now" |
+| **Observability** | The general ability to understand what's happening inside a running system from the outside |
+| **Metrics** | Numbers over time — good for "is something wrong right now" |
 | **Logs** | Timestamped text records of what a program did — good for "what exactly happened" |
-| **Distributed tracing** | Following a single request as it travels across multiple services, to see where time was spent |
-| **Continuous profiling** | Always-on sampling of exactly which code is consuming CPU, without manually attaching a profiler |
-| **Load testing** | Deliberately sending a lot of traffic at a system to see how it behaves under pressure |

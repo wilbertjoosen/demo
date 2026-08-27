@@ -70,7 +70,8 @@ public class ProductImportJobConfig {
                                    FlatFileItemReader<ProductCsvRow> reader, ItemProcessor<ProductCsvRow, Product> processor,
                                    ItemWriter<Product> writer) {
         return new StepBuilder("productImportStep", jobRepository)
-                .<ProductCsvRow, Product>chunk(5, transactionManager)
+                .<ProductCsvRow, Product>chunk(5)
+                .transactionManager(transactionManager)
                 .reader(reader)
                 .processor(processor)
                 .writer(writer)

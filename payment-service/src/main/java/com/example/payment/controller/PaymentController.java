@@ -1,6 +1,8 @@
 package com.example.payment.controller;
 
 import com.example.common.model.PaymentMethod;
+import com.example.payment.dto.GatewayAvailabilityRequest;
+import com.example.payment.dto.RejectPaymentRequest;
 import com.example.payment.model.Payment;
 import com.example.payment.model.PaymentModelAssembler;
 import com.example.payment.service.PaymentProofStorageService;
@@ -70,7 +72,7 @@ public class PaymentController {
                     .contentType(MediaTypeFactory.getMediaType(resource).orElse(MediaType.APPLICATION_OCTET_STREAM))
                     .header(HttpHeaders.CACHE_CONTROL, "private, max-age=31536000, immutable")
                     .body(resource);
-        } catch (MalformedURLException e) {
+        } catch (MalformedURLException _) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
     }
@@ -79,9 +81,6 @@ public class PaymentController {
     @GetMapping("/methods")
     public Map<PaymentMethod, Boolean> methods() {
         return paymentService.availableMethods();
-    }
-
-    public record GatewayAvailabilityRequest(boolean available) {
     }
 
     /** Admin-only: force a method's mock gateway up/down to demonstrate the unavailable path. */
@@ -106,9 +105,6 @@ public class PaymentController {
     public ResponseEntity<Void> approve(@PathVariable String id) {
         paymentService.approve(id);
         return ResponseEntity.noContent().build();
-    }
-
-    public record RejectPaymentRequest(String reason) {
     }
 
     /** Rejects a BANK_TRANSFER/CASH payment sitting in AWAITING_REVIEW — triggers the same compensation path a declined charge would. */
