@@ -30,14 +30,20 @@ spec:
           resources:
             requests: { cpu: "50m", memory: "64Mi" }
             limits: { cpu: "250m", memory: "192Mi" }
+          # startupProbe gates liveness during boot; liveness failureThreshold raised so a brief
+          # blip under a mass-rollout CPU spike doesn't SIGTERM the pod. tcpSocket is already cheap.
+          startupProbe:
+            tcpSocket: { port: 8200 }
+            failureThreshold: 30
+            periodSeconds: 5
           readinessProbe:
             tcpSocket: { port: 8200 }
             initialDelaySeconds: 5
             periodSeconds: 10
           livenessProbe:
             tcpSocket: { port: 8200 }
-            initialDelaySeconds: 15
             periodSeconds: 20
+            failureThreshold: 6
 ---
 apiVersion: v1
 kind: Service
