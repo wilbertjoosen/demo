@@ -385,13 +385,13 @@ against this same stack if you need it.
 
 ```bash
 k3d cluster create demo --servers 1 --agents 2 -p "18090:80@loadbalancer" -p "18453:443@loadbalancer" -p "8081:8081@loadbalancer" -p "9080:9080@loadbalancer" -p "9443:9443@loadbalancer" --api-port 6550
-kubectl apply -R -f k8s/platform/ -R -f k8s/demo/
+kubectl apply -k k8s
 ```
 
-> `k8s/` is split into `platform/` (namespaces + shared `infra` + `monitoring`), `demo/` (the app
-> tier, `namespace: demo`), and — on the `testing` branch — `demo-qa/` (the same apps,
-> `namespace: demo-qa`). `-R` because manifests live in subdirectories now. See
-> [`k8s/RESTRUCTURE.md`](k8s/RESTRUCTURE.md).
+> `k8s/` is a Kustomize tree: `k8s/kustomization.yaml` aggregates `platform/` (namespaces + shared
+> `infra` + `monitoring`) and `demo/` (the app tier, `namespace: demo`). The `testing` branch adds
+> `k8s/demo-qa/` — a thin overlay of `demo/` (a `namespace: demo-qa` transformer + QA image tags +
+> a few patches), not a second copy. See [`k8s/RESTRUCTURE.md`](k8s/RESTRUCTURE.md).
 
 > If you already have a local `demo` cluster from before Rancher moved in-cluster, the two new
 > `9080`/`9443` port mappings can only be set at cluster creation — `k3d cluster delete demo` and
@@ -416,7 +416,7 @@ cross-namespace DNS (`<service>.infra.svc.cluster.local`, see `k8s/demo/configma
 - **`-p "8081:8081@loadbalancer"` is load-bearing, not optional**: every service's
   `KEYCLOAK_ISSUER_URI` (and the frontend's) is hardcoded to `http://localhost:8081`, so in-cluster
   Keycloak has to keep answering there too — see `k8s/platform/infra/keycloak.yaml`'s comment for the full reasoning.
-- **the `kubectl apply -R -f k8s/…` above is a one-time bootstrap** — from then on, ArgoCD watches the repo
+- **the `kubectl apply -k k8s` above is a one-time bootstrap** — from then on, ArgoCD watches the repo
   and CI/CD (see [The path to production](#the-path-to-production-every-gate-explained)) handles
   building, pushing to GHCR, and bumping the manifests ArgoCD syncs. There's no `k3d image import`
   step in the normal flow, since images live in a real registry now.

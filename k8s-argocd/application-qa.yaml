@@ -3,11 +3,12 @@
 # of main. Not applied by the demo-qa namespace's own kubectl apply — this is ArgoCD's own
 # Application CR, applied once into the argocd namespace to tell it what to sync and from where.
 #
-# PENDING (k8s/RESTRUCTURE.md step 5): once the testing branch adopts the folder split, this
-# becomes `path: k8s/demo-qa` with `directory: { recurse: true }` — the QA app tier only. Shared
-# infra + monitoring stay owned by application.yaml's `demo` Application (k8s/platform/**), which
-# this Application must not re-sync. Left as `path: k8s` for now so it keeps working against
-# testing's still-flat layout until that migration lands.
+# PENDING (k8s/RESTRUCTURE.md step 3): once the testing branch adopts the layout, this becomes
+# `path: k8s/demo-qa` — a Kustomize overlay of k8s/demo (namespace: demo-qa transformer + QA image
+# tags + a few patches), the QA app tier only. Shared infra + monitoring stay owned by
+# application.yaml's `demo` Application (k8s/platform/**), which this Application must not re-sync.
+# Left as `path: k8s` for now so it keeps working against testing's still-flat layout until that
+# migration lands.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
