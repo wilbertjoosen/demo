@@ -1,0 +1,43 @@
+# No runtime env vars — Vite bakes VITE_* into the build (frontend/.env.production), since the SPA
+# runs in the user's own browser on the host regardless of how the backend is deployed.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: demo
+  labels: { app: frontend }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: frontend } }
+  template:
+    metadata: { labels: { app: frontend } }
+    spec:
+      imagePullSecrets:
+        - name: ghcr-pull-secret
+      containers:
+        - name: frontend
+          image: ghcr.io/wilbertjoosen/demo-frontend:1.0.7-6a4b09a
+          imagePullPolicy: Always
+          ports: [{ containerPort: 80 }]
+          resources:
+            requests: { cpu: "100m", memory: "128Mi" }
+            limits: { cpu: "500m", memory: "256Mi" }
+          # Plain nginx, no actuator — a static-asset GET of "/" is as good a health signal as this
+          # container has (nginx itself either serves it or isn't up).
+          readinessProbe:
+            httpGet: { path: /, port: 80 }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /, port: 80 }
+            initialDelaySeconds: 10
+            periodSeconds: 15
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: demo
+spec:
+  selector: { app: frontend }
+  ports: [{ name: http, port: 80, targetPort: 80 }]
