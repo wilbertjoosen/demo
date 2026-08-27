@@ -1,13 +1,13 @@
 package com.example.reporting;
+import com.example.reporting.config.ReportingTopology;
+import com.example.reporting.model.OrderMetric;
+import com.example.reporting.model.ProductRef;
+import com.example.reporting.model.UserRegistration;
 
 import com.example.common.events.DomainEvent;
 import com.example.common.events.EventContracts;
 import com.example.common.events.EventTypes;
 import com.example.common.events.Topics;
-import com.example.reporting.config.ReportingTopology;
-import com.example.reporting.model.OrderMetric;
-import com.example.reporting.model.ProductRef;
-import com.example.reporting.model.UserRegistration;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.StreamsConfig;

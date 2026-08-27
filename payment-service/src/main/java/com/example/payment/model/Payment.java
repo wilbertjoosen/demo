@@ -1,8 +1,8 @@
 package com.example.payment.model;
+import com.example.payment.enums.PaymentStatus;
 
 import com.example.common.model.PaymentMethod;
 import com.example.common.model.ShippingCarrier;
-import com.example.payment.enums.PaymentStatus;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedBy;

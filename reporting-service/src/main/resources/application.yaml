@@ -1,5 +1,8 @@
 server:
-  port: 8095
+  # Not 8095 (k8s/reporting-service.yaml's in-cluster port) — that collides with kafka-ui's own
+  # host port in this branch's docker-compose.yml. Not 8096 either anymore — that now collides
+  # with common-service's bundled default. 8097 is free of both.
+  port: 8097
 
 spring:
   application:
@@ -27,8 +30,8 @@ eureka:
     prefer-ip-address: false
 
 keycloak:
-  issuer-uri: ${KEYCLOAK_ISSUER_URI:http://keycloak.localhost:8181/realms/demo}
-  jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://keycloak.localhost:8181/realms/demo/protocol/openid-connect/certs}
+  issuer-uri: ${KEYCLOAK_ISSUER_URI:http://keycloak.localhost:8081/realms/demo}
+  jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://keycloak.localhost:8081/realms/demo/protocol/openid-connect/certs}
 
 management:
   endpoint:

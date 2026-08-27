@@ -1,6 +1,6 @@
 package com.example.chat.repository;
-
 import com.example.chat.model.DirectMessage;
+
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
 

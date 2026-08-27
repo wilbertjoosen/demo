@@ -1,9 +1,9 @@
 package com.example.order.model;
+import com.example.order.enums.OrderStatus;
 
 import com.example.common.model.Address;
 import com.example.common.model.PaymentMethod;
 import com.example.common.model.ShippingCarrier;
-import com.example.order.enums.OrderStatus;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;

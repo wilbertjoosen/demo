@@ -1,10 +1,10 @@
 package com.example.chat.service;
-
 import com.example.chat.model.Conversation;
 import com.example.chat.model.ConversationSummary;
 import com.example.chat.model.DirectMessage;
 import com.example.chat.repository.ConversationRepository;
 import com.example.chat.repository.DirectMessageRepository;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;

@@ -1,5 +1,4 @@
 package com.example.chat.service;
-
 import com.example.chat.model.ChatMessage;
 
 import java.util.List;

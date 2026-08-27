@@ -1,8 +1,8 @@
 package com.example.comment;
-
 import com.example.comment.model.Comment;
 import com.example.comment.repository.CommentRepository;
 import com.example.comment.service.CommentServiceImpl;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

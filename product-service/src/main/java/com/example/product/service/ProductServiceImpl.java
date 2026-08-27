@@ -1,10 +1,10 @@
 package com.example.product.service;
+import com.example.product.model.Product;
+import com.example.product.repository.ProductRepository;
 
 import com.example.common.events.DomainEvent;
 import com.example.common.events.EventTypes;
 import com.example.common.events.Topics;
-import com.example.product.model.Product;
-import com.example.product.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;

@@ -1,4 +1,9 @@
 package com.example.order.service;
+import com.example.order.enums.OrderStatus;
+import com.example.order.model.Order;
+import com.example.order.model.OrderView;
+import com.example.order.repository.OrderRepository;
+import com.example.order.repository.OrderViewRepository;
 
 import com.example.common.events.DomainEvent;
 import com.example.common.events.EventTypes;
@@ -6,11 +11,6 @@ import com.example.common.events.Topics;
 import com.example.common.model.Address;
 import com.example.common.model.PaymentMethod;
 import com.example.common.model.ShippingCarrier;
-import com.example.order.enums.OrderStatus;
-import com.example.order.model.Order;
-import com.example.order.model.OrderView;
-import com.example.order.repository.OrderRepository;
-import com.example.order.repository.OrderViewRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
@@ -40,7 +40,7 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional
     public Order placeOrder(String keycloakUserId, String email, String productId, int quantity, Address shippingAddress,
-                            PaymentMethod paymentMethod, ShippingCarrier shippingCarrier) {
+                             PaymentMethod paymentMethod, ShippingCarrier shippingCarrier) {
         boolean reserved = inventoryServiceClient.reserve(productId, quantity);
         if (!reserved) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, message("order.insufficientStock"));

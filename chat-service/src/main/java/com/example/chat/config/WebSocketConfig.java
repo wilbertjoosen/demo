@@ -1,9 +1,9 @@
 package com.example.chat.config;
-
 import com.example.chat.websocket.ChatHandshakeInterceptor;
 import com.example.chat.websocket.ChatWebSocketHandler;
 import com.example.chat.websocket.DirectMessageHandshakeInterceptor;
 import com.example.chat.websocket.DirectMessageWebSocketHandler;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.socket.config.annotation.EnableWebSocket;

@@ -1,8 +1,8 @@
 package com.example.chat.controller;
-
 import com.example.chat.model.ChatMessage;
 import com.example.chat.model.ChatModelAssembler;
 import com.example.chat.service.ChatService;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.hateoas.CollectionModel;
 import org.springframework.hateoas.EntityModel;

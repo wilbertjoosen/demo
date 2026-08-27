@@ -1,7 +1,7 @@
 package com.example.chat.service;
-
 import com.example.chat.model.ChatMessage;
 import com.example.chat.repository.ChatMessageRepository;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
