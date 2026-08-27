@@ -1,0 +1,37 @@
+# k3d ships Traefik as its default ingress controller — no separate install needed.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: demo-ingress
+  namespace: demo
+spec:
+  rules:
+    - host: demo.localhost
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service: { name: gateway-service, port: { number: 8080 } }
+          # Same-origin health probe for the frontend's useBackendHealth composable — actuator
+          # isn't under /api (Spring Boot serves it at the app root), so it needs its own rule.
+          - path: /actuator
+            pathType: Prefix
+            backend:
+              service: { name: gateway-service, port: { number: 8080 } }
+          # Direct-message and notification WebSockets bypass gateway-service entirely (it has no
+          # route for either — see its own application.yaml comment), so they need their own
+          # ingress rules straight to each owning service. Traefik proxies the upgrade transparently
+          # through a plain path rule, no special annotation needed.
+          - path: /ws/conversations
+            pathType: Prefix
+            backend:
+              service: { name: chat-service, port: { number: 8094 } }
+          - path: /ws/notifications
+            pathType: Prefix
+            backend:
+              service: { name: notification-service, port: { number: 8085 } }
+          - path: /
+            pathType: Prefix
+            backend:
+              service: { name: frontend, port: { number: 80 } }

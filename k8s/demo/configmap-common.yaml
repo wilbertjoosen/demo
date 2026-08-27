@@ -1,0 +1,75 @@
+# Shared by every app Deployment via envFrom.configMapRef.
+#
+# Kafka, Redis, MySQL, Keycloak, Mailpit, Vault, MongoDB, and Elasticsearch now all run IN this
+# cluster (k8s/kafka.yaml, k8s/redis.yaml, k8s/mysql.yaml, k8s/keycloak.yaml, k8s/mailpit.yaml,
+# k8s/vault.yaml, k8s/mongo.yaml, k8s/elasticsearch.yaml) instead of on the host — the
+# corresponding docker-compose.yml containers still exist for host-JVM debugging (kcat, redis-cli,
+# mysql client, a local IDE run) but the cluster itself no longer depends on any of them. The
+# demo-qa namespace (testing branch) reaches these same in-cluster instances cross-namespace (e.g.
+# mysql.demo.svc.cluster.local) rather than getting its own copies — all of these were already
+# shared between prod and QA on the host (same instance, separate DB/realm/index names)
+# specifically to avoid running two of everything on one machine; this preserves that. Mailpit
+# stays genuinely separate per namespace, also matching the host setup.
+#
+# KEYCLOAK_ISSUER_URI stays http://localhost:8081 deliberately — every service's `iss` claim
+# validation needs that exact string, browser or server-to-server alike (see k8s/keycloak.yaml's
+# comment for the full reasoning, including why the k3d cluster now needs
+# `-p "8081:8081@loadbalancer"` at creation time). KEYCLOAK_JWK_SET_URI/TOKEN_URI/ADMIN_URI instead
+# go straight through the cluster (faster, and no host round-trip needed) — only the issuer itself
+# has to be the externally-reachable address.
+#
+# Grafana/Loki/Prometheus/Tempo are now all in-cluster too (k8s/grafana.yaml, k8s/loki.yaml,
+# k8s/prometheus.yaml, k8s/tempo.yaml) — docker-compose.yml no longer runs any of them, so
+# OTLP_ENDPOINT below points at the in-cluster Tempo like everything else here, not the host.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: demo-common-config
+  namespace: demo
+data:
+  CONFIG_SERVER_URI: http://config-server:8888
+  EUREKA_URI: http://eureka-server:8761/eureka
+  KAFKA_BOOTSTRAP_SERVERS: kafka.infra.svc.cluster.local:9092
+  KEYCLOAK_ISSUER_URI: http://localhost:8081/realms/demo
+  KEYCLOAK_JWK_SET_URI: http://keycloak.infra.svc.cluster.local:8080/realms/demo/protocol/openid-connect/certs
+  KEYCLOAK_TOKEN_URI: http://keycloak.infra.svc.cluster.local:8080/realms/demo/protocol/openid-connect/token
+  KEYCLOAK_ADMIN_URI: http://keycloak.infra.svc.cluster.local:8080/admin/realms/demo
+  # 3-node replica set (task #74), now in-cluster (k8s/mongo.yaml) — each member's own stable
+  # per-pod DNS name via the headless Service, no host.docker.internal indirection needed anymore.
+  MONGO_HOST: mongo-0.mongo-headless.infra.svc.cluster.local:27017,mongo-1.mongo-headless.infra.svc.cluster.local:27017,mongo-2.mongo-headless.infra.svc.cluster.local:27017
+  MONGO_REPLICA_SET_PARAM: "?replicaSet=rs0"
+  REDIS_HOST: redis.infra.svc.cluster.local
+  REDIS_PORT: "6379"
+  ELASTICSEARCH_URI: http://elasticsearch.infra.svc.cluster.local:9200
+  DB_HOST: mysql.infra.svc.cluster.local
+  DB_PORT: "3306"
+  DB_NAME: demo
+  MAIL_HOST: mailpit.infra.svc.cluster.local
+  MAIL_PORT: "1025"
+  INVENTORY_SERVICE_URI: http://inventory-service:8089
+  CORS_ALLOWED_ORIGINS: http://localhost:5173,http://demo.localhost:18090
+  # In-cluster Tempo's OTLP/HTTP receiver (k8s/tempo.yaml) — see config-server's
+  # config-repo/application.yml for how every service picks this up.
+  OTLP_ENDPOINT: http://tempo.monitoring.svc.cluster.local:4318/v1/traces
+  # config-repo/application.yml defaults span export OFF (no collector on the host-JVM dev flow) —
+  # turn it back on here, where Tempo is reachable at OTLP_ENDPOINT above.
+  TRACING_EXPORT_OTLP_ENABLED: "true"
+  # In-cluster Pyroscope (k8s/pyroscope.yaml) — every service's Java agent (bundled in
+  # Dockerfile.service, PYROSCOPE_APPLICATION_NAME derived there from $HOSTNAME) pushes continuous
+  # profiles here directly, same push-based reasoning as Tempo above.
+  PYROSCOPE_SERVER_ADDRESS: http://pyroscope.monitoring.svc.cluster.local:4040
+  # PYROSCOPE_PROFILER_TYPE=JFR (2026-08-25) — io.pyroscope:agent:2.1.2's default profilerType,
+  # ASYNC, delegates to a bundled async-profiler native library that SIGSEGVs immediately on this
+  # cluster's JDK 26 + linux/arm64 combination (Recording::writeCpool native crash, confirmed on
+  # testing/demo-qa — see git history around 2026-08-25 for the incident). JFR instead delegates to
+  # the JDK's own built-in Flight Recorder — pure JVM, no native library — verified end-to-end on
+  # demo-qa (all 18 services re-enabled and profiling cleanly under JFR) before porting here. Lower
+  # sampling resolution than async-profiler, but that trade-off is what unblocks profiling at all.
+  PYROSCOPE_PROFILER_TYPE: JFR
+  # Task #75, real secrets management — Vault dev-mode instance, single node (no topology
+  # discovery needed, unlike Mongo's replica set), now in-cluster (k8s/vault.yaml). The token
+  # itself is sensitive and lives in the vault-token k8s Secret (created imperatively per-namespace,
+  # not committed — same pattern as ghcr-pull-secret) — it must match k8s/vault.yaml's fixed dev
+  # root token.
+  VAULT_HOST: vault.infra.svc.cluster.local
+  VAULT_PORT: "8200"

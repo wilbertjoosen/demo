@@ -9,13 +9,13 @@
 # (K8S_INFRASTRUCTURE in local-infra.sh is empty). NOT docker-compose's app containers either
 # (Option B's full-docker-compose-stack mode — irrelevant here, the cluster runs its own pods) and
 # NOT the dev-only pieces docker-compose also happens to host: Kafka, Redis, MySQL, Keycloak,
-# Mailpit, MongoDB, and Elasticsearch all now run in-cluster (k8s/kafka.yaml, k8s/redis.yaml,
-# k8s/mysql.yaml, k8s/keycloak.yaml, k8s/mailpit.yaml, k8s/mongo.yaml, k8s/elasticsearch.yaml) — the
+# Mailpit, MongoDB, and Elasticsearch all now run in-cluster (k8s/platform/infra/kafka.yaml, k8s/platform/infra/redis.yaml,
+# k8s/platform/infra/mysql.yaml, k8s/platform/infra/keycloak.yaml, k8s/platform/infra/mailpit.yaml, k8s/platform/infra/mongo.yaml, k8s/platform/infra/elasticsearch.yaml) — the
 # docker-compose versions stay for the host-JVM/compose-flow dev loop specifically, wired to
 # host.docker.internal/localhost targets, same as every dev-only piece. Grafana/Prometheus/Loki/
 # Promtail/Kibana aren't in docker-compose.yml at all any more — every one of them already has an
-# in-cluster equivalent (k8s/grafana.yaml, k8s/prometheus.yaml, k8s/loki.yaml,
-# k8s/promtail-daemonset.yaml, k8s/kibana.yaml), so the host-compose copies were pure duplication
+# in-cluster equivalent (k8s/platform/monitoring/grafana.yaml, k8s/platform/monitoring/prometheus.yaml, k8s/platform/monitoring/loki.yaml,
+# k8s/platform/infra/promtail-daemonset.yaml, k8s/platform/monitoring/kibana.yaml), so the host-compose copies were pure duplication
 # regardless of which local dev flow you're using. Pass --with-dev to also start/stop the dev-only
 # set, e.g. if you're running start-local.sh's host-JVM services against the cluster at the same
 # time.

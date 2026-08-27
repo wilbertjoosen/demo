@@ -1,5 +1,14 @@
 # Not applied by the demo namespace's own kubectl apply — this is ArgoCD's own Application CR,
 # applied once into the argocd namespace to tell it what to sync and from where.
+#
+# `path: k8s` now resolves via Kustomize: k8s/kustomization.yaml lists `platform` + `demo`
+# (each its own kustomization.yaml), so this one Application owns:
+#   k8s/demo/**      — the app tier, namespace: demo
+#   k8s/platform/**  — namespaces + shared infra (namespace: infra) + monitoring (namespace: monitoring),
+#                      one cluster-wide copy the demo-qa Application deliberately does NOT re-sync
+# k8s/demo-qa is not referenced by k8s/kustomization.yaml, so this Application never renders it —
+# that overlay is owned by application-qa.yaml (targetRevision: testing). No `directory:` block:
+# ArgoCD auto-detects the Kustomization and uses the Kustomize renderer.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
