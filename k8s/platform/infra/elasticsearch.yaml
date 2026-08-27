@@ -37,14 +37,23 @@ spec:
           resources:
             requests: { cpu: "500m", memory: "1Gi" }
             limits: { cpu: "1500m", memory: "1536Mi" }
+          # startupProbe gates liveness until ES is up; liveness gets an explicit timeout (default
+          # 1s — /_cluster/health can take longer than that under a mass-rollout CPU spike, and a
+          # timed-out liveness probe SIGTERMs the pod). 40 x 10s = ~6.5 min boot budget.
+          startupProbe:
+            httpGet: { path: /_cluster/health, port: 9200 }
+            failureThreshold: 40
+            periodSeconds: 10
           readinessProbe:
             httpGet: { path: /_cluster/health, port: 9200 }
             initialDelaySeconds: 30
             periodSeconds: 10
+            timeoutSeconds: 5
           livenessProbe:
             httpGet: { path: /_cluster/health, port: 9200 }
-            initialDelaySeconds: 60
             periodSeconds: 20
+            timeoutSeconds: 10
+            failureThreshold: 6
   volumeClaimTemplates:
     - metadata:
         name: data
