@@ -14,4 +14,6 @@ public interface UserRepository extends MongoRepository<User, String> {
     List<User> findByDeletedFalse();
 
     Optional<User> findByIdAndDeletedFalse(String id);
+
+    Optional<User> findByNationalIdAndDeletedFalse(String nationalId);
 }
