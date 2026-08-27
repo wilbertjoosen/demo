@@ -1,16 +1,13 @@
 package com.example.order.controller;
 
+import com.example.order.dto.PlaceOrderRequest;
 import com.example.order.model.Order;
 import com.example.order.model.OrderView;
 import com.example.order.model.OrderViewModelAssembler;
 import com.example.order.service.OrderService;
 
 import com.example.common.model.Address;
-import com.example.common.model.PaymentMethod;
-import com.example.common.model.ShippingCarrier;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.hateoas.CollectionModel;
@@ -30,14 +27,6 @@ public class OrderController {
 
     private final OrderService orderService;
     private final OrderViewModelAssembler assembler;
-
-    public record PlaceOrderRequest(
-            @NotBlank String productId,
-            @Min(1) int quantity,
-            @NotNull @Valid Address shippingAddress,
-            @NotNull PaymentMethod paymentMethod,
-            @NotNull ShippingCarrier shippingCarrier) {
-    }
 
     @PostMapping
     public ResponseEntity<EntityModel<OrderView>> placeOrder(@AuthenticationPrincipal Jwt jwt,
