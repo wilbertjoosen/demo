@@ -45,18 +45,24 @@ spec:
           resources:
             requests: { cpu: "250m", memory: "512Mi" }
             limits: { cpu: "1", memory: "1Gi" }
-          # timeoutSeconds explicit (not the 1s default) — see k8s/mongo.yaml's comment; same
-          # exec-probe-under-1s-default fragility applies to any exec probe, not just mongosh.
+          # startupProbe + tcpSocket liveness — see k8s/platform/infra/mongo.yaml's comment. Under a
+          # mass-rollout CPU spike an exec probe (spawning mysqladmin) can't finish in time and
+          # kubelet SIGTERMs the pod; liveness now only checks the port is open, the real ping
+          # stays on readiness.
+          startupProbe:
+            tcpSocket: { port: 3306 }
+            failureThreshold: 30
+            periodSeconds: 10
           readinessProbe:
             exec: { command: ["mysqladmin", "ping", "-h", "localhost", "-uroot", "-p$(MYSQL_ROOT_PASSWORD)"] }
             initialDelaySeconds: 15
-            periodSeconds: 10
-            timeoutSeconds: 5
+            periodSeconds: 15
+            timeoutSeconds: 10
           livenessProbe:
-            exec: { command: ["mysqladmin", "ping", "-h", "localhost", "-uroot", "-p$(MYSQL_ROOT_PASSWORD)"] }
-            initialDelaySeconds: 30
+            tcpSocket: { port: 3306 }
             periodSeconds: 20
             timeoutSeconds: 5
+            failureThreshold: 6
   volumeClaimTemplates:
     - metadata:
         name: data

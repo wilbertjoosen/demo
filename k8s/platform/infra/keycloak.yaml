@@ -404,14 +404,23 @@ spec:
           resources:
             requests: { cpu: "250m", memory: "512Mi" }
             limits: { cpu: "1", memory: "1Gi" }
+          # startupProbe gates liveness until Keycloak has finished booting (realm import can be
+          # slow), and liveness gets an explicit timeout (default is 1s — a JVM under a
+          # mass-rollout CPU spike blows that and gets SIGTERM'd). 40 x 10s = ~6.5 min boot budget.
+          startupProbe:
+            httpGet: { path: /realms/demo, port: 8080 }
+            failureThreshold: 40
+            periodSeconds: 10
           readinessProbe:
             httpGet: { path: /realms/demo, port: 8080 }
             initialDelaySeconds: 30
             periodSeconds: 10
+            timeoutSeconds: 5
           livenessProbe:
             httpGet: { path: /realms/demo, port: 8080 }
-            initialDelaySeconds: 45
             periodSeconds: 20
+            timeoutSeconds: 10
+            failureThreshold: 6
       volumes:
         - name: data
           persistentVolumeClaim: { claimName: keycloak-data }

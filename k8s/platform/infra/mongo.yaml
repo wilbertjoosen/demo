@@ -50,16 +50,26 @@ spec:
           # jitter at all — the 1s default was causing genuine false-positive probe failures
           # (confirmed live: kubelet killing/restarting the pod on "command timed out" even though
           # the node's actual CPU/memory usage was low single digits, not real contention).
+          # startupProbe + tcpSocket liveness: a mass app rollout (every service restarting at once
+          # on this single node) spikes CPU enough that spawning mongosh can't finish inside any
+          # sane timeout — that was killing/restarting all three replicas at once, collapsing the
+          # replica set. Liveness now just checks the port is open (mongod alive); the real
+          # replica-set ping stays on readiness, which only pulls the pod from Service endpoints,
+          # it doesn't SIGTERM it.
+          startupProbe:
+            tcpSocket: { port: 27017 }
+            failureThreshold: 30
+            periodSeconds: 10
           readinessProbe:
             exec: { command: ["mongosh", "--quiet", "--eval", "db.runCommand({ping:1})"] }
             initialDelaySeconds: 10
-            periodSeconds: 10
-            timeoutSeconds: 5
+            periodSeconds: 15
+            timeoutSeconds: 10
           livenessProbe:
-            exec: { command: ["mongosh", "--quiet", "--eval", "db.runCommand({ping:1})"] }
-            initialDelaySeconds: 20
+            tcpSocket: { port: 27017 }
             periodSeconds: 20
             timeoutSeconds: 5
+            failureThreshold: 6
   volumeClaimTemplates:
     - metadata:
         name: data
