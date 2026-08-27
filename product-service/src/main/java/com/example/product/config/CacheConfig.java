@@ -7,7 +7,7 @@ import org.springframework.cache.interceptor.CacheErrorHandler;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.cache.RedisCacheConfiguration;
-import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
+import org.springframework.data.redis.serializer.GenericJacksonJsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializationContext;
 
 /**
@@ -22,7 +22,14 @@ public class CacheConfig implements CachingConfigurer {
     @Bean
     public RedisCacheConfiguration cacheConfiguration() {
         return RedisCacheConfiguration.defaultCacheConfig()
-                .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(new GenericJackson2JsonRedisSerializer()));
+                .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(
+                        GenericJacksonJsonRedisSerializer.builder()
+                                // Match the old no-arg GenericJackson2JsonRedisSerializer: write @class type
+                                // hints so arbitrary POJOs round-trip, and handle Spring Cache's NullValue
+                                // marker (defaultCacheConfig() caches nulls).
+                                .enableUnsafeDefaultTyping()
+                                .enableSpringCacheNullValueSupport()
+                                .build()));
     }
 
     /**

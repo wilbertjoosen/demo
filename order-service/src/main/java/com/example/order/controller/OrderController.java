@@ -1,16 +1,13 @@
 package com.example.order.controller;
 
-import com.example.common.model.Address;
-import com.example.common.model.PaymentMethod;
-import com.example.common.model.ShippingCarrier;
+import com.example.order.dto.PlaceOrderRequest;
+import com.example.order.dto.UpdateAddressRequest;
 import com.example.order.model.Order;
-import com.example.order.service.OrderService;
 import com.example.order.model.OrderView;
 import com.example.order.model.OrderViewModelAssembler;
+import com.example.order.service.OrderService;
+
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.hateoas.CollectionModel;
 import org.springframework.hateoas.EntityModel;
@@ -29,14 +26,6 @@ public class OrderController {
 
     private final OrderService orderService;
     private final OrderViewModelAssembler assembler;
-
-    public record PlaceOrderRequest(
-            @NotBlank String productId,
-            @Min(1) int quantity,
-            @NotNull @Valid Address shippingAddress,
-            @NotNull PaymentMethod paymentMethod,
-            @NotNull ShippingCarrier shippingCarrier) {
-    }
 
     @PostMapping
     public ResponseEntity<EntityModel<OrderView>> placeOrder(@AuthenticationPrincipal Jwt jwt,
@@ -61,9 +50,6 @@ public class OrderController {
     @PostMapping("/{id}/cancel")
     public EntityModel<OrderView> cancelOrder(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id) {
         return assembler.toModel(orderService.cancelOrder(jwt.getSubject(), id));
-    }
-
-    public record UpdateAddressRequest(@NotNull @Valid Address shippingAddress) {
     }
 
     /** Address-only — see OrderService#updateShippingAddress for why quantity isn't patchable here. */

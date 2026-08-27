@@ -1,10 +1,11 @@
 package com.example.comment.controller;
 
+import com.example.comment.dto.CreateCommentRequest;
+import com.example.comment.dto.UpdateCommentRequest;
 import com.example.comment.model.Comment;
 import com.example.comment.model.CommentModelAssembler;
 import com.example.comment.service.CommentService;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import org.springframework.hateoas.CollectionModel;
 import org.springframework.hateoas.EntityModel;
@@ -28,17 +29,11 @@ public class CommentController {
         return assembler.toCollectionModel(commentService.listByProduct(productId));
     }
 
-    public record CreateCommentRequest(@NotBlank String productId, String parentId, @NotBlank String body) {
-    }
-
     @PostMapping
     public ResponseEntity<EntityModel<Comment>> create(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody CreateCommentRequest request) {
         String authorName = jwt.getClaimAsString("preferred_username");
         Comment created = commentService.create(request.productId(), request.parentId(), jwt.getSubject(), authorName, request.body());
         return ResponseEntity.status(201).body(assembler.toModel(created));
-    }
-
-    public record UpdateCommentRequest(@NotBlank String body) {
     }
 
     @PutMapping("/{id}")

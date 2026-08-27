@@ -1,0 +1,298 @@
+# In-cluster Keycloak for the demo namespace. This branch has no demo-qa counterpart namespace
+# (that only exists on the testing/main branches — see their own k8s/keycloak.yaml for the
+# two-realm/cross-namespace-sharing model used there), so the realm-import ConfigMap below only
+# embeds docker/keycloak/realm-demo.json.
+#
+# THE hostPort/nodeSelector BELOW ARE LOAD-BEARING, NOT COSMETIC: every service's
+# KEYCLOAK_ISSUER_URI (and the frontend's) is hardcoded to http://localhost:8081 — the `iss` claim
+# Keycloak puts in every token has to equal that exact string for every service's
+# JwtIssuerValidator to accept it, browser or server-to-server alike (see docker-compose.yml's own
+# keycloak comment for the full reasoning; KC_HOSTNAME below is what fixes the issuer to that
+# value regardless of which URL actually reached this pod). The k3d cluster is created with
+# `-p "8081:8081@loadbalancer"` specifically for this (see README's Kubernetes/GitOps section) —
+# k3d's loadbalancer forwards host:8081 to port 8081 on every node, so this Deployment binds
+# hostPort 8081 and is pinned (nodeSelector) to k3d-demo-server-0 specifically, so there's always
+# exactly one real listener for the loadbalancer to reach rather than a 1-in-3 chance of hitting a
+# node with nothing bound there. Other in-cluster pods reach Keycloak directly via the ClusterIP
+# Service on its normal port 8080 instead (see k8s/configmap-common.yaml's KEYCLOAK_JWK_SET_URI/
+# TOKEN_URI/ADMIN_URI) — only KEYCLOAK_ISSUER_URI itself needs the external, browser-reachable
+# localhost:8081 address; everything else is more efficient going straight through the cluster.
+#
+# PVC-backed (not emptyDir): Keycloak's own H2 database holds any user/session state created at
+# runtime beyond what the realm-import JSON seeds — losing it on every pod restart would be a real
+# regression from how the host container behaved (implicitly persisted via the container's own
+# writable layer, as long as it wasn't recreated).
+apiVersion: v1
+data:
+  realm-demo.json: |
+    {
+      "realm": "demo",
+      "enabled": true,
+      "displayName": "Demo",
+      "loginTheme": "demo",
+      "sslRequired": "none",
+      "roles": {
+        "realm": [
+          { "name": "user", "description": "Regular authenticated user" },
+          { "name": "admin", "description": "Full administrative access — superset of every domain role below" },
+          { "name": "finance", "description": "Payment/refund administration: gateway availability toggles, payment record deletion" },
+          { "name": "product_manager", "description": "Product catalog administration: create/update/delete products, batch import" },
+          { "name": "shipping_manager", "description": "Shipment administration: carrier/tracking record deletion" },
+          { "name": "inventory_manager", "description": "Inventory administration: stock adjustments, warehouse reservations" }
+        ]
+      },
+      "clients": [
+        {
+          "clientId": "demo-spa",
+          "enabled": true,
+          "publicClient": true,
+          "protocol": "openid-connect",
+          "redirectUris": ["http://localhost:5173/*", "http://demo.localhost:18090/*"],
+          "webOrigins": ["http://localhost:5173", "http://demo.localhost:18090"],
+          "standardFlowEnabled": true,
+          "directAccessGrantsEnabled": true,
+          "attributes": { "pkce.code.challenge.method": "S256" }
+        },
+        {
+          "clientId": "order-service-client",
+          "enabled": true,
+          "publicClient": false,
+          "secret": "order-service-secret",
+          "protocol": "openid-connect",
+          "standardFlowEnabled": false,
+          "directAccessGrantsEnabled": false,
+          "serviceAccountsEnabled": true,
+          "description": "Machine-to-machine client_credentials client — order-service uses this to call inventory-service"
+        },
+        {
+          "clientId": "user-service-admin-client",
+          "enabled": true,
+          "publicClient": false,
+          "secret": "user-service-admin-secret",
+          "protocol": "openid-connect",
+          "standardFlowEnabled": false,
+          "directAccessGrantsEnabled": false,
+          "serviceAccountsEnabled": true,
+          "description": "Machine-to-machine client_credentials client — user-service uses this to read (and admin-create) usernames/emails/names via Keycloak's own Admin REST API instead of duplicating them in Mongo"
+        }
+      ],
+      "users": [
+        {
+          "username": "demo",
+          "enabled": true,
+          "email": "demo@example.com",
+          "emailVerified": true,
+          "firstName": "Demo",
+          "lastName": "User",
+          "credentials": [
+            {
+              "type": "password",
+              "value": "demo",
+              "temporary": false
+            }
+          ],
+          "realmRoles": ["offline_access", "uma_authorization", "user"]
+        },
+        {
+          "username": "admin",
+          "enabled": true,
+          "email": "admin@example.com",
+          "emailVerified": true,
+          "firstName": "Admin",
+          "lastName": "User",
+          "credentials": [
+            {
+              "type": "password",
+              "value": "admin",
+              "temporary": false
+            }
+          ],
+          "realmRoles": ["offline_access", "uma_authorization", "user", "admin"],
+          "clientRoles": {
+            "realm-management": ["impersonation"]
+          }
+        },
+        {
+          "username": "manager",
+          "enabled": true,
+          "email": "manager@example.com",
+          "emailVerified": true,
+          "firstName": "Ops",
+          "lastName": "Manager",
+          "credentials": [
+            {
+              "type": "password",
+              "value": "manager",
+              "temporary": false
+            }
+          ],
+          "realmRoles": ["offline_access", "uma_authorization", "user", "finance", "product_manager", "shipping_manager", "inventory_manager"]
+        },
+        {
+          "username": "service-account-user-service-admin-client",
+          "enabled": true,
+          "serviceAccountClientId": "user-service-admin-client",
+          "clientRoles": {
+            "realm-management": ["view-users", "manage-users", "query-users"]
+          }
+        }
+      ]
+    }
+kind: ConfigMap
+metadata:
+  name: keycloak-realm-import
+  namespace: infra
+---
+# "demo" login theme — see docker/keycloak/themes/demo (same files, mounted here via ConfigMap
+# instead of a bind mount) for the theme's own reasoning comment. `items:` reconstructs the
+# theme's on-disk subdirectory layout (theme.properties at login/, styles.css one level deeper
+# at login/resources/css/) from this single ConfigMap's two flat keys.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: keycloak-theme-demo
+  namespace: infra
+data:
+  theme.properties: |
+    parent=keycloak.v2
+    import=common/keycloak
+
+    styles=css/styles.css
+  styles.css: |
+    @import url("../../keycloak.v2/css/styles.css");
+
+    /* !important below is load-bearing: PatternFly v5 ships a zero-specificity
+       `:where(.pf-v5-theme-dark) { ... }` block that redefines these same --pf-v5-global--*
+       variables for dark mode, and it wins a specificity tie against a plain :root rule on
+       source order alone. !important is the only thing that isn't out-specificity'd by that
+       block, since PatternFly's own variable definitions never use !important. Confirmed live
+       in a real dark-mode browser session: without this, the button/link/focus colors silently
+       reverted to PatternFly's defaults while every other selector in this file still worked. */
+    :root {
+        --pf-v5-global--primary-color--100: #409eff !important;
+        --pf-v5-global--primary-color--200: #3a8ee6 !important;
+        --pf-v5-global--primary-color--300: #409eff !important;
+        --pf-v5-global--primary-color--400: #ffffff !important;
+        --pf-v5-global--primary-color--light-100: #409eff !important;
+        --pf-v5-global--primary-color--dark-100: #409eff !important;
+        --pf-v5-global--link--Color: #409eff !important;
+        --pf-v5-global--link--Color--hover: #3a8ee6 !important;
+        --pf-v5-global--link--Color--light: #409eff !important;
+        --pf-v5-global--link--Color--light--hover: #3a8ee6 !important;
+        --pf-v5-global--link--Color--dark: #409eff !important;
+        --pf-v5-global--link--Color--dark--hover: #3a8ee6 !important;
+        --keycloak-card-top-color: #409eff !important;
+    }
+
+    .login-pf body {
+        background: linear-gradient(160deg, #ecf5ff 0%, #ffffff 55%);
+    }
+
+    /* This theme is light-only by design — PatternFly's dark theme reassigns the login card, form
+       controls, and header/footer text to component-scoped variables that bypass the
+       --pf-v5-global--* tokens above entirely, so token overrides alone can't reach them. Setting
+       the rendered background-color/color directly wins regardless of which token chain produced
+       the losing value. Confirmed live: without this the card, labels, and inputs stayed dark. */
+    .login-pf .pf-v5-c-login__main {
+        background-color: #ffffff !important;
+    }
+
+    .login-pf .pf-v5-c-login__header,
+    .login-pf .pf-v5-c-login__main-body,
+    .login-pf .pf-v5-c-login__main-footer,
+    .login-pf .pf-v5-c-login__footer {
+        color: #151515 !important;
+    }
+
+    .login-pf .pf-v5-c-form-control {
+        background-color: #ffffff !important;
+        color: #151515 !important;
+    }
+
+    /* The password show/hide toggle is a separate "control"-variant button, not part of
+       .pf-v5-c-form-control itself, so it needs its own override. */
+    .login-pf .pf-v5-c-button.pf-m-control {
+        background-color: #ffffff !important;
+        color: #6a6e73 !important;
+    }
+
+    /* color needs !important too: the base keycloak.v2 theme's own #kc-header-wrapper rule sets
+       color with !important, which no amount of specificity alone can beat. Confirmed live: the
+       header rendered light grey, not the brand color, until this was added. */
+    #kc-header-wrapper.pf-v5-c-brand {
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: #409eff !important;
+        letter-spacing: -0.02em;
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak
+  namespace: infra
+  labels: { app: keycloak }
+spec:
+  replicas: 1
+  strategy: { type: Recreate }
+  selector: { matchLabels: { app: keycloak } }
+  template:
+    metadata: { labels: { app: keycloak } }
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: k3d-demo-server-0
+      containers:
+        - name: keycloak
+          image: quay.io/keycloak/keycloak:latest
+          args: ["start-dev", "--import-realm"]
+          ports:
+            - { containerPort: 8080, hostPort: 8081, name: http }
+          env:
+            - { name: KEYCLOAK_ADMIN, value: "admin" }
+            - { name: KEYCLOAK_ADMIN_PASSWORD, value: "admin" }
+            - { name: KC_HOSTNAME, value: "http://localhost:8081" }
+          volumeMounts:
+            - { name: data, mountPath: /opt/keycloak/data/h2 }
+            - { name: realm-import, mountPath: /opt/keycloak/data/import }
+            - { name: theme-demo, mountPath: /opt/keycloak/themes/demo/login }
+          resources:
+            requests: { cpu: "250m", memory: "512Mi" }
+            limits: { cpu: "1", memory: "1Gi" }
+          readinessProbe:
+            httpGet: { path: /realms/demo, port: 8080 }
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /realms/demo, port: 8080 }
+            initialDelaySeconds: 45
+            periodSeconds: 20
+      volumes:
+        - name: data
+          persistentVolumeClaim: { claimName: keycloak-data }
+        - name: realm-import
+          configMap: { name: keycloak-realm-import }
+        - name: theme-demo
+          configMap:
+            name: keycloak-theme-demo
+            items:
+              - { key: theme.properties, path: theme.properties }
+              - { key: styles.css, path: resources/css/styles.css }
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: keycloak-data
+  namespace: infra
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests: { storage: 512Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak
+  namespace: infra
+spec:
+  selector: { app: keycloak }
+  ports: [{ name: http, port: 8080, targetPort: 8080 }]

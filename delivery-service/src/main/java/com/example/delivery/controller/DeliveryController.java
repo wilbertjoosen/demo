@@ -1,5 +1,6 @@
 package com.example.delivery.controller;
 
+import com.example.delivery.dto.ReportIssueRequest;
 import com.example.delivery.model.Delivery;
 import com.example.delivery.model.DeliveryModelAssembler;
 import com.example.delivery.service.DeliveryService;
@@ -36,9 +37,6 @@ public class DeliveryController {
     public ResponseEntity<Void> confirmDelivered(@PathVariable String id) {
         deliveryService.confirmDelivered(id);
         return ResponseEntity.noContent().build();
-    }
-
-    public record ReportIssueRequest(String reason) {
     }
 
     /** Reports that a PENDING_DELIVERY_AGENT delivery couldn't be completed — triggers the same compensation a system failure would. */

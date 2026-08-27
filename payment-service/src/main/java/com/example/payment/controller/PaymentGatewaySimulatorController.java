@@ -1,5 +1,6 @@
 package com.example.payment.controller;
 
+import com.example.payment.dto.ChargeRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -19,9 +20,6 @@ public class PaymentGatewaySimulatorController {
 
     /** Same demo trigger as the rest of the saga: quantity 13 simulates the gateway itself failing. */
     private static final int SIMULATED_GATEWAY_FAILURE_QUANTITY = 13;
-
-    public record ChargeRequest(String orderId, int quantity) {
-    }
 
     @PostMapping("/internal/gateway-simulator/charge")
     public ResponseEntity<Map<String, String>> charge(@RequestBody ChargeRequest request) {
