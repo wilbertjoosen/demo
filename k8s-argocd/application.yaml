@@ -1,5 +1,13 @@
 # Not applied by the demo namespace's own kubectl apply — this is ArgoCD's own Application CR,
 # applied once into the argocd namespace to tell it what to sync and from where.
+#
+# Since the k8s/ folder split (k8s/RESTRUCTURE.md) this one Application owns two things:
+#   k8s/demo/**      — the app tier, namespace: demo
+#   k8s/platform/**  — namespaces + shared infra (namespace: infra) + monitoring (namespace: monitoring),
+#                      one cluster-wide copy the demo-qa Application deliberately does NOT re-sync
+# recurse: true is required now that manifests live in subdirectories (a flat `path: k8s` picks up
+# top-level files only). exclude keeps this Application off k8s/demo-qa/** — that tree only exists on
+# the testing branch and is owned by application-qa.yaml.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -11,6 +19,9 @@ spec:
     repoURL: https://github.com/wilbertjoosen/demo.git
     targetRevision: main
     path: k8s
+    directory:
+      recurse: true
+      exclude: '{demo-qa/**,RESTRUCTURE.md}'
   destination:
     server: https://kubernetes.default.svc
     namespace: demo

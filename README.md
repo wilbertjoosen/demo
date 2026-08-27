@@ -175,18 +175,18 @@ and the tool picked to solve it — click through to the real file.
 
 | Technology | Role | Why | Where |
 |---|---|---|---|
-| ![MySQL](https://img.shields.io/badge/-%20-4479A1?style=flat-square&logo=mysql&logoColor=white) **MySQL** | `order-service`'s write model | Orders need real ACID transactions (create order + reserve stock atomically) — the one place in the system that isn't eventually-consistent by design | `order-service/`, `k8s/mysql.yaml` |
-| ![MongoDB](https://img.shields.io/badge/-%20-47A248?style=flat-square&logo=mongodb&logoColor=white) **MongoDB** | Every other service's store, + `order-service`'s read model | Schema flexibility fits domain objects that evolve fast (product attributes, chat messages); the read-model side of CQRS doesn't need MySQL's guarantees, just fast reads | every other service, `k8s/mongo.yaml` |
-| ![Apache Kafka](https://img.shields.io/badge/-%20-231F20?style=flat-square&logo=apachekafka&logoColor=white) **Apache&nbsp;Kafka** | Event backbone | Decouples the saga's steps completely — `payment-service` doesn't call `shipping-service`, it reacts to an event; consumer replay gives resilience largely for free | every `saga/` package, `k8s/kafka.yaml` |
-| ![Redis](https://img.shields.io/badge/-%20-FF4438?style=flat-square&logo=redis&logoColor=white) **Redis** | Response caching | Backs Resilience4j's cache annotations for read-heavy, slow-changing data | `k8s/redis.yaml` |
-| ![Elasticsearch](https://img.shields.io/badge/-%20-005571?style=flat-square&logo=elasticsearch&logoColor=white) **Elasticsearch** | Audit trail store | Full-text/structured search over every REST call ever made, across every service — a relational table would make this kind of ad-hoc querying painful | `audit-service/`, `k8s/elasticsearch.yaml` |
+| ![MySQL](https://img.shields.io/badge/-%20-4479A1?style=flat-square&logo=mysql&logoColor=white) **MySQL** | `order-service`'s write model | Orders need real ACID transactions (create order + reserve stock atomically) — the one place in the system that isn't eventually-consistent by design | `order-service/`, `k8s/platform/infra/mysql.yaml` |
+| ![MongoDB](https://img.shields.io/badge/-%20-47A248?style=flat-square&logo=mongodb&logoColor=white) **MongoDB** | Every other service's store, + `order-service`'s read model | Schema flexibility fits domain objects that evolve fast (product attributes, chat messages); the read-model side of CQRS doesn't need MySQL's guarantees, just fast reads | every other service, `k8s/platform/infra/mongo.yaml` |
+| ![Apache Kafka](https://img.shields.io/badge/-%20-231F20?style=flat-square&logo=apachekafka&logoColor=white) **Apache&nbsp;Kafka** | Event backbone | Decouples the saga's steps completely — `payment-service` doesn't call `shipping-service`, it reacts to an event; consumer replay gives resilience largely for free | every `saga/` package, `k8s/platform/infra/kafka.yaml` |
+| ![Redis](https://img.shields.io/badge/-%20-FF4438?style=flat-square&logo=redis&logoColor=white) **Redis** | Response caching | Backs Resilience4j's cache annotations for read-heavy, slow-changing data | `k8s/platform/infra/redis.yaml` |
+| ![Elasticsearch](https://img.shields.io/badge/-%20-005571?style=flat-square&logo=elasticsearch&logoColor=white) **Elasticsearch** | Audit trail store | Full-text/structured search over every REST call ever made, across every service — a relational table would make this kind of ad-hoc querying painful | `audit-service/`, `k8s/platform/infra/elasticsearch.yaml` |
 
 ### Identity, infra & delivery
 
 | Technology | Role | Why | Where |
 |---|---|---|---|
-| ![Keycloak](https://img.shields.io/badge/-%20-4D4D4D?style=flat-square&logo=keycloak&logoColor=white) **Keycloak** | OAuth2/OIDC identity provider | Centralized auth, roles, and (via its own Admin REST API) user management — services never store passwords | `k8s/keycloak.yaml`, `docker/keycloak/` |
-| ![HashiCorp Vault](https://img.shields.io/badge/-%20-FFEC6E?style=flat-square&logo=vault&logoColor=black) **HashiCorp&nbsp;Vault** | Secrets management | Real secrets engine instead of plaintext env vars or committed `.env` files | `k8s/vault.yaml` |
+| ![Keycloak](https://img.shields.io/badge/-%20-4D4D4D?style=flat-square&logo=keycloak&logoColor=white) **Keycloak** | OAuth2/OIDC identity provider | Centralized auth, roles, and (via its own Admin REST API) user management — services never store passwords | `k8s/platform/infra/keycloak.yaml`, `docker/keycloak/` |
+| ![HashiCorp Vault](https://img.shields.io/badge/-%20-FFEC6E?style=flat-square&logo=vault&logoColor=black) **HashiCorp&nbsp;Vault** | Secrets management | Real secrets engine instead of plaintext env vars or committed `.env` files | `k8s/platform/infra/vault.yaml` |
 | ![Docker Compose](https://img.shields.io/badge/-%20-2496ED?style=flat-square&logo=docker&logoColor=white) **Docker&nbsp;Compose** | Local infra & full-stack dev | Fastest path to "everything running" without touching Kubernetes at all — see [Quick start](#quick-start) Option B | `docker-compose.yml` |
 | ![k3d (Kubernetes in Docker)](https://img.shields.io/badge/-%20-326CE5?style=flat-square&logo=kubernetes&logoColor=white) **k3d** | Local Kubernetes cluster (Kubernetes in Docker) | A real multi-node cluster on a laptop, no cloud account needed — every k8s concept below (Deployments, Services, Ingress, RBAC) behaves exactly like it would in production | [Quick start](#quick-start) Option C |
 | ![ArgoCD](https://img.shields.io/badge/-%20-EF7B4D?style=flat-square&logo=argo&logoColor=white) **ArgoCD** | GitOps continuous delivery | The cluster's actual state is *reconciled from git*, not pushed to by a human running `kubectl apply` — see [Kubernetes / GitOps](#kubernetes--gitops) | `k8s-argocd/` |
@@ -198,15 +198,15 @@ and the tool picked to solve it — click through to the real file.
 
 | Technology | Signal | Why | Where |
 |---|---|---|---|
-| ![Prometheus](https://img.shields.io/badge/-%20-E6522C?style=flat-square&logo=prometheus&logoColor=white) **Prometheus** | Metrics | Pull-based scraping fits Kubernetes service discovery naturally — no per-service push config | `k8s/prometheus.yaml` |
-| ![Grafana](https://img.shields.io/badge/-%20-F46800?style=flat-square&logo=grafana&logoColor=white) **Grafana** | Dashboards + alerting | One pane of glass across metrics/logs/traces, plus file-provisioned alert rules (no UI clicking, git-reviewable) | `k8s/grafana.yaml` |
-| **Loki** | Logs | Prometheus's label model applied to logs — cheap to run, and queries feel identical to PromQL | `k8s/loki.yaml` |
-| **Tempo** | Distributed traces | Pairs natively with Grafana's `tracesToLogsV2` — click a trace, jump straight to its logs | `k8s/tempo.yaml` |
-| **Pyroscope** | Continuous CPU profiling | Answers performance questions Prometheus metrics can't — literally which method is burning CPU, live | `k8s/pyroscope.yaml` |
-| **kube-state-metrics**&nbsp;+&nbsp;**node-exporter** | Cluster/host metrics | Object-level (pod phase, PVC status) and host-level (CPU/disk) visibility Prometheus's own app-metrics scraping doesn't cover | `k8s/kube-state-metrics.yaml`, `k8s/node-exporter.yaml` |
-| ![k6](https://img.shields.io/badge/-%20-7D64FF?style=flat-square&logo=k6&logoColor=white) **k6** | Load testing | Scriptable load generation that pushes results straight into the same Prometheus everything else uses | `k8s/k6.yaml` |
-| ![Kibana](https://img.shields.io/badge/-%20-005571?style=flat-square&logo=kibana&logoColor=white) **Kibana** | Audit-trail search UI | Purpose-built for exploring Elasticsearch documents — the audit trail's natural home | `k8s/kibana.yaml` |
-| **Mailpit** | Mock SMTP inbox | Catches every email the system sends (order confirmations, Grafana alerts) without a real mail provider | `k8s/mailpit.yaml` |
+| ![Prometheus](https://img.shields.io/badge/-%20-E6522C?style=flat-square&logo=prometheus&logoColor=white) **Prometheus** | Metrics | Pull-based scraping fits Kubernetes service discovery naturally — no per-service push config | `k8s/platform/monitoring/prometheus.yaml` |
+| ![Grafana](https://img.shields.io/badge/-%20-F46800?style=flat-square&logo=grafana&logoColor=white) **Grafana** | Dashboards + alerting | One pane of glass across metrics/logs/traces, plus file-provisioned alert rules (no UI clicking, git-reviewable) | `k8s/platform/monitoring/grafana.yaml` |
+| **Loki** | Logs | Prometheus's label model applied to logs — cheap to run, and queries feel identical to PromQL | `k8s/platform/monitoring/loki.yaml` |
+| **Tempo** | Distributed traces | Pairs natively with Grafana's `tracesToLogsV2` — click a trace, jump straight to its logs | `k8s/platform/monitoring/tempo.yaml` |
+| **Pyroscope** | Continuous CPU profiling | Answers performance questions Prometheus metrics can't — literally which method is burning CPU, live | `k8s/platform/monitoring/pyroscope.yaml` |
+| **kube-state-metrics**&nbsp;+&nbsp;**node-exporter** | Cluster/host metrics | Object-level (pod phase, PVC status) and host-level (CPU/disk) visibility Prometheus's own app-metrics scraping doesn't cover | `k8s/platform/monitoring/kube-state-metrics.yaml`, `k8s/platform/monitoring/node-exporter.yaml` |
+| ![k6](https://img.shields.io/badge/-%20-7D64FF?style=flat-square&logo=k6&logoColor=white) **k6** | Load testing | Scriptable load generation that pushes results straight into the same Prometheus everything else uses | `k8s/platform/monitoring/k6.yaml` |
+| ![Kibana](https://img.shields.io/badge/-%20-005571?style=flat-square&logo=kibana&logoColor=white) **Kibana** | Audit-trail search UI | Purpose-built for exploring Elasticsearch documents — the audit trail's natural home | `k8s/platform/monitoring/kibana.yaml` |
+| **Mailpit** | Mock SMTP inbox | Catches every email the system sends (order confirmations, Grafana alerts) without a real mail provider | `k8s/platform/infra/mailpit.yaml` |
 
 ---
 
@@ -260,7 +260,7 @@ Kafka topics: `user-events`, `product-events`, `order-events`, `payment-events`,
   replay. That's exactly why the one sync call is wrapped in Resilience4j.
 - **Outbox / store-and-forward** — Kafka publish failures are persisted and retried rather than
   silently dropped or blocking the request.
-- **Sidecar** — demonstrated on `order-service`'s k8s pod (`k8s/order-service.yaml`): an `nginx`
+- **Sidecar** — demonstrated on `order-service`'s k8s pod (`k8s/demo/order-service.yaml`): an `nginx`
   access-log sidecar in the same pod.
 - **GitOps** — ArgoCD watches this repo's `k8s/` path; `kubectl apply` is not how deploys happen once
   the cluster is bootstrapped (see [Kubernetes / GitOps](#kubernetes--gitops)).
@@ -385,8 +385,13 @@ against this same stack if you need it.
 
 ```bash
 k3d cluster create demo --servers 1 --agents 2 -p "18090:80@loadbalancer" -p "18453:443@loadbalancer" -p "8081:8081@loadbalancer" -p "9080:9080@loadbalancer" -p "9443:9443@loadbalancer" --api-port 6550
-kubectl apply -f k8s/
+kubectl apply -R -f k8s/platform/ -R -f k8s/demo/
 ```
+
+> `k8s/` is split into `platform/` (namespaces + shared `infra` + `monitoring`), `demo/` (the app
+> tier, `namespace: demo`), and — on the `testing` branch — `demo-qa/` (the same apps,
+> `namespace: demo-qa`). `-R` because manifests live in subdirectories now. See
+> [`k8s/RESTRUCTURE.md`](k8s/RESTRUCTURE.md).
 
 > If you already have a local `demo` cluster from before Rancher moved in-cluster, the two new
 > `9080`/`9443` port mappings can only be set at cluster creation — `k3d cluster delete demo` and
@@ -403,15 +408,15 @@ App: http://demo.localhost:18090. Here's what's actually running where:
 
 Everything above runs in-cluster — nothing in this stack still depends on a Docker Compose
 container once the cluster is bootstrapped. App services reach `infra`/`monitoring` via
-cross-namespace DNS (`<service>.infra.svc.cluster.local`, see `k8s/configmap-common.yaml`).
+cross-namespace DNS (`<service>.infra.svc.cluster.local`, see `k8s/demo/configmap-common.yaml`).
 
 <details>
 <summary><b>Why the port mapping and image-import details matter</b> (click to expand)</summary>
 
 - **`-p "8081:8081@loadbalancer"` is load-bearing, not optional**: every service's
   `KEYCLOAK_ISSUER_URI` (and the frontend's) is hardcoded to `http://localhost:8081`, so in-cluster
-  Keycloak has to keep answering there too — see `k8s/keycloak.yaml`'s comment for the full reasoning.
-- **`kubectl apply -f k8s/` here is a one-time bootstrap** — from then on, ArgoCD watches the repo
+  Keycloak has to keep answering there too — see `k8s/platform/infra/keycloak.yaml`'s comment for the full reasoning.
+- **the `kubectl apply -R -f k8s/…` above is a one-time bootstrap** — from then on, ArgoCD watches the repo
   and CI/CD (see [The path to production](#the-path-to-production-every-gate-explained)) handles
   building, pushing to GHCR, and bumping the manifests ArgoCD syncs. There's no `k3d image import`
   step in the normal flow, since images live in a real registry now.
@@ -441,8 +446,8 @@ cross-namespace DNS (`<service>.infra.svc.cluster.local`, see `k8s/configmap-com
 docker-compose copy (used for host-JVM debugging; k8s pods reach their own in-cluster Mailpit
 instead). Not docker-compose's own app containers (Option B, irrelevant when using k8s), and not
 Grafana/Prometheus/Loki/Promtail/Tempo — those aren't docker-compose services at all anymore, they're
-fully in-cluster (`k8s/grafana.yaml`, `k8s/prometheus.yaml`, `k8s/loki.yaml`,
-`k8s/promtail-daemonset.yaml`, `k8s/tempo.yaml`), a single shared instance for both prod and QA.
+fully in-cluster (`k8s/platform/monitoring/grafana.yaml`, `k8s/platform/monitoring/prometheus.yaml`, `k8s/platform/monitoring/loki.yaml`,
+`k8s/platform/infra/promtail-daemonset.yaml`, `k8s/platform/monitoring/tempo.yaml`), a single shared instance for both prod and QA.
 
 ---
 
@@ -538,7 +543,7 @@ day to day.
 | `cattle-system` | Rancher | Cluster-wide management UI |
 
 Pods reach `infra`/`monitoring` via cross-namespace DNS (`<service>.infra.svc.cluster.local`, see
-`k8s/configmap-common.yaml`) rather than `host.k3d.internal`. The corresponding `demo-*` containers
+`k8s/demo/configmap-common.yaml`) rather than `host.k3d.internal`. The corresponding `demo-*` containers
 in `docker-compose.yml` are still used by the local mvnw/IDE dev flow, but the cluster itself no
 longer depends on them.
 
@@ -638,7 +643,7 @@ flowchart LR
   | Shared (one instance, both environments) | Separate per environment |
   |---|---|
   | MySQL, MongoDB, Elasticsearch, Keycloak, Vault | Kafka, Redis, Mailpit |
-  | QA reaches these cross-namespace (`mysql.infra.svc.cluster.local`, etc.) | Each namespace has its own — `k8s/kafka.yaml`, `k8s/redis.yaml`, `k8s/mailpit.yaml` |
+  | QA reaches these cross-namespace (`mysql.infra.svc.cluster.local`, etc.) | Each namespace has its own — `k8s/platform/infra/kafka.yaml`, `k8s/platform/infra/redis.yaml`, `k8s/platform/infra/mailpit.yaml` |
   | QA is scoped by name instead: `demo_qa` database, `<service>_qa` Mongo databases, `audit-log-qa` index, `demo-qa` Keycloak realm | Kafka/Redis: shared topics would mean QA traffic triggering prod's saga. Mailpit: was always separate, even on the host |
 
   Prometheus, Loki, and Kibana also run in-cluster, shared by both environments in their own
@@ -651,7 +656,7 @@ flowchart LR
   hostname (`qa.` prefix → `demo-qa`, anything else → the build-time default), matching the
   `demo.localhost` / `qa.demo.localhost` ingress split above.
 - **`demo_qa` database creation** on the shared in-cluster MySQL is handled automatically by a Job
-  (`mysql-create-qa-db` in `k8s/mysql.yaml`) rather than a manual step. MongoDB and Elasticsearch
+  (`mysql-create-qa-db` in `k8s/platform/infra/mysql.yaml`) rather than a manual step. MongoDB and Elasticsearch
   need no equivalent step — both auto-create on first write.
 - **Excluded from QA on purpose**: `promtail-daemonset.yaml`, `prometheus.yaml`, `loki.yaml`,
   `grafana.yaml`, `tempo.yaml`, and `kibana.yaml` are cluster-wide, single-shared-instance resources
@@ -699,7 +704,7 @@ flowchart LR
 <details>
 <summary><b>Metrics & alerting — the full detail</b> (click to expand)</summary>
 
-A single Prometheus runs *inside* the k3d cluster (`k8s/prometheus.yaml`, namespace `monitoring`),
+A single Prometheus runs *inside* the k3d cluster (`k8s/platform/monitoring/prometheus.yaml`, namespace `monitoring`),
 covering the k8s-deployed services in **both** `demo` and `demo-qa`, discovered via
 `kubernetes_sd_configs` (`role: pod`, opted in by the `monitored: "true"` label most manifests
 already carry) and labeled by `namespace`. Cluster-level metrics come from `kube-state-metrics`
@@ -726,7 +731,7 @@ correctly.
 <summary><b>Continuous profiling & load testing — the full detail</b> (click to expand)</summary>
 
 Every service ships an embedded Pyroscope Java agent (JFR-based, not async-profiler — the latter
-SIGSEGVs on JDK 26/arm64, see the agent's own comment in `k8s/configmap-common.yaml`) to the
+SIGSEGVs on JDK 26/arm64, see the agent's own comment in `k8s/demo/configmap-common.yaml`) to the
 in-cluster Pyroscope (single shared instance for both environments) —
 http://pyroscope.demo.localhost:18090. Toggle per-environment via the `PYROSCOPE_AGENT_ENABLED` key
 in each namespace's `pyroscope-agent` Secret (pod restart required to pick up a change) — useful to
@@ -734,7 +739,7 @@ disable under CPU pressure, since profiling isn't free. Ingestion is rate-limite
 generously above a full mass-restart's simultaneous JFR-snapshot burst, after the default limits
 caused a client-side retry storm during exactly that scenario.
 
-`k8s/k6.yaml` ships a k6 script (`smoke-test.js`, 5 VUs / 30s against `/actuator/health/readiness`)
+`k8s/platform/monitoring/k6.yaml` ships a k6 script (`smoke-test.js`, 5 VUs / 30s against `/actuator/health/readiness`)
 as a `CronJob` with `schedule: "0 0 1 1 *"` and `suspend: true` — it never runs on its own, it's a
 git-committed, ready-to-trigger template. Run it on demand with `kubectl create job
 --from=cronjob/k6-load-test <name> -n monitoring`; results push to Prometheus via
@@ -793,7 +798,7 @@ shared `application.yaml` has somewhere to move the environment-specific values 
 reintroducing the hand-reconciliation these branches used to need on every merge.
 
 **This does not change anything about how QA or production actually run today.**
-`k8s/configmap-common.yaml` (per namespace) already injects `MONGO_HOST`, `KEYCLOAK_ISSUER_URI`,
+`k8s/demo/configmap-common.yaml` (per namespace) already injects `MONGO_HOST`, `KEYCLOAK_ISSUER_URI`,
 etc. directly as env vars on every Deployment, and an explicit env var always wins over a YAML
 default regardless of which profile is active — so `SPRING_PROFILES_ACTIVE` is never set anywhere
 in `k8s/`, and doesn't need to be.
@@ -825,7 +830,7 @@ comment for why it extends `keycloak.v2` via `@import` rather than the more obvi
 | Frontend (k8s, QA) | http://qa.demo.localhost:18090 | — (realm `demo-qa`, same users as above) |
 | Keycloak admin | http://localhost:8081 | `admin` / `admin` (realm: **`demo`** for prod, **`demo-qa`** for QA — not `master`, see note below) |
 | Swagger UI (aggregated) | http://localhost:8080/swagger-ui.html | — |
-| Grafana (prod + QA) | http://grafana.demo.localhost:18090 | Secret `grafana-admin` in the `monitoring` namespace (create it yourself, see `k8s/grafana.yaml`'s comment) — datasources: **Prometheus**, **Loki**, **Tempo** (traces from both namespaces, trace-to-logs jump always resolves — no more host/cluster split) |
+| Grafana (prod + QA) | http://grafana.demo.localhost:18090 | Secret `grafana-admin` in the `monitoring` namespace (create it yourself, see `k8s/platform/monitoring/grafana.yaml`'s comment) — datasources: **Prometheus**, **Loki**, **Tempo** (traces from both namespaces, trace-to-logs jump always resolves — no more host/cluster split) |
 | Prometheus (prod + QA) | http://prometheus.demo.localhost:18090 | — |
 | Loki (prod + QA) | http://loki.demo.localhost:18090 | — |
 | Tempo (prod + QA) | http://tempo.demo.localhost:18090 | — |
@@ -853,13 +858,13 @@ for host-JVM/`start-local.sh` debugging.
 | Service | Host:Port | Notes |
 |---|---|---|
 | MySQL (host / dev) | `localhost:3306` | `demo-mysql` — `order-service`'s write model, db `demo` (prod) / `demo_qa` (QA), user/pass `demo`/`demo`; **dev-only**, in-cluster instance is shared cross-namespace from the `infra` namespace (`mysql.infra.svc.cluster.local`) |
-| MongoDB (host / dev) | `localhost:27017` | `demo-mongo` — a single standalone instance, every other service's store, `_qa`-suffixed DB names for QA; **dev-only**, in-cluster is a proper 3-node replica set (`k8s/mongo.yaml`) shared cross-namespace, now in the `infra` namespace |
-| Kafka (host clients / dev, prod) | `localhost:9092` | **dev-only**; prod k8s pods use their own in-cluster Kafka (`kafka.infra.svc.cluster.local:9092`, `k8s/kafka.yaml`) |
+| MongoDB (host / dev) | `localhost:27017` | `demo-mongo` — a single standalone instance, every other service's store, `_qa`-suffixed DB names for QA; **dev-only**, in-cluster is a proper 3-node replica set (`k8s/platform/infra/mongo.yaml`) shared cross-namespace, now in the `infra` namespace |
+| Kafka (host clients / dev, prod) | `localhost:9092` | **dev-only**; prod k8s pods use their own in-cluster Kafka (`kafka.infra.svc.cluster.local:9092`, `k8s/platform/infra/kafka.yaml`) |
 | Kafka (host clients / dev, QA) | `localhost:9192` | **dev-only**; QA k8s pods use their own separate in-cluster Kafka (`demo-qa` namespace) — shared topics would mean QA test traffic triggering prod's saga |
-| Redis (host / dev, prod) | `localhost:6379` | **dev-only**; prod k8s pods use their own in-cluster Redis (`k8s/redis.yaml`, `infra` namespace) |
+| Redis (host / dev, prod) | `localhost:6379` | **dev-only**; prod k8s pods use their own in-cluster Redis (`k8s/platform/infra/redis.yaml`, `infra` namespace) |
 | Redis (host / dev, QA) | `localhost:6380` | **dev-only**; QA's own separate in-cluster Redis (`demo-qa` namespace) |
 | Elasticsearch (host / dev) | `localhost:9200` | `demo-elasticsearch` — `audit-service`'s store, index `audit-log` (prod) / `audit-log-qa` (QA); **dev-only**, in-cluster instance is shared cross-namespace, now in the `infra` namespace |
-| Mailpit SMTP (host / dev, prod) | `localhost:1025` | `demo-mailpit`; **dev-only**, prod's in-cluster Mailpit (`k8s/mailpit.yaml`, `infra` namespace) is what `notification-service` sends to in k8s |
+| Mailpit SMTP (host / dev, prod) | `localhost:1025` | `demo-mailpit`; **dev-only**, prod's in-cluster Mailpit (`k8s/platform/infra/mailpit.yaml`, `infra` namespace) is what `notification-service` sends to in k8s |
 | Mailpit SMTP (host / dev, QA) | `localhost:1026` | **dev-only**; QA's own in-cluster Mailpit (`demo-qa` namespace) |
 | Vault (host / dev) | `localhost:8200` | `demo-vault`, fixed dev root token; **dev-only**, in-cluster instance is shared cross-namespace, now in the `infra` namespace |
 
