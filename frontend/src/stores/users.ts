@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { usersApi, type CreateUserPayload, type ProfileUpdate } from '../api/users'
+import { usersApi, type AdminUserUpdate, type CreateUserPayload, type ProfileUpdate } from '../api/users'
 import type { RealmRole, User } from '../models'
 
 export const useUsersStore = defineStore('users', {
@@ -31,7 +31,7 @@ export const useUsersStore = defineStore('users', {
       await usersApi.create(payload)
       await this.load()
     },
-    async update(id: string, payload: ProfileUpdate) {
+    async update(id: string, payload: AdminUserUpdate) {
       await usersApi.update(id, payload)
       await this.load()
     },
