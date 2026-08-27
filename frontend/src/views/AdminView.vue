@@ -7,7 +7,7 @@ import { useUsersStore } from '../stores/users'
 import { useProductsStore } from '../stores/products'
 import { inventoryApi } from '../api/inventory'
 import { impersonateUser } from '../api/impersonation'
-import type { CreateUserPayload } from '../api/users'
+import { usersApi, type CreateUserPayload } from '../api/users'
 import { showApiError } from '../composables/useApiError'
 import UserTable from '../components/admin/UserTable.vue'
 import UserFormDialog from '../components/admin/UserFormDialog.vue'
@@ -39,6 +39,7 @@ const stockTarget = ref<Product | null>(null)
 const userFormDialog = ref(false)
 const userDetailDialog = ref(false)
 const editingUser = ref<User | null>(null)
+const editingUserRoles = ref<string[]>([])
 
 const historyDialog = ref(false)
 const historyRecordId = ref<string | null>(null)
@@ -72,12 +73,21 @@ async function deleteUser(user: User) {
 
 function openUserCreate() {
   editingUser.value = null
+  editingUserRoles.value = []
   userFormDialog.value = true
+  users.loadRoles()
 }
 
-function openUserEdit(user: User) {
+async function openUserEdit(user: User) {
   editingUser.value = user
+  editingUserRoles.value = []
   userFormDialog.value = true
+  users.loadRoles()
+  try {
+    editingUserRoles.value = await usersApi.userRoles(user.id)
+  } catch (error) {
+    showApiError(error, t('admin.userUpdateError'), t('common.serviceUnavailable'))
+  }
 }
 
 function openUserDetail(user: User) {
@@ -104,6 +114,7 @@ async function saveUser(payload: {
   firstName?: string
   lastName?: string
   password?: string
+  roles?: string[]
   nationalId: string
   phone: string
   shippingAddress: Address
@@ -258,7 +269,13 @@ onMounted(() => {
     <ProductFormDialog v-model="productDialog" :product="editingProduct" @submit="saveProduct" />
     <ProductDetailDialog v-model="productDetailDialog" :product="editingProduct" />
     <StockDialog v-model="stockDialog" :product="stockTarget" @submit="addStock" />
-    <UserFormDialog v-model="userFormDialog" :user="editingUser" @submit="saveUser" />
+    <UserFormDialog
+      v-model="userFormDialog"
+      :user="editingUser"
+      :roles="users.roles"
+      :current-roles="editingUserRoles"
+      @submit="saveUser"
+    />
     <UserDetailDialog v-model="userDetailDialog" :user="editingUser" />
     <RecordHistoryDialog v-model="historyDialog" :record-id="historyRecordId" :title="historyTitle" />
     <AdminMediaDialog v-model="mediaDialog" :product="mediaTarget" />

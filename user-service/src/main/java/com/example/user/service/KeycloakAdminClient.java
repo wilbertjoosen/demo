@@ -1,18 +1,28 @@
 package com.example.user.service;
 
 import com.example.user.model.KeycloakUserSummary;
+import com.example.user.model.RealmRole;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.oauth2.client.OAuth2AuthorizeRequest;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClientManager;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.net.URI;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Talks to Keycloak's own Admin REST API so username/email/firstName/lastName are read live from
@@ -22,11 +32,24 @@ import java.util.Optional;
  */
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class KeycloakAdminClient {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     private record KeycloakUserRepresentation(String id, String username, String email, String firstName, String lastName) {
     }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private record KeycloakRoleRepresentation(String id, String name, String description) {
+    }
+
+    /** Keycloak's own composite/technical realm roles — never offered as an assignable choice. */
+    private static final Set<String> BUILTIN_ROLES =
+            Set.of("offline_access", "uma_authorization", "default-roles-demo", "default-roles-demo-qa");
+
+    /** Keycloak error bodies: {"errorMessage":"..."} on the admin API, {"error":..,"error_description":..} on token flows. */
+    private static final Pattern KEYCLOAK_ERROR =
+            Pattern.compile("\"(?:errorMessage|error_description|error)\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"");
 
     private final RestClient keycloakAdminRestClient;
     private final OAuth2AuthorizedClientManager authorizedClientManager;
@@ -64,19 +87,163 @@ public class KeycloakAdminClient {
                 "emailVerified", true,
                 "credentials", List.of(Map.of("type", "password", "value", password, "temporary", false))
         );
-        URI location = keycloakAdminRestClient.post()
-                .uri("/users")
-                .headers(h -> h.setBearerAuth(fetchAccessToken()))
-                .body(body)
-                .retrieve()
-                .toBodilessEntity()
-                .getHeaders()
-                .getLocation();
+        URI location;
+        try {
+            location = keycloakAdminRestClient.post()
+                    .uri("/users")
+                    .headers(h -> h.setBearerAuth(fetchAccessToken()))
+                    .body(body)
+                    .retrieve()
+                    .toBodilessEntity()
+                    .getHeaders()
+                    .getLocation();
+        } catch (HttpClientErrorException e) {
+            // e.g. 409 "User exists with same username" / "same email", 400 password-policy messages
+            throw translate(e);
+        }
         if (location == null) {
             throw new IllegalStateException("Keycloak did not return a Location header for the created user");
         }
         String path = location.getPath();
         return path.substring(path.lastIndexOf('/') + 1);
+    }
+
+    /** Realm roles an admin may assign, Keycloak's built-in composite/technical roles filtered out. */
+    public List<RealmRole> listAssignableRealmRoles() {
+        KeycloakRoleRepresentation[] roles;
+        try {
+            roles = keycloakAdminRestClient.get()
+                    .uri("/roles")
+                    .headers(h -> h.setBearerAuth(fetchAccessToken()))
+                    .retrieve()
+                    .body(KeycloakRoleRepresentation[].class);
+        } catch (HttpClientErrorException e) {
+            throw translate(e);
+        }
+        if (roles == null) {
+            return List.of();
+        }
+        return Arrays.stream(roles)
+                .filter(r -> r.name() != null && !BUILTIN_ROLES.contains(r.name()))
+                .map(r -> new RealmRole(r.name(), r.description()))
+                .toList();
+    }
+
+    /**
+     * Assigns the given realm roles to a user (additive). No-op for an empty list. An unknown role
+     * name is a 400 — the caller (an admin form) picked from this same list, so it shouldn't happen.
+     */
+    public void assignRealmRoles(String keycloakId, List<String> roleNames) {
+        if (roleNames == null || roleNames.isEmpty()) {
+            return;
+        }
+        postRealmRoleMappings(keycloakId, toRoleRepresentations(roleNames));
+    }
+
+    /** The assignable (non-builtin) realm roles a user currently holds. */
+    public List<String> currentRealmRoleNames(String keycloakId) {
+        KeycloakRoleRepresentation[] roles;
+        try {
+            roles = keycloakAdminRestClient.get()
+                    .uri("/users/{id}/role-mappings/realm", keycloakId)
+                    .headers(h -> h.setBearerAuth(fetchAccessToken()))
+                    .retrieve()
+                    .body(KeycloakRoleRepresentation[].class);
+        } catch (HttpClientErrorException e) {
+            throw translate(e);
+        }
+        if (roles == null) {
+            return List.of();
+        }
+        return Arrays.stream(roles)
+                .map(KeycloakRoleRepresentation::name)
+                .filter(n -> n != null && !BUILTIN_ROLES.contains(n))
+                .toList();
+    }
+
+    /**
+     * Makes the user's assignable realm roles exactly {@code desiredNames} — adds the ones missing,
+     * removes the assignable ones no longer wanted. Keycloak's built-in composites are never touched.
+     */
+    public void syncRealmRoles(String keycloakId, List<String> desiredNames) {
+        Set<String> desired = Set.copyOf(desiredNames == null ? List.of() : desiredNames);
+        Set<String> current = Set.copyOf(currentRealmRoleNames(keycloakId));
+
+        List<String> toAdd = desired.stream().filter(n -> !current.contains(n)).toList();
+        List<String> toRemove = current.stream().filter(n -> !desired.contains(n)).toList();
+
+        if (!toAdd.isEmpty()) {
+            postRealmRoleMappings(keycloakId, toRoleRepresentations(toAdd));
+        }
+        if (!toRemove.isEmpty()) {
+            try {
+                keycloakAdminRestClient.method(HttpMethod.DELETE)
+                        .uri("/users/{id}/role-mappings/realm", keycloakId)
+                        .headers(h -> h.setBearerAuth(fetchAccessToken()))
+                        .body(toRoleRepresentations(toRemove))
+                        .retrieve()
+                        .toBodilessEntity();
+            } catch (HttpClientErrorException e) {
+                throw translate(e);
+            }
+        }
+    }
+
+    private void postRealmRoleMappings(String keycloakId, List<Map<String, String>> roleReps) {
+        try {
+            keycloakAdminRestClient.post()
+                    .uri("/users/{id}/role-mappings/realm", keycloakId)
+                    .headers(h -> h.setBearerAuth(fetchAccessToken()))
+                    .body(roleReps)
+                    .retrieve()
+                    .toBodilessEntity();
+        } catch (HttpClientErrorException e) {
+            throw translate(e);
+        }
+    }
+
+    private List<Map<String, String>> toRoleRepresentations(List<String> roleNames) {
+        KeycloakRoleRepresentation[] all;
+        try {
+            all = keycloakAdminRestClient.get()
+                    .uri("/roles")
+                    .headers(h -> h.setBearerAuth(fetchAccessToken()))
+                    .retrieve()
+                    .body(KeycloakRoleRepresentation[].class);
+        } catch (HttpClientErrorException e) {
+            throw translate(e);
+        }
+        Map<String, KeycloakRoleRepresentation> byName = all == null ? Map.of()
+                : Arrays.stream(all).collect(java.util.stream.Collectors.toMap(KeycloakRoleRepresentation::name, r -> r, (a, b) -> a));
+
+        return roleNames.stream().distinct().map(name -> {
+            KeycloakRoleRepresentation role = byName.get(name);
+            if (role == null || BUILTIN_ROLES.contains(name)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown realm role: " + name);
+            }
+            return Map.of("id", role.id(), "name", role.name());
+        }).toList();
+    }
+
+    /** Best-effort cleanup — used to roll back a half-provisioned account. Never throws. */
+    public void deleteUserQuietly(String keycloakId) {
+        try {
+            keycloakAdminRestClient.delete()
+                    .uri("/users/{id}", keycloakId)
+                    .headers(h -> h.setBearerAuth(fetchAccessToken()))
+                    .retrieve()
+                    .toBodilessEntity();
+        } catch (RuntimeException e) {
+            log.warn("Failed to roll back Keycloak user {} after a provisioning error: {}", keycloakId, e.toString());
+        }
+    }
+
+    /** Surface Keycloak's own error message (and status) to the client instead of a generic 500. */
+    private ResponseStatusException translate(HttpClientErrorException e) {
+        String body = e.getResponseBodyAsString();
+        Matcher m = KEYCLOAK_ERROR.matcher(body);
+        String message = m.find() ? m.group(1).replace("\\\"", "\"") : e.getStatusText();
+        return new ResponseStatusException(e.getStatusCode(), message);
     }
 
     /**
