@@ -18,7 +18,8 @@ public class DatabaseInitializer {
                 countryRepository.saveAll(List.of(
                         new Country("BR", "Brazil"),
                         new Country("NL", "Nederland"),
-                        new Country("DE", "Germany")
+                        new Country("DE", "Germany"),
+                        new Country("US", "United States")
                 ));
             }
         };
