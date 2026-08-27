@@ -69,7 +69,7 @@ images:
   - name: ghcr.io/wilbertjoosen/demo-audit-service
     newTag: 1.0.1-604f8c5
   - name: ghcr.io/wilbertjoosen/demo-user-service
-    newTag: 1.0.2-5a038c4
+    newTag: 1.0.2-2cb946b
   - name: ghcr.io/wilbertjoosen/demo-product-service
     newTag: 1.0.1-604f8c5
   - name: ghcr.io/wilbertjoosen/demo-order-service
@@ -95,4 +95,4 @@ images:
   - name: ghcr.io/wilbertjoosen/demo-common-service
     newTag: 1.0.0-604f8c5
   - name: ghcr.io/wilbertjoosen/demo-frontend
-    newTag: 1.0.7-5a038c4
+    newTag: 1.0.7-2cb946b
