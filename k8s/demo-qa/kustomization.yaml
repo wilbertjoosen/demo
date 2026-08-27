@@ -58,3 +58,41 @@ patches:
 #       newTag: 1.0.3-abc1234
 # Each entry overrides the image inherited from ../demo in the demo-qa render only; prod is
 # unaffected. This is how QA runs ahead of prod without k8s/demo/*.yaml ever diverging by branch.
+
+images:
+  - name: ghcr.io/wilbertjoosen/demo-config-server
+    newTag: 1.0.0-604f8c5
+  - name: ghcr.io/wilbertjoosen/demo-gateway-service
+    newTag: 1.0.1-604f8c5
+  - name: ghcr.io/wilbertjoosen/demo-inventory-service
+    newTag: 1.0.1-604f8c5
+  - name: ghcr.io/wilbertjoosen/demo-audit-service
+    newTag: 1.0.1-604f8c5
+  - name: ghcr.io/wilbertjoosen/demo-user-service
+    newTag: 1.0.2-604f8c5
+  - name: ghcr.io/wilbertjoosen/demo-product-service
+    newTag: 1.0.1-604f8c5
+  - name: ghcr.io/wilbertjoosen/demo-order-service
+    newTag: 1.0.1-604f8c5
+  - name: ghcr.io/wilbertjoosen/demo-payment-service
+    newTag: 1.0.1-604f8c5
+  - name: ghcr.io/wilbertjoosen/demo-shipping-service
+    newTag: 1.0.1-604f8c5
+  - name: ghcr.io/wilbertjoosen/demo-delivery-service
+    newTag: 1.0.1-604f8c5
+  - name: ghcr.io/wilbertjoosen/demo-notification-service
+    newTag: 1.0.1-604f8c5
+  - name: ghcr.io/wilbertjoosen/demo-product-comment-service
+    newTag: 1.0.1-604f8c5
+  - name: ghcr.io/wilbertjoosen/demo-product-media-service
+    newTag: 1.1.0-604f8c5
+  - name: ghcr.io/wilbertjoosen/demo-product-review-service
+    newTag: 1.0.1-604f8c5
+  - name: ghcr.io/wilbertjoosen/demo-chat-service
+    newTag: 1.0.1-604f8c5
+  - name: ghcr.io/wilbertjoosen/demo-reporting-service
+    newTag: 1.0.2-604f8c5
+  - name: ghcr.io/wilbertjoosen/demo-common-service
+    newTag: 1.0.0-604f8c5
+  - name: ghcr.io/wilbertjoosen/demo-frontend
+    newTag: 1.0.7-604f8c5
