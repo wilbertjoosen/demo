@@ -173,7 +173,9 @@
     "identityStoredInKeycloak": "Al guardar, estos datos se actualizan directamente en Keycloak.",
     "userCreated": "Usuario creado",
     "userCreateError": "No se pudo crear el usuario",
-    "reports": "Informes"
+    "reports": "Informes",
+    "roles": "Roles de realm",
+    "rolesPlaceholder": "Solo el rol por defecto"
   },
   "queues": {
     "title": "Colas de tareas",
