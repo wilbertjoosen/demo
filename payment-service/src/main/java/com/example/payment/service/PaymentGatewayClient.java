@@ -1,6 +1,6 @@
 package com.example.payment.service;
-import com.example.payment.controller.PaymentGatewaySimulatorController;
 
+import com.example.payment.dto.ChargeRequest;
 import io.github.resilience4j.bulkhead.annotation.Bulkhead;
 import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
 import io.github.resilience4j.retry.annotation.Retry;
@@ -38,7 +38,7 @@ public class PaymentGatewayClient {
     public boolean charge(String orderId, int quantity) {
         Mono<Boolean> call = webClient.post()
                 .uri("/internal/gateway-simulator/charge")
-                .bodyValue(new PaymentGatewaySimulatorController.ChargeRequest(orderId, quantity))
+                .bodyValue(new ChargeRequest(orderId, quantity))
                 .retrieve()
                 .toBodilessEntity()
                 .map(response -> true)

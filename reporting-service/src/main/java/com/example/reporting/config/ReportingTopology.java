@@ -19,7 +19,7 @@ import org.apache.kafka.streams.state.KeyValueStore;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.annotation.EnableKafkaStreams;
-import org.springframework.kafka.support.serializer.JsonSerde;
+import org.springframework.kafka.support.serializer.JacksonJsonSerde;
 
 import java.util.Map;
 import java.util.Set;
@@ -42,13 +42,13 @@ public class ReportingTopology {
     private static final Set<String> PRODUCT_EVENT_TYPES =
             Set.of(EventTypes.PRODUCT_CREATED, EventTypes.PRODUCT_UPDATED, EventTypes.PRODUCT_DELETED);
 
-    private JsonSerde<DomainEvent> eventSerde() {
-        return new JsonSerde<>(DomainEvent.class).ignoreTypeHeaders();
+    private JacksonJsonSerde<DomainEvent> eventSerde() {
+        return new JacksonJsonSerde<>(DomainEvent.class).ignoreTypeHeaders();
     }
 
     @Bean
     public KTable<String, OrderMetric> orderMetricsTable(StreamsBuilder builder) {
-        JsonSerde<OrderMetric> orderMetricSerde = new JsonSerde<>(OrderMetric.class).ignoreTypeHeaders();
+        JacksonJsonSerde<OrderMetric> orderMetricSerde = new JacksonJsonSerde<>(OrderMetric.class).ignoreTypeHeaders();
 
         KTable<String, OrderMetric> baseMetrics = builder
                 .stream(Topics.ORDER_EVENTS, Consumed.with(Serdes.String(), eventSerde()))
@@ -78,7 +78,7 @@ public class ReportingTopology {
 
     @Bean
     public KTable<String, ProductRef> productRefsTable(StreamsBuilder builder) {
-        JsonSerde<ProductRef> productRefSerde = new JsonSerde<>(ProductRef.class).ignoreTypeHeaders();
+        JacksonJsonSerde<ProductRef> productRefSerde = new JacksonJsonSerde<>(ProductRef.class).ignoreTypeHeaders();
 
         return builder.stream(Topics.PRODUCT_EVENTS, Consumed.with(Serdes.String(), eventSerde()))
                 .filter((k, event) -> PRODUCT_EVENT_TYPES.contains(event.eventType()))
@@ -91,7 +91,7 @@ public class ReportingTopology {
 
     @Bean
     public KTable<String, UserRegistration> userRegistrationsTable(StreamsBuilder builder) {
-        JsonSerde<UserRegistration> userRegistrationSerde = new JsonSerde<>(UserRegistration.class).ignoreTypeHeaders();
+        JacksonJsonSerde<UserRegistration> userRegistrationSerde = new JacksonJsonSerde<>(UserRegistration.class).ignoreTypeHeaders();
 
         return builder.stream(Topics.USER_EVENTS, Consumed.with(Serdes.String(), eventSerde()))
                 .filter((k, event) -> EventTypes.USER_REGISTERED.equals(event.eventType()))

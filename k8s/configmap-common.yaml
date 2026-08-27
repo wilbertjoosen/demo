@@ -51,6 +51,9 @@ data:
   # In-cluster Tempo's OTLP/HTTP receiver (k8s/tempo.yaml) — see config-server's
   # config-repo/application.yml for how every service picks this up.
   OTLP_ENDPOINT: http://tempo.monitoring.svc.cluster.local:4318/v1/traces
+  # config-repo/application.yml defaults span export OFF (no collector on the host-JVM dev flow) —
+  # turn it back on here, where Tempo is reachable at OTLP_ENDPOINT above.
+  TRACING_EXPORT_OTLP_ENABLED: "true"
   # In-cluster Pyroscope (k8s/pyroscope.yaml) — every service's Java agent (bundled in
   # Dockerfile.service, PYROSCOPE_APPLICATION_NAME derived there from $HOSTNAME) pushes continuous
   # profiles here directly, same push-based reasoning as Tempo above.

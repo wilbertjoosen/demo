@@ -11,6 +11,7 @@ import com.example.user.model.UserDirectoryEntry;
 import com.example.user.model.UserProfileView;
 import com.example.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -42,7 +43,7 @@ public class UserServiceImpl implements UserService {
         User user = userRepository.findByKeycloakId(jwt.getSubject())
                 .orElseGet(() -> registerFromToken(jwt));
         applyProfileFields(user, fields);
-        user = userRepository.save(user);
+        user = saveChecked(user);
         return UserProfileView.merge(user, identityFromJwt(jwt));
     }
 
@@ -52,7 +53,7 @@ public class UserServiceImpl implements UserService {
         String keycloakId = keycloakAdminClient.createUser(username, email, firstName, lastName, password);
         User user = new User(keycloakId);
         applyProfileFields(user, fields);
-        user = userRepository.save(user);
+        user = saveChecked(user);
         return UserProfileView.merge(user, new KeycloakUserSummary(keycloakId, username, email, firstName, lastName));
     }
 
@@ -61,6 +62,7 @@ public class UserServiceImpl implements UserService {
             user.setShippingAddress(fields.shippingAddress());
         }
         if (fields.nationalId() != null) {
+            assertNationalIdAvailable(user, fields.nationalId());
             user.setNationalId(fields.nationalId());
         }
         if (fields.phone() != null) {
@@ -68,6 +70,31 @@ public class UserServiceImpl implements UserService {
         }
         if (fields.customAttributes() != null) {
             user.setCustomAttributes(fields.customAttributes());
+        }
+    }
+
+    /**
+     * Friendly 409 before touching the DB. Not authoritative on its own — two concurrent requests
+     * can both pass this — the partial unique index on {@code users.nationalId} (see
+     * {@code UserIndexConfig}) is the real guard, surfaced as a 409 by {@link #saveChecked}.
+     */
+    private void assertNationalIdAvailable(User user, String candidate) {
+        if (candidate.equals(user.getNationalId())) {
+            return; // unchanged — a re-submit of the same value is not a conflict
+        }
+        userRepository.findByNationalIdAndDeletedFalse(candidate).ifPresent(owner -> {
+            if (!owner.getId().equals(user.getId())) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "National ID is already in use");
+            }
+        });
+    }
+
+    private User saveChecked(User user) {
+        try {
+            return userRepository.save(user);
+        } catch (DuplicateKeyException e) {
+            // Lost the race with a concurrent writer between assertNationalIdAvailable and here.
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "National ID is already in use", e);
         }
     }
 
@@ -108,7 +135,7 @@ public class UserServiceImpl implements UserService {
     public UserProfileView updateUser(String id, ProfileFields fields, IdentityFields identity) {
         User user = findMongoUser(id);
         applyProfileFields(user, fields);
-        user = userRepository.save(user);
+        user = saveChecked(user);
         if (identity != null) {
             keycloakAdminClient.updateUser(user.getKeycloakId(), identity.username(), identity.email(),
                     identity.firstName(), identity.lastName());

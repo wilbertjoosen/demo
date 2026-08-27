@@ -32,12 +32,13 @@
         <dependency>
             <!-- Same reasoning as springdoc above: every consuming service already has
                  spring-boot-starter-actuator on its own classpath, so this alone is enough for Boot
-                 to auto-configure a Tracer/ObservationRegistry — no per-service config beyond the
-                 OTLP endpoint (set once, centrally, in config-server's config-repo/application.yml).
-                 This isn't the more obvious micrometer-tracing-bridge-otel +
-                 opentelemetry-exporter-otlp pairing — in Spring Boot 4.x those are just the
+                 to auto-configure a Tracer/ObservationRegistry and export spans via OTLP — no
+                 per-service config beyond the OTLP endpoint (set once, centrally, in config-server's
+                 config-repo/application.yml). This isn't the more obvious micrometer-tracing-bridge-otel
+                 + opentelemetry-exporter-otlp pairing — in Spring Boot 4.x those are just the
                  underlying libraries; the actual autoconfiguration classes that wire them together
-                 live specifically in this artifact. -->
+                 live specifically in this artifact (verified against the resolved classpath —
+                 neither of the two "obvious" deps alone registers any autoconfiguration). -->
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-micrometer-tracing-opentelemetry</artifactId>
         </dependency>
@@ -47,10 +48,7 @@
                  lives here — confirmed missing from the actually-deployed jar's BOOT-INF/lib even
                  after adding opentelemetry-exporter-otlp below (that fix alone was necessary but not
                  sufficient: zero tracing-related log lines at all, not even a Tracer being created,
-                 because this half of the requirement was still missing). This is the artifact PR #17
-                 removed under the (at the time reasonable-looking, but incomplete) theory that
-                 spring-boot-micrometer-tracing-opentelemetry alone supplied the autoconfiguration — it
-                 does, but only once OtelTracer/OtlpHttpSpanExporter both also exist on the classpath. -->
+                 because this half of the requirement was still missing). -->
             <groupId>io.micrometer</groupId>
             <artifactId>micrometer-tracing-bridge-otel</artifactId>
         </dependency>
@@ -70,6 +68,28 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-devtools</artifactId>
             <optional>true</optional>
+        </dependency>
+        <dependency>
+            <!-- EndUserIdTracingFilter (an OncePerRequestFilter) needs jakarta.servlet types to
+                 compile — common-security has no spring-boot-starter-web dependency of its own, only
+                 spring-security-web (transitively, via spring-boot-starter-security), which doesn't
+                 expose the servlet API at this module's own compile time. `provided` scope: every
+                 consuming service already supplies the real servlet container via its own
+                 spring-boot-starter-web, so this isn't bundled into the runtime jar, just needed here
+                 for common-security to compile against the types at all. Version comes from Spring
+                 Boot's own dependency management (spring-boot-starter-parent), same as every other
+                 dependency in this file. -->
+            <groupId>jakarta.servlet</groupId>
+            <artifactId>jakarta.servlet-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <!-- common-security had no test dependencies at all before EndUserIdTracingFilter —
+                 added specifically to cover it (a filter running on every authenticated request
+                 across all 9 services is worth a regression test). -->
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 </project>

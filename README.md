@@ -349,6 +349,27 @@ cd frontend && npm install && npm run dev
 
 Frontend: http://localhost:5173
 
+> **Startup ordering — matters when you launch services by hand (separate terminals or IDE run
+> configs).** Bring them up in this order, waiting for each stage to be healthy before the next:
+>
+> 1. **Infra** (the `docker compose up -d` line above) — wait for the containers to be up.
+> 2. **`eureka-server`** — wait for its dashboard at http://localhost:8761 to respond.
+> 3. **`config-server`** (8888) — services read shared config (`config-repo/application.yml`) from
+>    it; the `spring.config.import` is `optional:`, so they'll start without it but fall back to
+>    their bundled `application.yaml` defaults.
+> 4. **Everything else**, `gateway-service` last.
+>
+> If a business service starts before `eureka-server` is reachable you'll see
+> `Connect to http://localhost:8761 failed: Connection refused` and, at the gateway,
+> `503 Unable to find instance for <service>` / `No servers available for service: <service>` —
+> the gateway routes purely by Eureka discovery (`uri: lb://<service>`). The Netflix client retries
+> registration on a ~30s schedule so it can self-heal, but the reliable fix is to start
+> `eureka-server` first and **restart any service that came up before it**.
+>
+> `./start-local.sh` already does this — it starts `eureka-server`, then `config-server`, then the
+> rest, blocking on a health check between stages. The ordering caveat only applies when you bypass
+> it.
+
 ### Option B — full Docker Compose stack
 
 ```bash

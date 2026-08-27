@@ -1,13 +1,11 @@
 package com.example.review.controller;
+
+import com.example.review.dto.CreateReviewRequest;
 import com.example.review.model.Review;
 import com.example.review.model.ReviewModelAssembler;
 import com.example.review.model.ReviewSummary;
 import com.example.review.service.ReviewService;
-
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import org.springframework.hateoas.CollectionModel;
 import org.springframework.hateoas.EntityModel;
@@ -34,9 +32,6 @@ public class ReviewController {
     @GetMapping("/summary")
     public ReviewSummary summary(@RequestParam String productId) {
         return reviewService.summarize(productId);
-    }
-
-    public record CreateReviewRequest(@NotBlank String productId, @Min(1) @Max(5) int rating, String body) {
     }
 
     @PostMapping
