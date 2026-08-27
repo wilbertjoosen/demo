@@ -1,18 +1,16 @@
 package com.example.product.controller;
 
+import com.example.product.dto.CreateProductRequest;
+import com.example.product.dto.UpdateProductRequest;
 import com.example.product.model.Product;
 import com.example.product.model.ProductModelAssembler;
 import com.example.product.service.ProductService;
-import com.example.product.service.ProductServiceImpl;
 
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.DecimalMin;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.batch.core.job.Job;
 import org.springframework.batch.core.job.parameters.JobParametersBuilder;
-import org.springframework.batch.core.launch.JobLauncher;
+import org.springframework.batch.core.launch.JobOperator;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.hateoas.CollectionModel;
@@ -23,7 +21,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.math.BigDecimal;
 import java.net.URI;
 import java.util.Map;
 
@@ -34,7 +31,7 @@ public class ProductController {
 
     private final ProductService productService;
     private final ProductModelAssembler assembler;
-    private final JobLauncher jobLauncher;
+    private final JobOperator jobOperator;
     private final Job productImportJob;
     private final MessageSource messageSource;
 
@@ -48,21 +45,12 @@ public class ProductController {
         return assembler.toModel(productService.get(id));
     }
 
-    public record CreateProductRequest(@NotBlank String sku, @NotBlank String name,
-                                        @NotNull @DecimalMin(value = "0.0", inclusive = false) BigDecimal price) {
-    }
-
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'PRODUCT_MANAGER')")
     public ResponseEntity<EntityModel<Product>> create(@Valid @RequestBody CreateProductRequest request) {
         Product saved = productService.create(new Product(request.sku(), request.name(), request.price()));
         EntityModel<Product> model = assembler.toModel(saved);
         return ResponseEntity.created(URI.create(model.getRequiredLink("self").getHref())).body(model);
-    }
-
-    /** Every field optional — {@link ProductServiceImpl#update} applies only the ones present. */
-    public record UpdateProductRequest(String sku, String name,
-                                        @DecimalMin(value = "0.0", inclusive = false) BigDecimal price) {
     }
 
     @PutMapping("/{id}")
@@ -83,7 +71,7 @@ public class ProductController {
     @PreAuthorize("hasAnyRole('ADMIN', 'PRODUCT_MANAGER')")
     public ResponseEntity<Map<String, String>> importProducts() {
         try {
-            var execution = jobLauncher.run(productImportJob,
+            var execution = jobOperator.start(productImportJob,
                     new JobParametersBuilder().addLong("startedAt", System.currentTimeMillis()).toJobParameters());
             return ResponseEntity.accepted().body(Map.of(
                     "jobExecutionId", String.valueOf(execution.getId()),

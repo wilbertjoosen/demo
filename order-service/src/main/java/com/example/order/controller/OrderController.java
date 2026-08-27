@@ -1,14 +1,13 @@
 package com.example.order.controller;
 
 import com.example.order.dto.PlaceOrderRequest;
+import com.example.order.dto.UpdateAddressRequest;
 import com.example.order.model.Order;
 import com.example.order.model.OrderView;
 import com.example.order.model.OrderViewModelAssembler;
 import com.example.order.service.OrderService;
 
-import com.example.common.model.Address;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.hateoas.CollectionModel;
 import org.springframework.hateoas.EntityModel;
@@ -51,9 +50,6 @@ public class OrderController {
     @PostMapping("/{id}/cancel")
     public EntityModel<OrderView> cancelOrder(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id) {
         return assembler.toModel(orderService.cancelOrder(jwt.getSubject(), id));
-    }
-
-    public record UpdateAddressRequest(@NotNull @Valid Address shippingAddress) {
     }
 
     /** Address-only — see OrderService#updateShippingAddress for why quantity isn't patchable here. */
