@@ -62,6 +62,16 @@ management:
       # Demo-scale traffic — trace every request rather than tuning a sample rate. Drop this well
       # below 1.0 before this ever carries real production load.
       probability: 1.0
+    export:
+      otlp:
+        # Off by default for the host-JVM / IntelliJ dev flow: docker-compose.yml has no Tempo or
+        # OTLP collector on this branch (see local-infra.sh's header), so with export on, every
+        # service logs a java.net.ConnectException to localhost:4318 on each export interval.
+        # k8s/configmap-common.yaml sets TRACING_EXPORT_OTLP_ENABLED=true — next to the
+        # OTEL_EXPORTER_OTLP_TRACES_ENDPOINT it already injects — so in-cluster export stays on.
+        # Property name verified against Spring Boot 4.1 metadata (spring-boot-micrometer-tracing-
+        # opentelemetry): management.tracing.export.otlp.enabled, default true.
+        enabled: ${TRACING_EXPORT_OTLP_ENABLED:false}
   opentelemetry:
     tracing:
       export:

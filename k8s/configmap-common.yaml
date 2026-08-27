@@ -51,6 +51,9 @@ data:
   MAIL_HOST: mailpit.infra.svc.cluster.local
   MAIL_PORT: "1025"
   OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: http://tempo.monitoring.svc.cluster.local:4318/v1/traces
+  # config-repo/application.yml defaults span export OFF (no collector on the host-JVM dev flow) —
+  # turn it back on here, where Tempo is reachable at the endpoint above.
+  TRACING_EXPORT_OTLP_ENABLED: "true"
   # Pyroscope continuous-profiling server, same shared single-instance reasoning as Tempo above
   # (one cluster-wide monitoring-namespace resource, not per-environment) — picked up by
   # Dockerfile.service's entrypoint wrapper via the io.pyroscope agent's PYROSCOPE_SERVER_ADDRESS
