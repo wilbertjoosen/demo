@@ -1,6 +1,6 @@
 import { http } from './http'
 import { unwrapCollection } from './hal'
-import type { Address, DirectoryEntry, User } from '../models'
+import type { Address, DirectoryEntry, RealmRole, User } from '../models'
 
 export interface ProfileUpdate {
   shippingAddress?: Address
@@ -16,6 +16,8 @@ export interface CreateUserPayload extends ProfileUpdate {
   firstName: string
   lastName: string
   password: string
+  /** Realm role names to assign on creation; omit/empty for the realm default only. */
+  roles?: string[]
 }
 
 export const usersApi = {
@@ -30,6 +32,11 @@ export const usersApi = {
   async list(): Promise<User[]> {
     const { data } = await http.get('/api/users')
     return unwrapCollection<User>(data)
+  },
+  /** Realm roles assignable on the create-user form — read live from Keycloak. */
+  async roles(): Promise<RealmRole[]> {
+    const { data } = await http.get('/api/users/roles')
+    return data
   },
   /** Any authenticated user — minimal, PII-free list for picking someone to message. */
   async directory(): Promise<DirectoryEntry[]> {
