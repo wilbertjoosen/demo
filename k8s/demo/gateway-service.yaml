@@ -28,12 +28,21 @@ spec:
             # Pyroscope re-enable rollout right after Spring Boot startup completed, same JFR
             # profiling-overhead pattern that forced the same fix on eureka-server earlier today.
             limits: { cpu: "500m", memory: "512Mi" }
+          # Gates livenessProbe until the app has finished starting, so a slow JVM start
+          # under CPU contention (e.g. a cluster-wide image bump restarting every pod at
+          # once) can't trip liveness and cascade the whole namespace into CrashLoopBackOff.
+          # 30 x 10s = 5 min startup budget; liveness/readiness take over once it passes.
+          startupProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8080 }
+            failureThreshold: 30
+            periodSeconds: 10
           readinessProbe:
             httpGet: { path: /actuator/health/readiness, port: 8080 }
             initialDelaySeconds: 20
             periodSeconds: 10
           livenessProbe:
             httpGet: { path: /actuator/health/liveness, port: 8080 }
+            timeoutSeconds: 5
             initialDelaySeconds: 30
             periodSeconds: 15
 ---

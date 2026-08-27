@@ -68,6 +68,7 @@ spec:
             periodSeconds: 10
           livenessProbe:
             httpGet: { path: /actuator/health/liveness, port: 8095 }
+            timeoutSeconds: 5
             initialDelaySeconds: 30
             periodSeconds: 15
   volumeClaimTemplates:
