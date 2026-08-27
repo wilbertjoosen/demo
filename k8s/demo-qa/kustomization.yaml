@@ -91,7 +91,7 @@ images:
   - name: ghcr.io/wilbertjoosen/demo-chat-service
     newTag: 1.0.1-604f8c5
   - name: ghcr.io/wilbertjoosen/demo-reporting-service
-    newTag: 1.0.2-604f8c5
+    newTag: 1.0.2-2f1c327
   - name: ghcr.io/wilbertjoosen/demo-common-service
     newTag: 1.0.0-604f8c5
   - name: ghcr.io/wilbertjoosen/demo-frontend
