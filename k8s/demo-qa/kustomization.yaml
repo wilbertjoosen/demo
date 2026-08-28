@@ -71,7 +71,7 @@ images:
   - name: ghcr.io/wilbertjoosen/demo-user-service
     newTag: 1.0.2-c8d165a
   - name: ghcr.io/wilbertjoosen/demo-product-service
-    newTag: 1.0.1-c8d165a
+    newTag: 1.0.1-a5c01a1
   - name: ghcr.io/wilbertjoosen/demo-order-service
     newTag: 1.0.1-c8d165a
   - name: ghcr.io/wilbertjoosen/demo-payment-service
@@ -83,13 +83,13 @@ images:
   - name: ghcr.io/wilbertjoosen/demo-notification-service
     newTag: 1.0.1-c8d165a
   - name: ghcr.io/wilbertjoosen/demo-product-comment-service
-    newTag: 1.0.1-c8d165a
+    newTag: 1.0.1-a5c01a1
   - name: ghcr.io/wilbertjoosen/demo-product-media-service
-    newTag: 1.1.0-c8d165a
+    newTag: 1.1.0-a5c01a1
   - name: ghcr.io/wilbertjoosen/demo-product-review-service
-    newTag: 1.0.1-c8d165a
+    newTag: 1.0.1-a5c01a1
   - name: ghcr.io/wilbertjoosen/demo-chat-service
-    newTag: 1.0.1-c8d165a
+    newTag: 1.0.1-a5c01a1
   - name: ghcr.io/wilbertjoosen/demo-reporting-service
     newTag: 1.0.2-c8d165a
   - name: ghcr.io/wilbertjoosen/demo-common-service
