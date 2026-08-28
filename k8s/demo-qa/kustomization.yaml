@@ -65,13 +65,13 @@ images:
   - name: ghcr.io/wilbertjoosen/demo-gateway-service
     newTag: 1.0.1-4783a95
   - name: ghcr.io/wilbertjoosen/demo-inventory-service
-    newTag: 1.0.1-4783a95
+    newTag: 1.0.1-31b2d31
   - name: ghcr.io/wilbertjoosen/demo-audit-service
     newTag: 1.0.1-4783a95
   - name: ghcr.io/wilbertjoosen/demo-user-service
     newTag: 1.0.2-4783a95
   - name: ghcr.io/wilbertjoosen/demo-product-service
-    newTag: 1.0.1-4783a95
+    newTag: 1.0.1-31b2d31
   - name: ghcr.io/wilbertjoosen/demo-order-service
     newTag: 1.0.1-4783a95
   - name: ghcr.io/wilbertjoosen/demo-payment-service
