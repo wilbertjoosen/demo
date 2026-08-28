@@ -47,7 +47,7 @@ public class InventoryItem {
     private boolean deleted = false;
     private Instant deletedAt;
 
-    /** Edge-trigger latch for {@code LOW_STOCK_DETECTED} — true once alerted, reset when restocked above threshold, so the event fires once per dip instead of once per reserve() call. */
+    /** Edge-trigger latch for LOW_STOCK_DETECTED — true once alerted, reset on restock above threshold. */
     private boolean lowStockAlerted = false;
 
     public InventoryItem(String productId, String warehouseId, int quantity) {
