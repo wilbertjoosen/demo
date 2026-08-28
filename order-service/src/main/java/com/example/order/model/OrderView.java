@@ -6,6 +6,8 @@ import com.example.common.model.PaymentMethod;
 import com.example.common.model.ShippingCarrier;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.index.HashIndexed;
+import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
@@ -14,7 +16,11 @@ import java.time.Instant;
  * Query-side (read) model — CQRS: kept in sync by the same Kafka listeners the saga already
  * requires this service to have (see OrderSagaListener), so this read model is close to free.
  *
- * <p>Compound index serves findByKeycloakUserIdAndDeletedFalse(keycloakUserId).
+ * <p>The compound index serves findByKeycloakUserIdAndDeletedFalse(keycloakUserId). The single-field
+ * hashed index on {@code keycloakUserId} is separate and serves a different purpose: it's this
+ * collection's shard key (see k8s/platform/infra/mongo-cluster-init-job.yaml) — hashed rather than
+ * ranged, since it's the natural query key but isn't guaranteed to distribute evenly across shards
+ * on its own the way inventory's (productId, warehouseId) does.
  */
 @CompoundIndex(def = "{'keycloakUserId': 1, 'deleted': 1}")
 @Document(collection = "order-view")
@@ -23,6 +29,8 @@ public class OrderView {
     @Id
     private String id;
 
+    @Indexed
+    @HashIndexed
     private String keycloakUserId;
     private String productId;
     private int quantity;

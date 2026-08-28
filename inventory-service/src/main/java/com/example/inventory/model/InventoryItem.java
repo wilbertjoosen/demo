@@ -21,8 +21,11 @@ import java.time.Instant;
  * {@code lastModifiedBy}/{@code updatedAt} manually on those update paths instead.
  *
  * <p>Compound indexes serve findByProductIdAndDeletedFalse(productId) and
- * findByProductIdAndWarehouseId(productId, warehouseId) — the latter is this document's natural
- * composite key per the javadoc above.
+ * findByProductIdAndWarehouseId(productId, warehouseId). The latter is also this document's own
+ * natural composite key and this collection's shard key (see
+ * k8s/platform/infra/mongo-cluster-init-job.yaml) — every reserve()/addStock() for a given
+ * product's line routes to a single shard and stays a single-document atomic
+ * {@code findAndModify}, never a cross-shard operation.
  */
 @CompoundIndexes({
         @CompoundIndex(def = "{'productId': 1, 'deleted': 1}"),

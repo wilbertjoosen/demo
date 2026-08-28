@@ -1,0 +1,73 @@
+# shard0 — one of the two shards backing the sharded cluster (see mongo-configsvr.yaml,
+# mongo-shard1.yaml, mongo-mongos.yaml, mongo-cluster-init-job.yaml for the rest). Each shard is its
+# own replica set, exactly like the single mongo.yaml replica set this topology replaces — same
+# StatefulSet + headless Service + rs.initiate pattern, just scoped to this one shard's data instead
+# of the whole deployment.
+#
+# replicas: 2 as the floor, scaling to 5 (k8s-horizontal-scaling) — as requested. Worth being
+# explicit about the tradeoff this carries: a 2-member replica set has no safe automatic failover
+# (losing either member loses majority — 1 of 2 isn't a majority — so the survivor can't elect a new
+# primary and the shard goes read-only until it's repaired manually). Scaling this beyond 2 needs
+# mongo-cluster-init-job.yaml's rs.add()/rs.remove() pattern run again for the new member, not a
+# bare `kubectl scale` — a StatefulSet replica added that way starts as a fresh mongod with no
+# replica-set membership at all.
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongo-shard0-headless
+  namespace: infra
+  labels: { app: mongo-shard0 }
+spec:
+  clusterIP: None
+  selector: { app: mongo-shard0 }
+  ports: [{ name: mongo, port: 27018, targetPort: 27018 }]
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongo-shard0
+  namespace: infra
+  labels: { app: mongo-shard0 }
+spec:
+  serviceName: mongo-shard0-headless
+  replicas: 2
+  selector: { matchLabels: { app: mongo-shard0 } }
+  template:
+    metadata: { labels: { app: mongo-shard0 } }
+    spec:
+      containers:
+        - name: mongo-shard0
+          image: mongo:7
+          command: ["mongod", "--shardsvr", "--replSet", "shard0rs", "--port", "27018", "--bind_ip_all"]
+          ports: [{ containerPort: 27018 }]
+          volumeMounts:
+            - { name: data, mountPath: /data/db }
+          resources:
+            requests: { cpu: "250m", memory: "512Mi" }
+            limits: { cpu: "1", memory: "1Gi" }
+          # Same reasoning as the pre-sharding mongo.yaml's probes: mongosh has real process-startup
+          # overhead that a 1s default timeout treats as a false-positive failure under any
+          # scheduling jitter, and liveness only checks the port (mongod alive) so a mass rollout's
+          # CPU spike can't kill/restart every member at once and collapse the replica set —
+          # readiness (the real replica-set ping) just pulls the pod from Service endpoints instead.
+          startupProbe:
+            tcpSocket: { port: 27018 }
+            failureThreshold: 30
+            periodSeconds: 10
+          readinessProbe:
+            exec: { command: ["mongosh", "--port", "27018", "--quiet", "--eval", "db.runCommand({ping:1})"] }
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 10
+          livenessProbe:
+            tcpSocket: { port: 27018 }
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 6
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests: { storage: 2Gi }

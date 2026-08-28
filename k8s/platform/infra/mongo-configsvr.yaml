@@ -1,0 +1,64 @@
+# Config server replica set for the sharded cluster (see mongo-shard0.yaml, mongo-shard1.yaml,
+# mongo-mongos.yaml, mongo-cluster-init-job.yaml for the rest of it) — every mongos router and every
+# shard consults this replica set for cluster metadata (which shard owns which chunk, shard-key
+# ranges, etc.), so it has to be a real replica set itself, not a single node: losing it loses the
+# cluster's map of itself. 3 members is a hard MongoDB requirement for a config server replica set
+# in practice (a 1-member "test" config RS exists but has no failover at all) — unlike the shards
+# below, this one isn't part of the min-2/max-5 scaling range.
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongo-configsvr-headless
+  namespace: infra
+  labels: { app: mongo-configsvr }
+spec:
+  clusterIP: None
+  selector: { app: mongo-configsvr }
+  ports: [{ name: mongo, port: 27019, targetPort: 27019 }]
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongo-configsvr
+  namespace: infra
+  labels: { app: mongo-configsvr }
+spec:
+  serviceName: mongo-configsvr-headless
+  replicas: 3
+  selector: { matchLabels: { app: mongo-configsvr } }
+  template:
+    metadata: { labels: { app: mongo-configsvr } }
+    spec:
+      containers:
+        - name: mongo-configsvr
+          image: mongo:7
+          command: ["mongod", "--configsvr", "--replSet", "configsvr0", "--port", "27019", "--bind_ip_all"]
+          ports: [{ containerPort: 27019 }]
+          volumeMounts:
+            - { name: data, mountPath: /data/db }
+          resources:
+            requests: { cpu: "150m", memory: "256Mi" }
+            limits: { cpu: "500m", memory: "512Mi" }
+          # Same probe reasoning as mongo-shard0.yaml/mongo-shard1.yaml — see there for the full
+          # explanation (mongosh startup overhead under scheduling jitter, liveness vs readiness split).
+          startupProbe:
+            tcpSocket: { port: 27019 }
+            failureThreshold: 30
+            periodSeconds: 10
+          readinessProbe:
+            exec: { command: ["mongosh", "--port", "27019", "--quiet", "--eval", "db.runCommand({ping:1})"] }
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 10
+          livenessProbe:
+            tcpSocket: { port: 27019 }
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 6
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests: { storage: 1Gi }

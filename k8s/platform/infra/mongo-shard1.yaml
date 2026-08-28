@@ -1,0 +1,58 @@
+# shard1 — the second shard. Same shape as mongo-shard0.yaml (see there for the full reasoning on
+# replica count, probes, and how to scale this beyond 2 members); only the replica-set name, port,
+# and Service/StatefulSet names differ.
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongo-shard1-headless
+  namespace: infra
+  labels: { app: mongo-shard1 }
+spec:
+  clusterIP: None
+  selector: { app: mongo-shard1 }
+  ports: [{ name: mongo, port: 27018, targetPort: 27018 }]
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongo-shard1
+  namespace: infra
+  labels: { app: mongo-shard1 }
+spec:
+  serviceName: mongo-shard1-headless
+  replicas: 2
+  selector: { matchLabels: { app: mongo-shard1 } }
+  template:
+    metadata: { labels: { app: mongo-shard1 } }
+    spec:
+      containers:
+        - name: mongo-shard1
+          image: mongo:7
+          command: ["mongod", "--shardsvr", "--replSet", "shard1rs", "--port", "27018", "--bind_ip_all"]
+          ports: [{ containerPort: 27018 }]
+          volumeMounts:
+            - { name: data, mountPath: /data/db }
+          resources:
+            requests: { cpu: "250m", memory: "512Mi" }
+            limits: { cpu: "1", memory: "1Gi" }
+          startupProbe:
+            tcpSocket: { port: 27018 }
+            failureThreshold: 30
+            periodSeconds: 10
+          readinessProbe:
+            exec: { command: ["mongosh", "--port", "27018", "--quiet", "--eval", "db.runCommand({ping:1})"] }
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 10
+          livenessProbe:
+            tcpSocket: { port: 27018 }
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 6
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests: { storage: 2Gi }
