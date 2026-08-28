@@ -4,10 +4,23 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.index.CompoundIndexes;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
 
+/**
+ * findByConversationIdOrderByCreatedAtDesc, findByConversationIdAndSenderIdNotAndDeliveredAtIsNull,
+ * findByConversationIdAndSenderIdNotAndReadAtIsNull (+ its count variant) — all lead with
+ * conversationId equality, so each compound index below still narrows on that prefix even though
+ * senderId's "Not" condition itself can't use an index.
+ */
+@CompoundIndexes({
+        @CompoundIndex(def = "{'conversationId': 1, 'createdAt': -1}"),
+        @CompoundIndex(def = "{'conversationId': 1, 'deliveredAt': 1}"),
+        @CompoundIndex(def = "{'conversationId': 1, 'readAt': 1}")
+})
 @Document(collection = "direct_messages")
 @Getter
 @NoArgsConstructor

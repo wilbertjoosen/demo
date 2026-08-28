@@ -5,6 +5,7 @@ import com.example.common.model.Address;
 import com.example.common.model.PaymentMethod;
 import com.example.common.model.ShippingCarrier;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
@@ -12,7 +13,10 @@ import java.time.Instant;
 /**
  * Query-side (read) model — CQRS: kept in sync by the same Kafka listeners the saga already
  * requires this service to have (see OrderSagaListener), so this read model is close to free.
+ *
+ * <p>Compound index serves findByKeycloakUserIdAndDeletedFalse(keycloakUserId).
  */
+@CompoundIndex(def = "{'keycloakUserId': 1, 'deleted': 1}")
 @Document(collection = "order-view")
 public class OrderView {
 

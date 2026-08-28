@@ -9,11 +9,15 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.LastModifiedBy;
 import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
 import java.util.Map;
 
+/** findByNationalIdAndDeletedFalse(nationalId). */
+@CompoundIndex(def = "{'nationalId': 1, 'deleted': 1}")
 @Document(collection = "users")
 @Getter
 @NoArgsConstructor
@@ -22,7 +26,8 @@ public class User {
     @Id
     private String id;
 
-    /** Everything identity-related (username/email/firstName/lastName) lives in Keycloak, not here — see KeycloakAdminClient. */
+    /** Identity lives in Keycloak, not here — see KeycloakAdminClient. findByKeycloakId(keycloakId). */
+    @Indexed
     private String keycloakId;
 
     @Setter
@@ -38,6 +43,7 @@ public class User {
     @Setter
     private Map<String, String> customAttributes;
 
+    @Indexed
     private boolean deleted = false;
     private Instant deletedAt;
 

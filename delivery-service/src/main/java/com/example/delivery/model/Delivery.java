@@ -8,6 +8,7 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.LastModifiedBy;
 import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
@@ -21,6 +22,8 @@ public class Delivery {
     private String id;
 
     private String orderId;
+    /** findByStatus(status). */
+    @Indexed
     private DeliveryStatus status;
     /** Set when a DELIVERY_AGENT-role user reports an issue instead of confirming delivery. */
     private String issueReason;
@@ -39,6 +42,8 @@ public class Delivery {
     @LastModifiedBy
     private String lastModifiedBy;
 
+    /** findByDeletedFalse() / findByIdAndDeletedFalse(). */
+    @Indexed
     private boolean deleted = false;
     private Instant deletedAt;
 

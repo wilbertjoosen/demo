@@ -10,6 +10,8 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.LastModifiedBy;
 import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.math.BigDecimal;
@@ -17,6 +19,8 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
+/** findByOrderIdAndDeletedFalse(orderId). */
+@CompoundIndex(def = "{'orderId': 1, 'deleted': 1}")
 @Document(collection = "shipments")
 @Getter
 @NoArgsConstructor
@@ -29,6 +33,8 @@ public class Shipment {
     private String keycloakUserId;
     private String email;
     private int quantity;
+    /** findByStatusAndTrackingStatusNot(status, trackingStatus). */
+    @Indexed
     private ShipmentStatus status;
     /** Set when a WAREHOUSE-role user reports an issue instead of confirming the pick. */
     private String issueReason;
@@ -49,6 +55,7 @@ public class Shipment {
     @LastModifiedBy
     private String lastModifiedBy;
 
+    @Indexed
     private boolean deleted = false;
     private Instant deletedAt;
 
