@@ -65,31 +65,31 @@ images:
   - name: ghcr.io/wilbertjoosen/demo-gateway-service
     newTag: 1.0.1-8f018d6
   - name: ghcr.io/wilbertjoosen/demo-inventory-service
-    newTag: 1.0.1-8f018d6
+    newTag: 1.0.1-aae09f6
   - name: ghcr.io/wilbertjoosen/demo-audit-service
     newTag: 1.0.1-8f018d6
   - name: ghcr.io/wilbertjoosen/demo-user-service
-    newTag: 1.0.2-8f018d6
+    newTag: 1.0.2-aae09f6
   - name: ghcr.io/wilbertjoosen/demo-product-service
-    newTag: 1.0.1-8f018d6
+    newTag: 1.0.1-aae09f6
   - name: ghcr.io/wilbertjoosen/demo-order-service
-    newTag: 1.0.1-8f018d6
+    newTag: 1.0.1-aae09f6
   - name: ghcr.io/wilbertjoosen/demo-payment-service
-    newTag: 1.0.1-8f018d6
+    newTag: 1.0.1-aae09f6
   - name: ghcr.io/wilbertjoosen/demo-shipping-service
-    newTag: 1.0.1-8f018d6
+    newTag: 1.0.1-aae09f6
   - name: ghcr.io/wilbertjoosen/demo-delivery-service
-    newTag: 1.0.1-8f018d6
+    newTag: 1.0.1-aae09f6
   - name: ghcr.io/wilbertjoosen/demo-notification-service
     newTag: 1.0.1-8f018d6
   - name: ghcr.io/wilbertjoosen/demo-product-comment-service
-    newTag: 1.0.1-8f018d6
+    newTag: 1.0.1-aae09f6
   - name: ghcr.io/wilbertjoosen/demo-product-media-service
-    newTag: 1.1.0-8f018d6
+    newTag: 1.1.0-aae09f6
   - name: ghcr.io/wilbertjoosen/demo-product-review-service
-    newTag: 1.0.1-8f018d6
+    newTag: 1.0.1-aae09f6
   - name: ghcr.io/wilbertjoosen/demo-chat-service
-    newTag: 1.0.1-8f018d6
+    newTag: 1.0.1-aae09f6
   - name: ghcr.io/wilbertjoosen/demo-reporting-service
     newTag: 1.0.2-8f018d6
   - name: ghcr.io/wilbertjoosen/demo-common-service
