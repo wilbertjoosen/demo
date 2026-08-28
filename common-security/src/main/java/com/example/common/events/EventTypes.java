@@ -23,7 +23,9 @@ public final class EventTypes {
     public static final String DELIVERED = "DELIVERED";
     public static final String DELIVERY_FAILED = "DELIVERY_FAILED";
 
-    /** Fired when a warehouse line crosses below its reorder threshold — edge-triggered, not level-triggered (see inventory-service's ReorderPolicy). */
+    /** Raw fact, published on every reserve()/addStock() mutation — the input inventory-service's InventoryStreamsTopology derives LOW_STOCK_DETECTED from. */
+    public static final String STOCK_LEVEL_CHANGED = "STOCK_LEVEL_CHANGED";
+    /** Derived by InventoryStreamsTopology from STOCK_LEVEL_CHANGED — edge-triggered (fires once per dip below threshold, not once per update; see its Kafka Streams Processor's state store). */
     public static final String LOW_STOCK_DETECTED = "LOW_STOCK_DETECTED";
 
     private EventTypes() {

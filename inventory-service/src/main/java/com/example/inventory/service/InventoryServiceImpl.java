@@ -1,7 +1,6 @@
 package com.example.inventory.service;
 import com.example.inventory.model.InventoryItem;
-import com.example.inventory.policy.ReorderPolicy;
-import com.example.inventory.ports.StockAlertPort;
+import com.example.inventory.ports.StockEventPort;
 import com.example.inventory.repository.InventoryRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -31,13 +30,11 @@ public class InventoryServiceImpl implements InventoryService {
     private static final String UPDATED_AT = "updatedAt";
     private static final String LAST_MODIFIED_BY = "lastModifiedBy";
     private static final String AGGREGATE_CACHE = "inventoryAggregate";
-    private static final String LOW_STOCK_ALERTED = "lowStockAlerted";
 
     private final InventoryRepository inventoryRepository;
     private final MongoTemplate mongoTemplate;
     private final AuditorAware<String> auditorAware;
-    private final ReorderPolicy reorderPolicy;
-    private final StockAlertPort stockAlertPort;
+    private final StockEventPort stockEventPort;
 
     private String currentAuditor() {
         return auditorAware.getCurrentAuditor().orElse("system");
@@ -56,36 +53,9 @@ public class InventoryServiceImpl implements InventoryService {
         InventoryItem updated = mongoTemplate.findAndModify(query, update,
                 FindAndModifyOptions.options().returnNew(true), InventoryItem.class);
         if (updated != null) {
-            maybeAlertLowStock(updated);
+            stockEventPort.publishStockLevelChanged(updated);
         }
         return updated != null;
-    }
-
-    /**
-     * Edge-triggered: only publishes once per dip below threshold, not once per reserve() call.
-     * The second {@code findAndModify} is a compare-and-set on {@code lowStockAlerted} — under
-     * concurrent reserves only the caller that flips false→true gets to publish.
-     */
-    private void maybeAlertLowStock(InventoryItem afterUpdate) {
-        if (!reorderPolicy.isLowStock(afterUpdate.getQuantity())) {
-            return;
-        }
-        Query armQuery = Query.query(Criteria.where("id").is(afterUpdate.getId()).and(LOW_STOCK_ALERTED).is(false));
-        Update armUpdate = new Update().set(LOW_STOCK_ALERTED, true);
-        InventoryItem armed = mongoTemplate.findAndModify(armQuery, armUpdate,
-                FindAndModifyOptions.options().returnNew(true), InventoryItem.class);
-        if (armed != null) {
-            stockAlertPort.publishLowStock(armed, reorderPolicy.threshold());
-        }
-    }
-
-    /** Restocking above threshold resets the latch so a future dip alerts again. */
-    private void maybeDisarmLowStock(InventoryItem afterUpdate) {
-        if (afterUpdate == null || !afterUpdate.isLowStockAlerted() || reorderPolicy.isLowStock(afterUpdate.getQuantity())) {
-            return;
-        }
-        Query query = Query.query(Criteria.where("id").is(afterUpdate.getId()));
-        mongoTemplate.updateFirst(query, new Update().set(LOW_STOCK_ALERTED, false), InventoryItem.class);
     }
 
     @Override
@@ -127,7 +97,7 @@ public class InventoryServiceImpl implements InventoryService {
                 .setOnInsert("createdBy", auditor);
         InventoryItem result = mongoTemplate.findAndModify(query, update,
                 FindAndModifyOptions.options().returnNew(true).upsert(true), InventoryItem.class);
-        maybeDisarmLowStock(result);
+        stockEventPort.publishStockLevelChanged(result);
         return result;
     }
 

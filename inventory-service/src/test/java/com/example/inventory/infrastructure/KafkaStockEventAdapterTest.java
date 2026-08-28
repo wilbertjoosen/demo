@@ -24,7 +24,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class KafkaStockAlertAdapterTest {
+class KafkaStockEventAdapterTest {
 
     @Mock
     KafkaTemplate<String, Object> kafkaTemplate;
@@ -35,29 +35,28 @@ class KafkaStockAlertAdapterTest {
     @Captor
     ArgumentCaptor<DomainEvent> eventCaptor;
 
-    KafkaStockAlertAdapter adapter;
+    KafkaStockEventAdapter adapter;
 
     @BeforeEach
     void setUp() {
-        adapter = new KafkaStockAlertAdapter(kafkaTemplate, meterRegistry);
+        adapter = new KafkaStockEventAdapter(kafkaTemplate, meterRegistry);
     }
 
     @Test
-    void publishLowStock_sendsEventSatisfyingContractAndIncrementsCounter() {
-        when(meterRegistry.counter("inventory.lowstock.events")).thenReturn(counter);
+    void publishStockLevelChanged_sendsEventSatisfyingContractAndIncrementsCounter() {
+        when(meterRegistry.counter("inventory.stocklevel.changed.events")).thenReturn(counter);
         InventoryItem item = new InventoryItem("p1", "MAIN", 3);
 
-        adapter.publishLowStock(item, 10);
+        adapter.publishStockLevelChanged(item);
 
         verify(kafkaTemplate).send(eq(Topics.INVENTORY_EVENTS), eventCaptor.capture());
         DomainEvent event = eventCaptor.getValue();
-        assertThat(event.eventType()).isEqualTo(EventTypes.LOW_STOCK_DETECTED);
+        assertThat(event.eventType()).isEqualTo(EventTypes.STOCK_LEVEL_CHANGED);
         assertThat(event.orderId()).isNull();
         @SuppressWarnings("unchecked")
         Map<String, Object> payload = (Map<String, Object>) event.payload();
-        assertThat(payload).containsEntry("productId", "p1").containsEntry("warehouseId", "MAIN")
-                .containsEntry("quantity", 3).containsEntry("threshold", 10);
-        assertThat(EventContracts.missingFields(EventTypes.LOW_STOCK_DETECTED, payload)).isEmpty();
+        assertThat(payload).containsEntry("productId", "p1").containsEntry("warehouseId", "MAIN").containsEntry("quantity", 3);
+        assertThat(EventContracts.missingFields(EventTypes.STOCK_LEVEL_CHANGED, payload)).isEmpty();
         verify(counter).increment();
     }
 }

@@ -28,6 +28,16 @@ spring:
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
         spring.json.trusted.packages: "*"
+    streams:
+      application-id: inventory-service
+      # Same reasoning as reporting-service: a fresh instance's alertedStore (RocksDB) starts
+      # empty, and every STOCK_LEVEL_CHANGED event carries the full current quantity (not a
+      # delta), so replaying from earliest reconstructs the exact same edge-trigger history as if
+      # this instance had been running the whole time — Streams' default (latest) would silently
+      # miss any line that dipped below threshold before this instance started.
+      properties:
+        auto.offset.reset: earliest
+        state.dir: ${KAFKA_STREAMS_STATE_DIR:/tmp/kafka-streams/inventory-service}
 
 inventory:
   reorder:

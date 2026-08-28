@@ -39,6 +39,7 @@ public final class EventContracts {
             Map.entry(EventTypes.SHIPPING_FAILED, Set.of("email", "quantity")),
             Map.entry(EventTypes.DELIVERED, Set.of("email", "quantity")),
             Map.entry(EventTypes.DELIVERY_FAILED, Set.of("email", "quantity")),
+            Map.entry(EventTypes.STOCK_LEVEL_CHANGED, Set.of("productId", "warehouseId", "quantity")),
             Map.entry(EventTypes.LOW_STOCK_DETECTED, Set.of("productId", "warehouseId", "quantity", "threshold")));
 
     public static Set<String> requiredFields(String eventType) {
