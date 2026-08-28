@@ -23,6 +23,9 @@ public final class EventTypes {
     public static final String DELIVERED = "DELIVERED";
     public static final String DELIVERY_FAILED = "DELIVERY_FAILED";
 
+    /** Fired when a warehouse line crosses below its reorder threshold — edge-triggered, not level-triggered (see inventory-service's ReorderPolicy). */
+    public static final String LOW_STOCK_DETECTED = "LOW_STOCK_DETECTED";
+
     private EventTypes() {
     }
 }

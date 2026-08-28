@@ -34,7 +34,7 @@ public class NotificationListener {
 
     @KafkaListener(topics = {
             Topics.USER_EVENTS, Topics.PRODUCT_EVENTS, Topics.ORDER_EVENTS,
-            Topics.PAYMENT_EVENTS, Topics.SHIPPING_EVENTS, Topics.DELIVERY_EVENTS
+            Topics.PAYMENT_EVENTS, Topics.SHIPPING_EVENTS, Topics.DELIVERY_EVENTS, Topics.INVENTORY_EVENTS
     }, groupId = "notification-service")
     public void onEvent(DomainEvent event) {
         broadcast(event);
