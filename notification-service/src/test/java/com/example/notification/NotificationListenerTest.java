@@ -1,4 +1,5 @@
 package com.example.notification;
+import com.example.notification.mail.EmailDispatcher;
 import com.example.notification.saga.NotificationListener;
 import com.example.notification.websocket.NotificationWebSocketHandler;
 
@@ -13,7 +14,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
 
 import java.util.Map;
 
@@ -27,7 +27,7 @@ class NotificationListenerTest {
     @Mock
     NotificationWebSocketHandler webSocketHandler;
     @Mock
-    JavaMailSender mailSender;
+    EmailDispatcher emailDispatcher;
 
     NotificationListener notificationListener;
 
@@ -38,7 +38,7 @@ class NotificationListenerTest {
         // by hand rather than through a Spring context; DomainEvent.timestamp() is an Instant, and
         // a raw ObjectMapper can't serialize that without it.
         ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
-        notificationListener = new NotificationListener(webSocketHandler, mailSender, objectMapper);
+        notificationListener = new NotificationListener(webSocketHandler, emailDispatcher, objectMapper);
         setField("fallbackEmail", "admin@example.com");
         setField("fromEmail", "demo@example.com");
     }
@@ -57,7 +57,7 @@ class NotificationListenerTest {
 
         verify(webSocketHandler).broadcast(anyString());
         ArgumentCaptor<SimpleMailMessage> captor = ArgumentCaptor.forClass(SimpleMailMessage.class);
-        verify(mailSender).send(captor.capture());
+        verify(emailDispatcher).send(captor.capture());
         assertThat(captor.getValue().getTo()).containsExactly("buyer@example.com");
         assertThat(captor.getValue().getSubject()).contains("ORDER_CREATED").contains("order-1");
     }
@@ -69,7 +69,7 @@ class NotificationListenerTest {
         notificationListener.onEvent(event);
 
         ArgumentCaptor<SimpleMailMessage> captor = ArgumentCaptor.forClass(SimpleMailMessage.class);
-        verify(mailSender).send(captor.capture());
+        verify(emailDispatcher).send(captor.capture());
         assertThat(captor.getValue().getTo()).containsExactly("admin@example.com");
     }
 
@@ -81,7 +81,7 @@ class NotificationListenerTest {
         notificationListener.onEvent(event);
 
         ArgumentCaptor<SimpleMailMessage> captor = ArgumentCaptor.forClass(SimpleMailMessage.class);
-        verify(mailSender).send(captor.capture());
+        verify(emailDispatcher).send(captor.capture());
         SimpleMailMessage message = captor.getValue();
         assertThat(message.getTo()).containsExactly("buyer@example.com");
         assertThat(message.getSubject()).contains("Payment instructions").contains("order-1");
@@ -96,7 +96,7 @@ class NotificationListenerTest {
         notificationListener.onEvent(event);
 
         ArgumentCaptor<SimpleMailMessage> captor = ArgumentCaptor.forClass(SimpleMailMessage.class);
-        verify(mailSender).send(captor.capture());
+        verify(emailDispatcher).send(captor.capture());
         assertThat(captor.getValue().getText()).contains("in cash").contains("order-2");
     }
 

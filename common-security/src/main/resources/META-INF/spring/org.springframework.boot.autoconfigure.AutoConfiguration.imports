@@ -1,1 +1,2 @@
 com.example.common.mongo.MongoPoolAutoConfiguration
+com.example.common.kafka.KafkaTopicAutoConfiguration

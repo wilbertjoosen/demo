@@ -13,18 +13,13 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
 import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.kafka.config.TopicBuilder;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
-import org.springframework.context.annotation.Import;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
-import org.apache.kafka.clients.admin.NewTopic;
 
 import java.time.Duration;
 import java.util.Map;
@@ -43,35 +38,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * ({@link OrderSagaListener}'s {@code @KafkaListener} methods) rather than calling it directly —
  * OrderSagaListenerTest (unit) already pins the event-to-action mapping; this pins that the topic
  * names, consumer group, and JSON deserialization actually wire up end to end.
+ *
+ * <p>Used to pre-create payment/shipping/delivery-events itself (order-service never produces to
+ * them, only consumes, so unlike order-events they didn't exist yet when this test's context
+ * started — the already-running consumer's first metadata fetch would find no such topic, and
+ * could take a long time to notice Kafka auto-creating it on first publish). common-security's
+ * KafkaTopicAutoConfiguration now pre-creates every topic in {@link Topics} for every service that
+ * has Kafka on its classpath, order-service included, so that race is closed at the source and
+ * this test needs no topic setup of its own anymore.
  */
-@Import(OrderSagaIntegrationTest.PreCreatedTopics.class)
 class OrderSagaIntegrationTest extends AbstractIntegrationTest {
-
-    /**
-     * order-service never produces to payment/shipping/delivery-events (only consumes), so unlike
-     * order-events, these topics don't exist yet when this test's Spring context starts. Without
-     * pre-creating them, the consumer's very first metadata fetch finds no such topic; Kafka
-     * auto-creates it on first publish, but the already-running consumer can take a long time to
-     * notice — pre-creating via NewTopic beans (auto-applied by Spring Kafka's KafkaAdmin at context
-     * startup) avoids that race entirely.
-     */
-    @TestConfiguration
-    static class PreCreatedTopics {
-        @Bean
-        NewTopic paymentEventsTopic() {
-            return TopicBuilder.name(Topics.PAYMENT_EVENTS).partitions(1).replicas(1).build();
-        }
-
-        @Bean
-        NewTopic shippingEventsTopic() {
-            return TopicBuilder.name(Topics.SHIPPING_EVENTS).partitions(1).replicas(1).build();
-        }
-
-        @Bean
-        NewTopic deliveryEventsTopic() {
-            return TopicBuilder.name(Topics.DELIVERY_EVENTS).partitions(1).replicas(1).build();
-        }
-    }
 
     static WireMockServer inventoryService;
 
