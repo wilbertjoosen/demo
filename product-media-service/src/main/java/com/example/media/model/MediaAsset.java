@@ -8,10 +8,16 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.LastModifiedBy;
 import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
 
+/**
+ * findByProductIdAndDeletedFalseOrderByPositionAsc(productId) and
+ * countByProductIdAndDeletedFalse(productId).
+ */
+@CompoundIndex(def = "{'productId': 1, 'deleted': 1, 'position': 1}")
 @Document(collection = "media_assets")
 @Getter
 @NoArgsConstructor
