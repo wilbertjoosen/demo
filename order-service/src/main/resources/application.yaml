@@ -24,6 +24,19 @@ spring:
     username: ${DB_USERNAME:demo}
     password: ${DB_PASSWORD:demo}
     driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      pool-name: order-service-hikari
+      # Sized per pod, not per service — k8s-horizontal-scaling can run several order-service pods
+      # at once, each opening its own pool against the same MySQL instance, so this has to leave
+      # headroom under MySQL's max_connections rather than assume it's the only consumer.
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:15}
+      minimum-idle: ${DB_POOL_MIN_IDLE:5}
+      connection-timeout: ${DB_POOL_CONNECTION_TIMEOUT_MS:5000}
+      idle-timeout: ${DB_POOL_IDLE_TIMEOUT_MS:300000}
+      max-lifetime: ${DB_POOL_MAX_LIFETIME_MS:1200000}
+      # Logs a stack trace for any connection held > 30s instead of silently starving the pool —
+      # HikariCP ships this off by default.
+      leak-detection-threshold: ${DB_POOL_LEAK_DETECTION_MS:30000}
 
   jpa:
     hibernate:
