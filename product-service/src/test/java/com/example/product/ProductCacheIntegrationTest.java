@@ -16,6 +16,7 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.kafka.KafkaContainer;
 import org.testcontainers.mongodb.MongoDBContainer;
 import org.testcontainers.utility.DockerImageName;
 
@@ -44,6 +45,14 @@ class ProductCacheIntegrationTest {
     @Container
     @ServiceConnection
     static final GenericContainer<?> REDIS = new GenericContainer<>(DockerImageName.parse("redis:7-alpine")).withExposedPorts(6379);
+
+    // create()/update()/delete() all publish to Kafka — without a real broker, kafkaTemplate.send()
+    // times out after 60s and every test here fails, not just skips the publish. (Locally this can
+    // go unnoticed if an ambient Kafka happens to be running on localhost:9092 from
+    // local-infra.sh — CI has no such thing, which is exactly how this was missed initially.)
+    @Container
+    @ServiceConnection
+    static final KafkaContainer KAFKA = new KafkaContainer(DockerImageName.parse("apache/kafka:3.8.0"));
 
     @DynamicPropertySource
     static void shortTtlForThisTest(DynamicPropertyRegistry registry) {
