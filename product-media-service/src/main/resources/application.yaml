@@ -47,3 +47,22 @@ management:
 aws:
   s3:
     bucket-name: ${AWS_S3_BUCKET_NAME}
+    # Presigned uploads land here first, never directly in the production bucket above —
+    # MediaValidationListener is the only thing that moves an object from staging to production,
+    # and only after inspecting its actual bytes (see MediaContentValidator).
+    staging-bucket-name: ${AWS_S3_STAGING_BUCKET_NAME}
+
+media:
+  presigned-upload:
+    # Below this, a single presigned PUT; at or above it, real S3 multipart upload. 8MB keeps the
+    # multipart path exercised by anything but small images without forcing every tiny file through
+    # the extra create/complete round trips.
+    multipart-threshold-bytes: ${MEDIA_MULTIPART_THRESHOLD_BYTES:8388608}
+    # 5MB is S3's own minimum part size for every part but the last — going lower would make S3
+    # reject the multipart upload outright.
+    part-size-bytes: ${MEDIA_MULTIPART_PART_SIZE_BYTES:5242880}
+  multipart-cleanup:
+    # Hourly: frequent enough that an abandoned upload's staging storage doesn't linger long, cheap
+    # enough (ListMultipartUploads is a single call) not to matter at this scale.
+    cron: ${MEDIA_MULTIPART_CLEANUP_CRON:0 0 * * * *}
+    max-age: ${MEDIA_MULTIPART_CLEANUP_MAX_AGE:24h}

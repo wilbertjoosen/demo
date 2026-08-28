@@ -21,9 +21,11 @@ spec:
             - configMapRef: { name: demo-common-config }
             - secretRef: { name: pyroscope-agent }
             # AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY (read by the S3 SDK's default credential
-            # provider chain), AWS_S3_BUCKET_NAME (aws.s3.bucket-name), AWS_REGION
-            # (spring.cloud.aws.region.static, via config-server's shared config-repo) — created
-            # imperatively via Rancher's Secrets UI, never committed to git.
+            # provider chain), AWS_S3_BUCKET_NAME (aws.s3.bucket-name), AWS_S3_STAGING_BUCKET_NAME
+            # (aws.s3.staging-bucket-name — presigned uploads land here first, see
+            # MediaValidationListener), AWS_REGION (spring.cloud.aws.region.static, via
+            # config-server's shared config-repo) — created imperatively via Rancher's Secrets UI,
+            # never committed to git.
             - secretRef: { name: aws-credentials }
           env:
             - { name: EUREKA_INSTANCE_HOSTNAME, value: product-media-service }
