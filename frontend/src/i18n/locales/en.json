@@ -26,6 +26,7 @@
     "uploadFile": "Upload file",
     "typeAutoDetected": "Type is detected automatically from the file you choose.",
     "uploaded": "File uploaded — URL filled in below",
+    "uploadQueued": "Upload received — processing, will appear here shortly",
     "uploadError": "Could not upload file",
     "added": "Media added",
     "addError": "Could not add media",

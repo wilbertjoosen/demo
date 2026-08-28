@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { Delete, Clock } from '@element-plus/icons-vue'
 import { mediaApi } from '../../api/media'
 import { showApiError } from '../../composables/useApiError'
+import { uploadMediaDirectToS3 } from '../../composables/usePresignedMediaUpload'
 import RecordHistoryDialog from './RecordHistoryDialog.vue'
 import { detectMediaType } from '../../models'
 import type { MediaAsset, MediaType, Product } from '../../models'
@@ -42,17 +43,23 @@ watch(
   },
 )
 
-/** Upload IS the add action — one file picked attaches directly to the product, no separate URL step.
- * Type is auto-detected from the file's extension, not user-selected. */
+/**
+ * Upload IS the add action — one file picked attaches directly to the product, no separate URL
+ * step. Type is auto-detected from the file's extension, not user-selected.
+ *
+ * Goes straight to S3 (usePresignedMediaUpload) rather than through this service's own /upload
+ * endpoint — the resulting asset is PENDING_VALIDATION, not immediately visible in `load()`'s
+ * listing, until product-media-service's MediaValidationListener inspects the actual bytes and
+ * promotes it to ACTIVE (usually within a few seconds).
+ */
 async function uploadFile(rawFile: File) {
   if (!props.product) return false
   const type = detectMediaType(rawFile.name)
   form.type = type
   uploading.value = true
   try {
-    const data = await mediaApi.upload(rawFile)
-    await mediaApi.create({ productId: props.product.id, type, url: `${data.url}`, fileName: `${data.fileName}`, caption: form.caption || undefined })
-    ElMessage.success(t('media.added'))
+    await uploadMediaDirectToS3(rawFile, { productId: props.product.id, type, caption: form.caption || undefined })
+    ElMessage.success(t('media.uploadQueued'))
     form.caption = ''
     await load()
   } catch (error) {
