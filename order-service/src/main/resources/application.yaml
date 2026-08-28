@@ -69,6 +69,12 @@ spring:
     producer:
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
     consumer:
+      # earliest, not the client default of "latest": OrderSagaListener's consumer group is only
+      # ever a few hundred ms old on a fresh deploy (new group id, or first-ever startup) — with
+      # "latest" any payment/shipping/delivery event published before that group's initial
+      # partition assignment finishes is silently skipped forever rather than replayed, which is
+      # never acceptable for a saga step. Once the group has committed offsets this is a no-op.
+      auto-offset-reset: earliest
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
         spring.json.trusted.packages: "*"
