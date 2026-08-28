@@ -91,6 +91,16 @@
             <scope>provided</scope>
         </dependency>
         <dependency>
+            <!-- KafkaTopicAutoConfiguration needs NewTopic/TopicBuilder/KafkaAdmin to compile
+                 against. `provided`: every one of the 13 services that pulls in common-security and
+                 actually uses Kafka already supplies the real spring-boot-starter-kafka at runtime
+                 (chat-service and audit-service don't use Kafka at all — this autoconfiguration's
+                 @ConditionalOnClass(KafkaAdmin.class) just never activates for them). -->
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-kafka</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
             <!-- EndUserIdTracingFilter (an OncePerRequestFilter) needs jakarta.servlet types to
                  compile — common-security has no spring-boot-starter-web dependency of its own, only
                  spring-security-web (transitively, via spring-boot-starter-security), which doesn't
