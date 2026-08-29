@@ -1,0 +1,52 @@
+# In-cluster Redis for the demo-qa namespace. Previously QA pods reached out to the host
+# (docker-compose.qa.yml's redis-qa, via host.k3d.internal:6380) the same way prod does for its
+# own demo-redis — see docker-compose.yml's redis service comment for why that's now dev-only.
+# This Deployment replaces that cross-boundary hop for QA: pods resolve it in-cluster as
+# "redis" (ClusterIP Service, below), which is what k8s/configmap-common.yaml's REDIS_HOST now
+# points at. docker-compose.qa.yml's redis-qa container is untouched and still useful for
+# host-JVM debugging (redis-cli, a local IDE run) against QA — it's just no longer what the
+# cluster itself depends on.
+#
+# emptyDir, not a PersistentVolumeClaim: this only backs Resilience4j response caching, which is
+# fine to lose on pod restart — same "throwaway, nothing needs to survive a restart" reasoning
+# already used for the Vault dev-mode instance (see configmap-common.yaml).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: demo-qa
+  labels: { app: redis }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: redis } }
+  template:
+    metadata: { labels: { app: redis } }
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          ports: [{ containerPort: 6379 }]
+          volumeMounts:
+            - { name: data, mountPath: /data }
+          resources:
+            requests: { cpu: "50m", memory: "64Mi" }
+            limits: { cpu: "250m", memory: "192Mi" }
+          readinessProbe:
+            tcpSocket: { port: 6379 }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket: { port: 6379 }
+            initialDelaySeconds: 15
+            periodSeconds: 20
+      volumes:
+        - { name: data, emptyDir: {} }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: demo-qa
+spec:
+  selector: { app: redis }
+  ports: [{ name: redis, port: 6379, targetPort: 6379 }]

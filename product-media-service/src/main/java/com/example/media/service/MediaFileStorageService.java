@@ -2,6 +2,7 @@ package com.example.media.service;
 
 import com.example.media.dto.MediaFileResponse;
 import com.example.media.ports.StoragePort;
+import com.example.media.validation.MediaContentValidator;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -9,15 +10,10 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
-import java.util.Set;
 import java.util.UUID;
 
 @Service
 public final class MediaFileStorageService {
-
-    private static final Set<String> ALLOWED_EXTENSIONS = Set.of(
-            "jpg", "jpeg", "png", "gif", "webp", "mp4", "webm", "mov",
-            "pdf", "doc", "docx", "xls", "xlsx");
 
     private final String uploadDir;
     private final StoragePort storage;
@@ -30,7 +26,7 @@ public final class MediaFileStorageService {
 
     public MediaFileResponse store(MultipartFile file) throws IOException {
         String extension = extensionOf(file.getOriginalFilename());
-        if (!ALLOWED_EXTENSIONS.contains(extension)) {
+        if (!MediaContentValidator.ALLOWED_EXTENSIONS.contains(extension)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported file type: " + extension);
         }
         String fileName = UUID.randomUUID() + "." + extension;

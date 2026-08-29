@@ -7,6 +7,7 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.LastModifiedBy;
 import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
@@ -14,7 +15,10 @@ import java.time.Instant;
 /**
  * One-level-deep threading only ({@code parentId} points at a top-level comment, never another
  * reply) — enough to demonstrate the pattern without a recursive tree API.
+ *
+ * <p>Compound index serves findByProductIdAndDeletedFalseOrderByCreatedAtAsc(productId).
  */
+@CompoundIndex(def = "{'productId': 1, 'deleted': 1, 'createdAt': 1}")
 @Document(collection = "comments")
 @Getter
 @NoArgsConstructor

@@ -1,0 +1,15 @@
+# S3 key prefix (not a filesystem path — see ../demo/product-media-service.yaml). A QA-specific
+# prefix keeps QA's uploads separate from prod's within the same shared bucket.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: product-media-service
+  namespace: demo
+spec:
+  template:
+    spec:
+      containers:
+        - name: product-media-service
+          env:
+            - name: MEDIA_UPLOAD_DIR
+              value: media-uploads-qa

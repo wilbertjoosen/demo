@@ -29,6 +29,11 @@ spring:
       properties:
         spring.json.trusted.packages: "*"
 
+inventory:
+  reorder:
+    # Per-(productId, warehouseId) line: below this quantity, LOW_STOCK_DETECTED fires once (until restocked above it again).
+    threshold: ${INVENTORY_REORDER_THRESHOLD:10}
+
 eureka:
   client:
     service-url:

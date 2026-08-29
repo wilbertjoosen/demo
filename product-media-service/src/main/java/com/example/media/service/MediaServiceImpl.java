@@ -1,5 +1,6 @@
 package com.example.media.service;
 import com.example.media.enums.MediaType;
+import com.example.media.enums.MediaValidationStatus;
 import com.example.media.model.MediaAsset;
 import com.example.media.ports.StoragePort;
 import com.example.media.repository.MediaAssetRepository;
@@ -34,8 +35,38 @@ public class MediaServiceImpl implements MediaService {
     }
 
     @Override
-    public List<MediaAsset> listByProduct(String productId) {
+    public MediaAsset createPendingValidation(String productId, MediaType type, String stagingUrl, String fileName, String caption) {
+        int nextPosition = mediaAssetRepository.countByProductIdAndDeletedFalse(productId);
+        return mediaAssetRepository.save(new MediaAsset(
+                productId, type, stagingUrl, fileName, uploadDir, caption, nextPosition, MediaValidationStatus.PENDING_VALIDATION));
+    }
+
+    @Override
+    public void activate(String mediaAssetId, String productionUrl) {
+        MediaAsset mediaAsset = mediaAssetRepository.findByIdAndDeletedFalse(mediaAssetId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        mediaAsset.activate(productionUrl);
+        mediaAssetRepository.save(mediaAsset);
+    }
+
+    @Override
+    public void reject(String mediaAssetId) {
+        MediaAsset mediaAsset = mediaAssetRepository.findByIdAndDeletedFalse(mediaAssetId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        mediaAsset.reject();
+        mediaAsset.markDeleted();
+        mediaAssetRepository.save(mediaAsset);
+    }
+
+    @Override
+    public List<MediaAsset> listAllByProduct(String productId) {
         return mediaAssetRepository.findByProductIdAndDeletedFalseOrderByPositionAsc(productId);
+    }
+
+    @Override
+    public List<MediaAsset> listByProduct(String productId) {
+        return mediaAssetRepository.findByProductIdAndValidationStatusAndDeletedFalseOrderByPositionAsc(
+                productId, MediaValidationStatus.ACTIVE);
     }
 
     @Override

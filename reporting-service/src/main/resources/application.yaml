@@ -22,6 +22,10 @@ spring:
       properties:
         auto.offset.reset: earliest
         state.dir: ${KAFKA_STREAMS_STATE_DIR:/tmp/kafka-streams/reporting-service}
+        # Matches kafka.topics.partitions (common-security's KafkaTopicAutoConfiguration, default
+        # 3) — Streams assigns at most one thread per partition per input topic, so this only helps
+        # up to however many partitions the topics with the most partitions actually have.
+        num.stream.threads: ${KAFKA_STREAMS_THREADS:3}
 
 eureka:
   client:

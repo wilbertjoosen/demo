@@ -9,7 +9,7 @@ export type { PaymentMethod, PaymentMethodAvailability, PaymentStatus, Payment }
 export type { ShippingCarrier, TrackingStatus, TrackingEvent, ShipmentQuote, Shipment, ShipmentStatus } from './shipment'
 export type { Delivery, DeliveryStatus } from './delivery'
 export type { Comment } from './comment'
-export type { MediaAsset, MediaType } from './media'
+export type { MediaAsset, MediaType, MediaValidationStatus, PresignedUploadResponse, PresignedUploadPart } from './media'
 export type { ChatMessage } from './chatMessage'
 export { detectMediaType } from './media'
 export type { FieldChange, RecordHistoryAction, RecordHistoryEntry } from './auditHistory'

@@ -11,6 +11,8 @@ export function detectMediaType(filename: string): MediaType {
   return 'DOCUMENT'
 }
 
+export type MediaValidationStatus = 'PENDING_VALIDATION' | 'ACTIVE' | 'REJECTED'
+
 export interface MediaAsset {
   id: string
   productId: string
@@ -22,4 +24,23 @@ export interface MediaAsset {
   createdAt: string
   updatedAt: string
   deleted: boolean
+  validationStatus: MediaValidationStatus
+}
+
+/** One presigned URL per S3 multipart upload part. */
+export interface PresignedUploadPart {
+  partNumber: number
+  uploadUrl: string
+}
+
+/**
+ * Exactly one shape is populated, matching product-media-service's PresignedUploadResponse:
+ * `uploadUrl` alone for a single-PUT upload, or `uploadId`/`parts` for a multipart one.
+ */
+export interface PresignedUploadResponse {
+  key: string
+  uploadUrl: string | null
+  uploadId: string | null
+  parts: PresignedUploadPart[] | null
+  partSizeBytes: number | null
 }

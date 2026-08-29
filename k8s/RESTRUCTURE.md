@@ -1,8 +1,8 @@
 # k8s manifest layout — folder split + Kustomize
 
-**Status:** folder split done (#74, on `main`). Thin Kustomization files + ArgoCD switched to
-Kustomize mode — this file's PR. `demo-qa` overlay + propagation to `testing` / `develop` — see
-[Rollout](#rollout).
+**Status:** on `main` — folder split (#74) + thin Kustomization / ArgoCD Kustomize mode (#75).
+On `testing` — this file's PR adopts `main`'s `k8s/` tree and adds the `demo-qa` overlay + the CI
+`images:` automation. `develop` — still to do (see [Rollout](#rollout)).
 
 ---
 
@@ -58,16 +58,16 @@ what actually differs between prod and QA:
 
 ```
 k8s/demo-qa/
-├── kustomization.yaml
-├── configmap-common.yaml          # strategic-merge patch: the QA values (see table)
+├── kustomization.yaml             # namespace: demo-qa transformer + resources + patches
+├── configmap-common.yaml          # strategic-merge patch on ConfigMap/demo-common-config (8 keys)
 ├── kafka.yaml                     # QA-isolated infra — own copies, namespace: demo-qa
 ├── redis.yaml
 ├── mailpit.yaml
 ├── namespace.yaml                 # the demo-qa Namespace object
 └── patches/
-    ├── mongo-db-names.yaml        # MONGO_DB: <svc>_qa  for all 12 stateful services
-    ├── order-service.yaml         # canary step weights (kind is already Rollout in demo/)
-    └── vault.yaml                 # VAULT_TOKEN env on the services that read Vault
+    ├── mongo-db-names.yaml        # MONGO_DB: <svc>_qa  — 12 stateful services (order-service = Rollout)
+    ├── audit-es-index.yaml        # AUDIT_ES_INDEX: audit-log-qa  (QA-only env var)
+    └── media-upload-dir.yaml      # MEDIA_UPLOAD_DIR: media-uploads-qa
 ```
 
 ```yaml
@@ -81,15 +81,22 @@ resources:
   - kafka.yaml                      # ...plus QA's own kafka/redis/mailpit
   - redis.yaml
   - mailpit.yaml
-images:                             # QA runs its own tags, promoted to prod later
-  - { name: ghcr.io/wilbertjoosen/demo-order-service, newTag: <qa-tag> }
-  # ...one per service + frontend
 patches:
-  - path: configmap-common.yaml     # target: ConfigMap/demo-common-config
-  - path: patches/mongo-db-names.yaml
-  - path: patches/order-service.yaml
-  - path: patches/vault.yaml
+  - path: configmap-common.yaml     # patch bodies carry `namespace: demo`, matching ../demo at
+  - path: patches/mongo-db-names.yaml  #   patch time (the transformer above runs afterwards)
+  - path: patches/audit-es-index.yaml
+  - path: patches/media-upload-dir.yaml
+  - target: { kind: Ingress, name: demo-ingress }   # JSON patch: rules list has no merge key
+    patch: |
+      - { op: replace, path: /spec/rules/0/host, value: qa.demo.localhost }
+# images: — absent until QA runs ahead of prod. CI adds entries here (see CI section); each
+# overrides the tag inherited from ../demo in the demo-qa render only.
 ```
+
+No `order-service` or `vault` patch: the canary `strategy` and `VAULT_TOKEN` env are already
+identical in `../demo` (promoted from QA earlier), so the overlay inherits them unchanged.
+`eureka-server` (Pyroscope env, 512Mi) and `order-service` (nginx access-log sidecar) also come
+straight from `../demo` — QA gains those over its previous hand-maintained manifests.
 
 | Concern | `demo/` (prod) | `demo-qa/` overlay does |
 |---|---|---|

@@ -23,6 +23,12 @@ public final class EventTypes {
     public static final String DELIVERED = "DELIVERED";
     public static final String DELIVERY_FAILED = "DELIVERY_FAILED";
 
+    /** Fired when a warehouse line drops below its reorder threshold — edge-triggered, see inventory-service's ReorderPolicy. */
+    public static final String LOW_STOCK_DETECTED = "LOW_STOCK_DETECTED";
+
+    /** A presigned direct-to-S3 upload landed in the staging bucket — see MediaValidationListener. */
+    public static final String MEDIA_STAGED = "MEDIA_STAGED";
+
     private EventTypes() {
     }
 }

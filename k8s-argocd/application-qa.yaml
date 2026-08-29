@@ -1,14 +1,11 @@
-# QA counterpart to application.yaml — same repo, but tracks the testing branch (whose k8s
-# manifests target namespace demo-qa and the isolated QA infra from docker-compose.qa.yml) instead
-# of main. Not applied by the demo-qa namespace's own kubectl apply — this is ArgoCD's own
-# Application CR, applied once into the argocd namespace to tell it what to sync and from where.
+# QA counterpart to application.yaml — same repo, tracks the testing branch instead of main.
+# Not applied by the demo-qa namespace's own kubectl apply — this is ArgoCD's own Application CR,
+# applied once into the argocd namespace to tell it what to sync and from where.
 #
-# PENDING (k8s/RESTRUCTURE.md step 3): once the testing branch adopts the layout, this becomes
-# `path: k8s/demo-qa` — a Kustomize overlay of k8s/demo (namespace: demo-qa transformer + QA image
-# tags + a few patches), the QA app tier only. Shared infra + monitoring stay owned by
-# application.yaml's `demo` Application (k8s/platform/**), which this Application must not re-sync.
-# Left as `path: k8s` for now so it keeps working against testing's still-flat layout until that
-# migration lands.
+# path: k8s/demo-qa is a Kustomize overlay of k8s/demo (namespace: demo-qa transformer + a
+# configmap-common patch + a few env patches; see its kustomization.yaml). Shared infra +
+# monitoring (k8s/platform/**) are owned by application.yaml's `demo` Application — this one must
+# not re-sync them, and doesn't: the overlay references ../demo only, never ../platform.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -19,7 +16,7 @@ spec:
   source:
     repoURL: https://github.com/wilbertjoosen/demo.git
     targetRevision: testing
-    path: k8s
+    path: k8s/demo-qa
   destination:
     server: https://kubernetes.default.svc
     namespace: demo-qa
