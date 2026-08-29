@@ -4,7 +4,7 @@
 production toolchain around them (CI/CD, GitOps, Kubernetes, observability) — built to show not just
 *how* each piece works, but *why* it exists.**
 
-[![CI/CD](https://github.com/wilbertjoosen/demo/actions/workflows/ci-cd.yml/badge.svg?branch=develop)](https://github.com/wilbertjoosen/demo/actions/workflows/ci-cd.yml)
+[![CI/CD](https://github.com/wilbertjoosen/demo/actions/workflows/ci-cd.yml/badge.svg?branch=main)](https://github.com/wilbertjoosen/demo/actions/workflows/ci-cd.yml)
 ![Java](https://img.shields.io/badge/Java-26-ED8B00?logo=openjdk&logoColor=white)
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4-6DB33F?logo=springboot&logoColor=white)
 ![Vue](https://img.shields.io/badge/Vue-3-4FC08D?logo=vuedotjs&logoColor=white)
@@ -15,8 +15,8 @@ production toolchain around them (CI/CD, GitOps, Kubernetes, observability) — 
 ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
 ![Environments](https://img.shields.io/badge/Environments-prod%20%2B%20QA-6f42c1)
 
-This is `testing` — the QA environment, one hop before production. Two other branches complete the
-picture: `develop` (day-to-day feature work, single local environment) and `main` (production). See
+This is `develop` — day-to-day feature work, single local environment. Two other branches complete
+the picture: `testing` (the QA environment, one hop before production) and `main` (production). See
 [Branch model & release flow](#branch-model--release-flow) for how a change moves between them.
 
 ---
