@@ -85,7 +85,7 @@ images:
   - name: ghcr.io/wilbertjoosen/demo-product-comment-service
     newTag: 1.0.1-9dd2a67
   - name: ghcr.io/wilbertjoosen/demo-product-media-service
-    newTag: 1.1.0-9dd2a67
+    newTag: 1.1.0-24a0aaf
   - name: ghcr.io/wilbertjoosen/demo-product-review-service
     newTag: 1.0.1-9dd2a67
   - name: ghcr.io/wilbertjoosen/demo-chat-service
