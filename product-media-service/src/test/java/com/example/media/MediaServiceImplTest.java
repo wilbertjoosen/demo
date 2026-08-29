@@ -1,6 +1,7 @@
 package com.example.media;
 
 import com.example.media.enums.MediaType;
+import com.example.media.enums.MediaValidationStatus;
 import com.example.media.model.MediaAsset;
 import com.example.media.ports.StoragePort;
 import com.example.media.repository.MediaAssetRepository;
@@ -80,11 +81,58 @@ class MediaServiceImplTest {
     }
 
     @Test
-    void listByProduct_returnsOrderedAssets() {
+    void listByProduct_returnsOnlyActiveOrderedAssets() {
+        List<MediaAsset> assets = List.of(new MediaAsset("p1", MediaType.PHOTO, "u1", "c1", UPLOAD_DIR, "caption", 0));
+        when(mediaAssetRepository.findByProductIdAndValidationStatusAndDeletedFalseOrderByPositionAsc("p1", MediaValidationStatus.ACTIVE))
+                .thenReturn(assets);
+
+        assertThat(mediaService.listByProduct("p1")).isEqualTo(assets);
+    }
+
+    @Test
+    void listAllByProduct_includesEveryValidationStatus() {
         List<MediaAsset> assets = List.of(new MediaAsset("p1", MediaType.PHOTO, "u1", "c1", UPLOAD_DIR, "caption", 0));
         when(mediaAssetRepository.findByProductIdAndDeletedFalseOrderByPositionAsc("p1")).thenReturn(assets);
 
-        assertThat(mediaService.listByProduct("p1")).isEqualTo(assets);
+        assertThat(mediaService.listAllByProduct("p1")).isEqualTo(assets);
+    }
+
+    @Test
+    void createPendingValidation_setsStatusAndStagingUrl() {
+        when(mediaAssetRepository.countByProductIdAndDeletedFalse("p1")).thenReturn(0);
+        when(mediaAssetRepository.save(any(MediaAsset.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        MediaAsset asset = mediaService.createPendingValidation(
+                "p1", MediaType.PHOTO, "https://staging.example.com/img.jpg", "img.jpg", "caption");
+
+        assertThat(asset.getValidationStatus()).isEqualTo(MediaValidationStatus.PENDING_VALIDATION);
+        assertThat(asset.getUrl()).isEqualTo("https://staging.example.com/img.jpg");
+    }
+
+    @Test
+    void activate_setsActiveStatusAndProductionUrl() {
+        MediaAsset asset = new MediaAsset("p1", MediaType.PHOTO, "https://staging/img.jpg", "img.jpg", UPLOAD_DIR,
+                "caption", 0, MediaValidationStatus.PENDING_VALIDATION);
+        when(mediaAssetRepository.findByIdAndDeletedFalse("m1")).thenReturn(Optional.of(asset));
+
+        mediaService.activate("m1", "https://production/img.jpg");
+
+        assertThat(asset.getValidationStatus()).isEqualTo(MediaValidationStatus.ACTIVE);
+        assertThat(asset.getUrl()).isEqualTo("https://production/img.jpg");
+        verify(mediaAssetRepository).save(asset);
+    }
+
+    @Test
+    void reject_marksRejectedAndSoftDeletes() {
+        MediaAsset asset = new MediaAsset("p1", MediaType.PHOTO, "https://staging/img.jpg", "img.jpg", UPLOAD_DIR,
+                "caption", 0, MediaValidationStatus.PENDING_VALIDATION);
+        when(mediaAssetRepository.findByIdAndDeletedFalse("m1")).thenReturn(Optional.of(asset));
+
+        mediaService.reject("m1");
+
+        assertThat(asset.getValidationStatus()).isEqualTo(MediaValidationStatus.REJECTED);
+        assertThat(asset.isDeleted()).isTrue();
+        verify(mediaAssetRepository).save(asset);
     }
 
     @Test

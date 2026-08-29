@@ -26,6 +26,7 @@
     "uploadFile": "Subir archivo",
     "typeAutoDetected": "El tipo se detecta automáticamente según el archivo elegido.",
     "uploaded": "Archivo subido — URL completada abajo",
+    "uploadQueued": "Subida recibida — procesando, aparecerá aquí en breve",
     "uploadError": "No se pudo subir el archivo",
     "added": "Contenido añadido",
     "addError": "No se pudo añadir el contenido",

@@ -1,5 +1,6 @@
 package com.example.media.model;
 import com.example.media.enums.MediaType;
+import com.example.media.enums.MediaValidationStatus;
 
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -49,6 +50,14 @@ public class MediaAsset {
     private boolean deleted = false;
     private Instant deletedAt;
 
+    /**
+     * ACTIVE by default: the old direct-through-the-backend upload path (MediaFileStorageService)
+     * already has the file's bytes in this JVM before ever calling create() — nothing to stage or
+     * validate asynchronously. Only assets from the presigned upload flow start at
+     * PENDING_VALIDATION (see the other constructor and MediaValidationListener).
+     */
+    private MediaValidationStatus validationStatus = MediaValidationStatus.ACTIVE;
+
     public MediaAsset(String productId, MediaType type, String url, String fileMame, String path, String caption, int position) {
         this.productId = productId;
         this.type = type;
@@ -57,6 +66,24 @@ public class MediaAsset {
         this.path = path;
         this.caption = caption;
         this.position = position;
+    }
+
+    /** Presigned upload flow: starts PENDING_VALIDATION, {@code url} points at the staging bucket until {@link #activate}. */
+    public MediaAsset(String productId, MediaType type, String stagingUrl, String fileMame, String path, String caption,
+            int position, MediaValidationStatus validationStatus) {
+        this(productId, type, stagingUrl, fileMame, path, caption, position);
+        this.validationStatus = validationStatus;
+    }
+
+    /** Validation passed: the object has been copied to the production bucket at {@code productionUrl}. */
+    public void activate(String productionUrl) {
+        this.url = productionUrl;
+        this.validationStatus = MediaValidationStatus.ACTIVE;
+    }
+
+    /** Validation failed — the staging object is deleted by the caller; this just records the outcome. */
+    public void reject() {
+        this.validationStatus = MediaValidationStatus.REJECTED;
     }
 
     public void markDeleted() {

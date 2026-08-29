@@ -22,7 +22,7 @@ public class MediaProvisioningListener {
     public void onProductEvent(DomainEvent event) {
         if (EventTypes.PRODUCT_DELETED.equals(event.eventType())) {
             String productId = (String) ((Map<?, ?>) event.payload()).get("productId");
-            List<MediaAsset> productMedia = mediaService.listByProduct(productId);
+            List<MediaAsset> productMedia = mediaService.listAllByProduct(productId);
             productMedia.stream().forEach(mediaAsset -> {
                 mediaService.delete(mediaAsset.getId());
             });
