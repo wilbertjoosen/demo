@@ -14,7 +14,7 @@ spec:
         - name: ghcr-pull-secret
       containers:
         - name: eureka-server
-          image: ghcr.io/wilbertjoosen/demo-eureka-server:1.0.1-061a4a9
+          image: ghcr.io/wilbertjoosen/demo-eureka-server:1.0.1-9dd2a67
           imagePullPolicy: Always
           # No configMapRef here (unlike every other app service) — eureka-server doesn't need
           # Kafka/MySQL/OTLP config, so it never picked up demo-common-config. It still needs the
