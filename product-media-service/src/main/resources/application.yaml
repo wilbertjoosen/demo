@@ -23,9 +23,6 @@ spring:
       max-file-size: 25MB
       max-request-size: 25MB
 
-media:
-  upload-dir: ${MEDIA_UPLOAD_DIR:media-uploads}
-
 eureka:
   client:
     service-url:
@@ -53,6 +50,7 @@ aws:
     staging-bucket-name: ${AWS_S3_STAGING_BUCKET_NAME}
 
 media:
+  upload-dir: ${MEDIA_UPLOAD_DIR:media-uploads}
   presigned-upload:
     # Below this, a single presigned PUT; at or above it, real S3 multipart upload. 8MB keeps the
     # multipart path exercised by anything but small images without forcing every tiny file through
