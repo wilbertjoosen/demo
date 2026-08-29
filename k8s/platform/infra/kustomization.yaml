@@ -5,7 +5,11 @@ resources:
   - kafka.yaml
   - keycloak.yaml
   - mailpit.yaml
-  - mongo.yaml
+  - mongo-configsvr.yaml
+  - mongo-shard0.yaml
+  - mongo-shard1.yaml
+  - mongo-mongos.yaml
+  - mongo-cluster-init-job.yaml
   - mysql.yaml
   - promtail-daemonset.yaml
   - redis.yaml

@@ -1,0 +1,125 @@
+# One-shot cluster bring-up, in dependency order: initiate the config server replica set, initiate
+# each shard's replica set, then (once mongos has something to route to) register both shards and
+# shard the two highest-write collections this cluster actually has — inventory-service's
+# `inventory` (reserve/release/addStock on every order) and order-service's `order-view` (the CQRS
+# read side, kept in sync by the same saga events on every order status change).
+#
+# Shard keys deliberately demonstrate two different strategies:
+#   - inventory: {productId: 1, warehouseId: 1} — ranged/compound, the collection's own natural
+#     composite key (see InventoryItem's javadoc) — productId already distributes reasonably, no
+#     need to hash it, and a ranged key keeps a single product's warehouse lines chunk-adjacent.
+#   - order-view: {keycloakUserId: "hashed"} — hashed, because keycloakUserId is the natural
+#     query key (findByKeycloakUserIdAndDeletedFalse) but isn't guaranteed to distribute evenly on
+#     its own; hashing spreads writes across both shards regardless of the actual ID values.
+#
+# Safe to re-run in full: every step either checks for existing state first or catches the
+# already-done error, same pattern as the original mongo-rs-init Job this one replaces.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: mongo-cluster-init
+  namespace: infra
+spec:
+  backoffLimit: 5
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: mongo-cluster-init
+          image: mongo:7
+          command:
+            - bash
+            - -c
+            - |
+              wait_for() {
+                until mongosh --host "$1" --port "$2" --quiet --eval "db.runCommand({ping:1})" >/dev/null 2>&1; do
+                  echo "waiting for $1:$2..."; sleep 2
+                done
+              }
+
+              for host in mongo-configsvr-0.mongo-configsvr-headless mongo-configsvr-1.mongo-configsvr-headless mongo-configsvr-2.mongo-configsvr-headless; do
+                wait_for "$host" 27019
+              done
+              mongosh --host mongo-configsvr-0.mongo-configsvr-headless --port 27019 --quiet --eval '
+                try {
+                  rs.initiate({
+                    _id: "configsvr0",
+                    configsvr: true,
+                    members: [
+                      { _id: 0, host: "mongo-configsvr-0.mongo-configsvr-headless.infra.svc.cluster.local:27019" },
+                      { _id: 1, host: "mongo-configsvr-1.mongo-configsvr-headless.infra.svc.cluster.local:27019" },
+                      { _id: 2, host: "mongo-configsvr-2.mongo-configsvr-headless.infra.svc.cluster.local:27019" }
+                    ]
+                  });
+                  print("configsvr0 initiated");
+                } catch (e) { print("configsvr0 already initiated (or init failed): " + e); }
+              '
+
+              for host in mongo-shard0-0.mongo-shard0-headless mongo-shard0-1.mongo-shard0-headless; do
+                wait_for "$host" 27018
+              done
+              mongosh --host mongo-shard0-0.mongo-shard0-headless --port 27018 --quiet --eval '
+                try {
+                  rs.initiate({
+                    _id: "shard0rs",
+                    members: [
+                      { _id: 0, host: "mongo-shard0-0.mongo-shard0-headless.infra.svc.cluster.local:27018" },
+                      { _id: 1, host: "mongo-shard0-1.mongo-shard0-headless.infra.svc.cluster.local:27018" }
+                    ]
+                  });
+                  print("shard0rs initiated");
+                } catch (e) { print("shard0rs already initiated (or init failed): " + e); }
+              '
+
+              for host in mongo-shard1-0.mongo-shard1-headless mongo-shard1-1.mongo-shard1-headless; do
+                wait_for "$host" 27018
+              done
+              mongosh --host mongo-shard1-0.mongo-shard1-headless --port 27018 --quiet --eval '
+                try {
+                  rs.initiate({
+                    _id: "shard1rs",
+                    members: [
+                      { _id: 0, host: "mongo-shard1-0.mongo-shard1-headless.infra.svc.cluster.local:27018" },
+                      { _id: 1, host: "mongo-shard1-1.mongo-shard1-headless.infra.svc.cluster.local:27018" }
+                    ]
+                  });
+                  print("shard1rs initiated");
+                } catch (e) { print("shard1rs already initiated (or init failed): " + e); }
+              '
+
+              # mongos itself only comes up once configsvr0 has a primary — give it the same
+              # retry treatment rather than assuming it's already there.
+              wait_for mongos.infra.svc.cluster.local 27017
+
+              mongosh --host mongos.infra.svc.cluster.local --port 27017 --quiet --eval '
+                function addShardIfMissing(rsName, hosts) {
+                  try { sh.addShard(rsName + "/" + hosts); print(rsName + " added"); }
+                  catch (e) { print(rsName + " already added (or failed): " + e); }
+                }
+                addShardIfMissing("shard0rs", "mongo-shard0-0.mongo-shard0-headless.infra.svc.cluster.local:27018,mongo-shard0-1.mongo-shard0-headless.infra.svc.cluster.local:27018");
+                addShardIfMissing("shard1rs", "mongo-shard1-0.mongo-shard1-headless.infra.svc.cluster.local:27018,mongo-shard1-1.mongo-shard1-headless.infra.svc.cluster.local:27018");
+
+                function shardInventory(dbName) {
+                  sh.enableSharding(dbName);
+                  db.getSiblingDB(dbName).inventory.createIndex({ productId: 1, warehouseId: 1 });
+                  try {
+                    sh.shardCollection(dbName + ".inventory", { productId: 1, warehouseId: 1 });
+                    print(dbName + ".inventory sharded");
+                  } catch (e) { print(dbName + ".inventory already sharded (or failed): " + e); }
+                }
+                function shardOrderView(dbName) {
+                  sh.enableSharding(dbName);
+                  db.getSiblingDB(dbName)["order-view"].createIndex({ keycloakUserId: "hashed" });
+                  try {
+                    sh.shardCollection(dbName + ".order-view", { keycloakUserId: "hashed" });
+                    print(dbName + ".order-view sharded");
+                  } catch (e) { print(dbName + ".order-view already sharded (or failed): " + e); }
+                }
+
+                // demo (production) and demo-qa each get their own DB names on this same shared
+                // cluster (k8s/demo-qa/patches/mongo-db-names.yaml), so both need sharding.
+                shardInventory("inventory");
+                shardInventory("inventory_qa");
+                shardOrderView("orders");
+                shardOrderView("orders_qa");
+              '
