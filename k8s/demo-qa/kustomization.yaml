@@ -65,7 +65,7 @@ images:
   - name: ghcr.io/wilbertjoosen/demo-gateway-service
     newTag: 1.0.1-9dd2a67
   - name: ghcr.io/wilbertjoosen/demo-inventory-service
-    newTag: 1.0.1-9dd2a67
+    newTag: 1.0.1-ba926d7
   - name: ghcr.io/wilbertjoosen/demo-audit-service
     newTag: 1.0.1-9dd2a67
   - name: ghcr.io/wilbertjoosen/demo-user-service
@@ -73,7 +73,7 @@ images:
   - name: ghcr.io/wilbertjoosen/demo-product-service
     newTag: 1.0.1-9dd2a67
   - name: ghcr.io/wilbertjoosen/demo-order-service
-    newTag: 1.0.1-9dd2a67
+    newTag: 1.0.1-ba926d7
   - name: ghcr.io/wilbertjoosen/demo-payment-service
     newTag: 1.0.1-9dd2a67
   - name: ghcr.io/wilbertjoosen/demo-shipping-service
