@@ -10,6 +10,7 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.LastModifiedBy;
 import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
@@ -22,9 +23,13 @@ public class Payment {
     @Id
     private String id;
 
+    /** findByOrderId(orderId). */
+    @Indexed
     private String orderId;
     private String email;
     private PaymentMethod method;
+    /** findByStatus(status). */
+    @Indexed
     private PaymentStatus status;
     /** Set when status is FAILED because the method's mock gateway was unavailable, rather than a declined charge. */
     private String failureReason;
@@ -53,6 +58,7 @@ public class Payment {
     @LastModifiedBy
     private String lastModifiedBy;
 
+    @Indexed
     private boolean deleted = false;
     private Instant deletedAt;
 

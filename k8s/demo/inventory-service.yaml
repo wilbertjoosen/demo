@@ -53,3 +53,28 @@ metadata:
 spec:
   selector: { app: inventory-service }
   ports: [{ name: http, port: 8089, targetPort: 8089 }]
+---
+# Same reasoning as gateway-service.yaml's HPA (see there for the full explanation) — every
+# order-service reserve() call round-trips through here, and it's the sole authority for stock, so
+# it's worth scaling out under load rather than becoming the bottleneck the whole saga waits on.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: inventory-service
+  namespace: demo
+  labels: { monitored: "true" }
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: inventory-service
+  minReplicas: 1
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource: { name: cpu, target: { type: Utilization, averageUtilization: 70 } }
+    - type: Resource
+      resource: { name: memory, target: { type: Utilization, averageUtilization: 80 } }
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300

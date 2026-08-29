@@ -55,3 +55,33 @@ metadata:
 spec:
   selector: { app: gateway-service }
   ports: [{ name: http, port: 8080, targetPort: 8080 }]
+---
+# Every request from the browser passes through this one service first, making it the most
+# load-sensitive Deployment in the whole namespace — starts at the existing single replica,
+# scales out under real load instead of needing a manual redeploy to bump replicas. Relies on
+# metrics-server, which k3d/k3s bundles by default (not disabled anywhere in this repo's cluster
+# creation command — see k8s-local.sh) — without it the HPA applies fine but shows <unknown> for
+# current metrics and never actually scales.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: gateway-service
+  namespace: demo
+  labels: { monitored: "true" }
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: gateway-service
+  minReplicas: 1
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource: { name: cpu, target: { type: Utilization, averageUtilization: 70 } }
+    - type: Resource
+      resource: { name: memory, target: { type: Utilization, averageUtilization: 80 } }
+  behavior:
+    # Scale up fast (whatever the default is), scale down slow — a 5-minute window so a brief
+    # traffic dip doesn't immediately give back a replica right before the next spike needs it.
+    scaleDown:
+      stabilizationWindowSeconds: 300

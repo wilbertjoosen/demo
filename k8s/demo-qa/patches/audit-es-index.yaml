@@ -1,0 +1,15 @@
+# QA shares the prod Elasticsearch instance — a separate index keeps its audit trail out of
+# production's. This env var only exists in QA (prod audit-service uses the default index name).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: audit-service
+  namespace: demo
+spec:
+  template:
+    spec:
+      containers:
+        - name: audit-service
+          env:
+            - name: AUDIT_ES_INDEX
+              value: audit-log-qa

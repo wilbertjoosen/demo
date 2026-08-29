@@ -105,3 +105,31 @@ metadata:
 spec:
   selector: { app: order-service }
   ports: [{ name: http, port: 8084, targetPort: 8084 }]
+---
+# Same reasoning as gateway-service.yaml's HPA (see there for the full explanation), but
+# minReplicas: 2 not 1 — this Rollout already keeps 2 as its floor specifically so a canary step has
+# something to split between (see the comment above spec.replicas); the HPA has to respect that same
+# floor, not undercut it back to 1. Standard HPA works against a Rollout directly: Argo Rollouts
+# implements the same /scale subresource a Deployment does, exactly so ordinary autoscaling/v2 can
+# target it without any Rollout-specific autoscaling object.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: order-service
+  namespace: demo
+  labels: { monitored: "true" }
+spec:
+  scaleTargetRef:
+    apiVersion: argoproj.io/v1alpha1
+    kind: Rollout
+    name: order-service
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource: { name: cpu, target: { type: Utilization, averageUtilization: 70 } }
+    - type: Resource
+      resource: { name: memory, target: { type: Utilization, averageUtilization: 80 } }
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300

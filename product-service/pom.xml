@@ -101,6 +101,40 @@
             <scope>test</scope>
         </dependency>
         <dependency>
+            <!-- Real Redis + MongoDB + Kafka via Testcontainers for ProductCacheIntegrationTest and
+                 ProductReadPreferenceIntegrationTest — same pattern as order-service's
+                 AbstractIntegrationTest. Redis needs no dedicated testcontainers-redis artifact:
+                 RedisContainerConnectionDetailsFactory (in spring-boot-data-redis, already on the
+                 classpath via spring-boot-starter-data-redis) auto-detects any @ServiceConnection
+                 GenericContainer using a "redis" image. -->
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-testcontainers</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-mongodb</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <!-- ProductServiceImpl.create()/update()/delete() all publish to Kafka — without a real
+                 broker, kafkaTemplate.send() blocks for 60s then fails every test in this class. -->
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-kafka</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.awaitility</groupId>
+            <artifactId>awaitility</artifactId>
+            <version>4.3.0</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-devtools</artifactId>
             <optional>true</optional>

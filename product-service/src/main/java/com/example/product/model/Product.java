@@ -7,6 +7,7 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.LastModifiedBy;
 import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.math.BigDecimal;
@@ -37,6 +38,8 @@ public class Product {
     @LastModifiedBy
     private String lastModifiedBy;
 
+    /** findByDeletedFalse() / findByIdAndDeletedFalse() both filter on this. */
+    @Indexed
     private boolean deleted = false;
     private Instant deletedAt;
 

@@ -7,6 +7,8 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.LastModifiedBy;
 import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.index.CompoundIndexes;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
@@ -17,7 +19,18 @@ import java.time.Instant;
  * <p>Most mutations here go through {@code MongoTemplate.findAndModify} (atomic stock ops), which
  * bypasses Spring Data's auditing entity callbacks — {@code InventoryServiceImpl} sets
  * {@code lastModifiedBy}/{@code updatedAt} manually on those update paths instead.
+ *
+ * <p>Compound indexes serve findByProductIdAndDeletedFalse(productId) and
+ * findByProductIdAndWarehouseId(productId, warehouseId). The latter is also this document's own
+ * natural composite key and this collection's shard key (see
+ * k8s/platform/infra/mongo-cluster-init-job.yaml) — every reserve()/addStock() for a given
+ * product's line routes to a single shard and stays a single-document atomic
+ * {@code findAndModify}, never a cross-shard operation.
  */
+@CompoundIndexes({
+        @CompoundIndex(def = "{'productId': 1, 'deleted': 1}"),
+        @CompoundIndex(def = "{'productId': 1, 'warehouseId': 1}")
+})
 @Document(collection = "inventory")
 @Getter
 @NoArgsConstructor
@@ -46,6 +59,9 @@ public class InventoryItem {
 
     private boolean deleted = false;
     private Instant deletedAt;
+
+    /** Edge-trigger latch for LOW_STOCK_DETECTED — true once alerted, reset on restock above threshold. */
+    private boolean lowStockAlerted = false;
 
     public InventoryItem(String productId, String warehouseId, int quantity) {
         this.productId = productId;

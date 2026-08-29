@@ -7,10 +7,20 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.LastModifiedBy;
 import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.index.CompoundIndexes;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
 
+/**
+ * findByProductIdAndDeletedFalseOrderByCreatedAtDesc(productId) and
+ * findByProductIdAndKeycloakUserIdAndDeletedFalse(productId, keycloakUserId).
+ */
+@CompoundIndexes({
+        @CompoundIndex(def = "{'productId': 1, 'deleted': 1, 'createdAt': -1}"),
+        @CompoundIndex(def = "{'productId': 1, 'keycloakUserId': 1, 'deleted': 1}")
+})
 @Document(collection = "reviews")
 @Getter
 @NoArgsConstructor

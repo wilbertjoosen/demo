@@ -1,5 +1,20 @@
 server:
   port: 8084
+  tomcat:
+    threads:
+      # Spring Boot's own default (max 200, min-spare 10) sizes for a generic app with no idea
+      # what's downstream. This one has a specific bottleneck worth sizing against: every request
+      # either holds a JDBC connection (HikariCP's own default pool, unconfigured here, is 10) or
+      # blocks on the outbound WebClient call to inventory-service. Past ~4x the DB pool size,
+      # extra request threads just pile up waiting for a connection that isn't there — more
+      # context-switching, not more throughput. 40 leaves headroom for the inventory-service calls
+      # (which don't hold a DB connection while blocked) without going anywhere near 200.
+      max: ${SERVER_TOMCAT_THREADS_MAX:40}
+      min-spare: ${SERVER_TOMCAT_THREADS_MIN_SPARE:10}
+    # Requests beyond max-threads queue here instead of being refused outright — bounded so a
+    # sustained overload fails fast (503) rather than growing an unbounded queue of requests that'll
+    # time out anyway by the time they're served.
+    accept-count: ${SERVER_TOMCAT_ACCEPT_COUNT:50}
 
 spring:
   application:
@@ -24,6 +39,19 @@ spring:
     username: ${DB_USERNAME:demo}
     password: ${DB_PASSWORD:demo}
     driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      pool-name: order-service-hikari
+      # Sized per pod, not per service — k8s-horizontal-scaling can run several order-service pods
+      # at once, each opening its own pool against the same MySQL instance, so this has to leave
+      # headroom under MySQL's max_connections rather than assume it's the only consumer.
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:15}
+      minimum-idle: ${DB_POOL_MIN_IDLE:5}
+      connection-timeout: ${DB_POOL_CONNECTION_TIMEOUT_MS:5000}
+      idle-timeout: ${DB_POOL_IDLE_TIMEOUT_MS:300000}
+      max-lifetime: ${DB_POOL_MAX_LIFETIME_MS:1200000}
+      # Logs a stack trace for any connection held > 30s instead of silently starving the pool —
+      # HikariCP ships this off by default.
+      leak-detection-threshold: ${DB_POOL_LEAK_DETECTION_MS:30000}
 
   jpa:
     hibernate:
@@ -41,6 +69,12 @@ spring:
     producer:
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
     consumer:
+      # earliest, not the client default of "latest": OrderSagaListener's consumer group is only
+      # ever a few hundred ms old on a fresh deploy (new group id, or first-ever startup) — with
+      # "latest" any payment/shipping/delivery event published before that group's initial
+      # partition assignment finishes is silently skipped forever rather than replayed, which is
+      # never acceptable for a saga step. Once the group has committed offsets this is a no-op.
+      auto-offset-reset: earliest
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
         spring.json.trusted.packages: "*"

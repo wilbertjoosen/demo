@@ -2,7 +2,7 @@
 #
 # Kafka, Redis, MySQL, Keycloak, Mailpit, Vault, MongoDB, and Elasticsearch now all run IN this
 # cluster (k8s/kafka.yaml, k8s/redis.yaml, k8s/mysql.yaml, k8s/keycloak.yaml, k8s/mailpit.yaml,
-# k8s/vault.yaml, k8s/mongo.yaml, k8s/elasticsearch.yaml) instead of on the host — the
+# k8s/vault.yaml, k8s/platform/infra/mongo-*.yaml, k8s/elasticsearch.yaml) instead of on the host — the
 # corresponding docker-compose.yml containers still exist for host-JVM debugging (kcat, redis-cli,
 # mysql client, a local IDE run) but the cluster itself no longer depends on any of them. The
 # demo-qa namespace (testing branch) reaches these same in-cluster instances cross-namespace (e.g.
@@ -34,10 +34,14 @@ data:
   KEYCLOAK_JWK_SET_URI: http://keycloak.infra.svc.cluster.local:8080/realms/demo/protocol/openid-connect/certs
   KEYCLOAK_TOKEN_URI: http://keycloak.infra.svc.cluster.local:8080/realms/demo/protocol/openid-connect/token
   KEYCLOAK_ADMIN_URI: http://keycloak.infra.svc.cluster.local:8080/admin/realms/demo
-  # 3-node replica set (task #74), now in-cluster (k8s/mongo.yaml) — each member's own stable
-  # per-pod DNS name via the headless Service, no host.docker.internal indirection needed anymore.
-  MONGO_HOST: mongo-0.mongo-headless.infra.svc.cluster.local:27017,mongo-1.mongo-headless.infra.svc.cluster.local:27017,mongo-2.mongo-headless.infra.svc.cluster.local:27017
-  MONGO_REPLICA_SET_PARAM: "?replicaSet=rs0"
+  # Sharded cluster now (mongo-configsvr.yaml, mongo-shard0.yaml, mongo-shard1.yaml,
+  # mongo-mongos.yaml, mongo-cluster-init-job.yaml — replaces the single 3-node replica set from
+  # task #74) — every service talks to mongos, a single logical endpoint that transparently routes
+  # to whichever shard actually owns the data (or the unsharded collections' primary shard). No
+  # replicaSet param: that's meaningful for connecting directly to a replica set's members, not for
+  # a mongos connection, which handles that routing internally.
+  MONGO_HOST: mongos.infra.svc.cluster.local:27017
+  MONGO_REPLICA_SET_PARAM: ""
   REDIS_HOST: redis.infra.svc.cluster.local
   REDIS_PORT: "6379"
   ELASTICSEARCH_URI: http://elasticsearch.infra.svc.cluster.local:9200

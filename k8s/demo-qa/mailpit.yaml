@@ -1,0 +1,48 @@
+# In-cluster Mailpit for the demo-qa namespace — genuinely separate from prod's own copy
+# (main branch's k8s/mailpit.yaml), matching how it was already a separate host container per
+# environment (docker-compose.yml's mailpit vs docker-compose.qa.yml's mailpit-qa). Unlike
+# MySQL/Keycloak/Vault, Mailpit was never shared, so this isn't reached cross-namespace.
+#
+# emptyDir, not a PVC: Mailpit is a disposable local SMTP inbox for the demo — losing captured
+# emails on a pod restart is an acceptable, already-true-today tradeoff (the host container has no
+# volume mount either).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mailpit
+  namespace: demo-qa
+  labels: { app: mailpit }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: mailpit } }
+  template:
+    metadata: { labels: { app: mailpit } }
+    spec:
+      containers:
+        - name: mailpit
+          image: axllent/mailpit:latest
+          ports:
+            - { containerPort: 1025, name: smtp }
+            - { containerPort: 8025, name: http }
+          resources:
+            requests: { cpu: "25m", memory: "32Mi" }
+            limits: { cpu: "150m", memory: "128Mi" }
+          readinessProbe:
+            tcpSocket: { port: 8025 }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket: { port: 8025 }
+            initialDelaySeconds: 15
+            periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mailpit
+  namespace: demo-qa
+spec:
+  selector: { app: mailpit }
+  ports:
+    - { name: smtp, port: 1025, targetPort: 1025 }
+    - { name: http, port: 8025, targetPort: 8025 }

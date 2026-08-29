@@ -15,10 +15,9 @@ production toolchain around them (CI/CD, GitOps, Kubernetes, observability) — 
 ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
 ![Environments](https://img.shields.io/badge/Environments-prod%20%2B%20QA-6f42c1)
 
-This is `main` — **production**. Two other branches complete the picture: `develop` (day-to-day
-feature work, single local environment) and `testing` (the QA environment, one hop before
-production). See [Branch model & release flow](#branch-model--release-flow) for how a change moves
-between them.
+This is `develop` — day-to-day feature work, single local environment. Two other branches complete
+the picture: `testing` (the QA environment, one hop before production) and `main` (production). See
+[Branch model & release flow](#branch-model--release-flow) for how a change moves between them.
 
 ---
 

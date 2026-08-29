@@ -3,6 +3,7 @@ package com.example.notification.saga;
 import com.example.common.events.DomainEvent;
 import com.example.common.events.EventTypes;
 import com.example.common.events.Topics;
+import com.example.notification.mail.EmailDispatcher;
 import com.example.notification.websocket.NotificationWebSocketHandler;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -11,7 +12,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
@@ -22,7 +22,7 @@ import java.util.Map;
 public class NotificationListener {
 
     private final NotificationWebSocketHandler webSocketHandler;
-    private final JavaMailSender mailSender;
+    private final EmailDispatcher emailDispatcher;
     private final ObjectMapper objectMapper;
 
     /** Fallback recipient only for events with no specific user in scope (e.g. PRODUCT_CREATED — products aren't tied to a customer). */
@@ -32,10 +32,13 @@ public class NotificationListener {
     @Value("${notifications.mail.from-email:demo@example.com}")
     private String fromEmail;
 
+    // concurrency matches KafkaTopicAutoConfiguration's partition count (common-security) — Kafka
+    // only ever hands one consumer per partition per group, so this would silently do nothing
+    // against the broker's old 1-partition auto-create default (see that class's javadoc).
     @KafkaListener(topics = {
             Topics.USER_EVENTS, Topics.PRODUCT_EVENTS, Topics.ORDER_EVENTS,
-            Topics.PAYMENT_EVENTS, Topics.SHIPPING_EVENTS, Topics.DELIVERY_EVENTS
-    }, groupId = "notification-service")
+            Topics.PAYMENT_EVENTS, Topics.SHIPPING_EVENTS, Topics.DELIVERY_EVENTS, Topics.INVENTORY_EVENTS
+    }, groupId = "notification-service", concurrency = "${kafka.topics.partitions:3}")
     public void onEvent(DomainEvent event) {
         broadcast(event);
         emailFor(event);
@@ -54,7 +57,7 @@ public class NotificationListener {
         SimpleMailMessage message = EventTypes.PAYMENT_INSTRUCTIONS_REQUIRED.equals(event.eventType())
                 ? paymentInstructionsMessage(event, recipient)
                 : genericMessage(event, recipient);
-        mailSender.send(message);
+        emailDispatcher.send(message);
     }
 
     private SimpleMailMessage genericMessage(DomainEvent event, String recipient) {
