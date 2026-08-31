@@ -12,8 +12,10 @@ import com.example.common.security.ResourceServerSecurityConfig;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Import;
+import org.springframework.retry.annotation.EnableRetry;
 
 @SpringBootApplication
+@EnableRetry
 @Import({
         ResourceServerSecurityConfig.class, OpenApiConfig.class, MessageSourceConfig.class, ApiExceptionHandler.class,
         KafkaAuditEventRepository.class, AuditSchedulingConfig.class, RestCallAuditAspect.class,
