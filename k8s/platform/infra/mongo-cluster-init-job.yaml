@@ -24,11 +24,24 @@
 # isn't the specific already-done error, plus the shard-count assertion at the very end, are here
 # so the next occurrence fails this Job loudly (kubectl get jobs -n infra shows it) instead of
 # quietly degrading half the cluster's data.
+#
+# ArgoCD hook, not a plain synced resource (same reasoning as monitoring/kibana.yaml's
+# kibana-dashboard-init): a Job's spec.template is immutable, so once ArgoCD has applied this
+# once, every later sync of this file (already listed as a plain resource in this folder's
+# kustomization.yaml) tries to patch the completed Job in place and fails with "field is
+# immutable" — invisibly, since nothing else here depends on this Job succeeding on any given
+# sync. hook-delete-policy: BeforeHookCreation makes ArgoCD delete the previous run and create a
+# fresh one each sync instead of patching. PostSync (not PreSync) because this Job's own wait_for
+# retry loops already handle "the StatefulSets aren't ready yet" — it doesn't need ArgoCD to
+# sequence anything for it, just to stop trying to patch a finished Job.
 apiVersion: batch/v1
 kind: Job
 metadata:
   name: mongo-cluster-init
   namespace: infra
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
 spec:
   backoffLimit: 5
   template:
