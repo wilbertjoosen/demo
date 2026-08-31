@@ -105,10 +105,11 @@ spec:
             backend:
               service: { name: kibana, port: { number: 5601 } }
 ---
-# One-shot import, mirrors docker-compose.yml's kibana-dashboard-init container exactly (same
-# three-file loop, same curl command). Jobs have no native "wait for another Deployment's
-# readiness" primitive the way docker-compose's `depends_on: condition: service_healthy` does, so
-# an initContainer polls Kibana's own /api/status first.
+# One-shot import — same three-file loop, same curl command docker-compose.yml's now-removed
+# kibana-dashboard-init container used to run (this in-cluster Kibana is the only one left; see
+# docker-compose.yml's comment). Jobs have no native "wait for another Deployment's readiness"
+# primitive the way docker-compose's `depends_on: condition: service_healthy` did, so an
+# initContainer polls Kibana's own /api/status first.
 #
 # ArgoCD hook, not a plain synced resource: a Job's spec.template is immutable, so once ArgoCD has
 # applied this once, every later sync tries to patch the completed Job in place and fails with

@@ -331,10 +331,9 @@ if $DO_INFRA; then
     echo "Mailpit:        http://localhost:8025"
     echo "Kafka UI:       http://localhost:8095"
     echo "Elasticsearch:  http://localhost:9200"
-    echo "Kibana:         http://localhost:5601"
 fi
-# Grafana/Prometheus/Loki/Promtail/Tempo used to print here too — all fully in-cluster now (see
-# local-infra.sh's header comment), no docker-compose service left to point at.
+# Kibana/Grafana/Prometheus/Loki/Promtail/Tempo used to print here too — all fully in-cluster now
+# (see local-infra.sh's header comment), no docker-compose service left to point at.
 
 echo
 echo "Logs:           ./logs/"
