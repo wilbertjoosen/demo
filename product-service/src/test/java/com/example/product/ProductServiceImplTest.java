@@ -13,6 +13,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.domain.AuditorAware;
 import org.springframework.data.mongodb.core.FindAndModifyOptions;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -106,6 +107,29 @@ class ProductServiceImplTest {
         Map<String, Object> payload = (Map<String, Object>) published.payload();
         assertThat(payload).containsEntry("productId", "p1").containsEntry("sku", "SKU-1");
         assertThat(EventContracts.missingFields(EventTypes.PRODUCT_CREATED, payload)).isEmpty();
+    }
+
+    @Test
+    void create_duplicateSku_returnsExistingProductWithoutRepublishing() {
+        Product toSave = new Product("SKU-1", "Widget", new BigDecimal("9.99"));
+        Product existing = savedProduct("p1", "SKU-1", "Widget", new BigDecimal("9.99"));
+        when(productRepository.save(toSave)).thenThrow(new DuplicateKeyException("uniq_sku_active"));
+        when(productRepository.findBySkuAndDeletedFalse("SKU-1")).thenReturn(Optional.of(existing));
+
+        Product result = productService.create(toSave);
+
+        assertThat(result).isEqualTo(existing);
+        verifyNoInteractions(kafkaTemplate);
+    }
+
+    @Test
+    void create_duplicateKeyButProductGone_rethrowsOriginalException() {
+        Product toSave = new Product("SKU-1", "Widget", new BigDecimal("9.99"));
+        DuplicateKeyException original = new DuplicateKeyException("uniq_sku_active");
+        when(productRepository.save(toSave)).thenThrow(original);
+        when(productRepository.findBySkuAndDeletedFalse("SKU-1")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> productService.create(toSave)).isSameAs(original);
     }
 
     @Test
