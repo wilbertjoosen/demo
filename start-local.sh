@@ -137,6 +137,25 @@ wait_for_url() {
 # ================================================================
 
 if $DO_SERVICES; then
+    # product-media-service's StoragePort has no local-disk fallback (S3StorageAdapter is its only
+    # implementation) and these four have no defaults in its application.yaml — without them it
+    # fails at boot with a placeholder-resolution error, easy to miss among 17 other services'
+    # startup output. Warn instead of blocking the whole run: everything else works fine without them.
+    missing_aws_vars=()
+    for var in AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_S3_BUCKET_NAME AWS_S3_STAGING_BUCKET_NAME; do
+        if [ -z "${!var:-}" ]; then
+            missing_aws_vars+=("$var")
+        fi
+    done
+
+    if [ "${#missing_aws_vars[@]}" -gt 0 ]; then
+        echo
+        echo "⚠️  product-media-service needs real AWS S3 credentials — missing: ${missing_aws_vars[*]}"
+        echo "    It will fail to start without them (no local-disk fallback). Export them first,"
+        echo "    or ignore this if you don't need media upload this session."
+        echo
+    fi
+
     if compgen -G "$PID_DIR/*.pid" > /dev/null; then
         echo
         echo "⚠️  Local environment appears to already be running."
@@ -310,12 +329,12 @@ fi
 if $DO_INFRA; then
     echo "Keycloak:       http://keycloak.localhost:8081"
     echo "Mailpit:        http://localhost:8025"
-    echo "Kafka UI:       http://localhost:8099"
+    echo "Kafka UI:       http://localhost:8095"
     echo "Elasticsearch:  http://localhost:9200"
     echo "Kibana:         http://localhost:5601"
-    echo "Grafana:        http://localhost:3000"
-    echo "Prometheus:     http://localhost:9090"
 fi
+# Grafana/Prometheus/Loki/Promtail/Tempo used to print here too — all fully in-cluster now (see
+# local-infra.sh's header comment), no docker-compose service left to point at.
 
 echo
 echo "Logs:           ./logs/"

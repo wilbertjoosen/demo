@@ -4,7 +4,7 @@
 production toolchain around them (CI/CD, GitOps, Kubernetes, observability) — built to show not just
 *how* each piece works, but *why* it exists.**
 
-[![CI/CD](https://github.com/wilbertjoosen/demo/actions/workflows/ci-cd.yml/badge.svg?branch=develop)](https://github.com/wilbertjoosen/demo/actions/workflows/ci-cd.yml)
+[![CI/CD](https://github.com/wilbertjoosen/demo/actions/workflows/ci-cd.yml/badge.svg?branch=main)](https://github.com/wilbertjoosen/demo/actions/workflows/ci-cd.yml)
 ![Java](https://img.shields.io/badge/Java-26-ED8B00?logo=openjdk&logoColor=white)
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4-6DB33F?logo=springboot&logoColor=white)
 ![Vue](https://img.shields.io/badge/Vue-3-4FC08D?logo=vuedotjs&logoColor=white)
@@ -15,8 +15,8 @@ production toolchain around them (CI/CD, GitOps, Kubernetes, observability) — 
 ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
 ![Environments](https://img.shields.io/badge/Environments-prod%20%2B%20QA-6f42c1)
 
-This is `testing` — the QA environment, one hop before production. Two other branches complete the
-picture: `develop` (day-to-day feature work, single local environment) and `main` (production). See
+This is `develop` — day-to-day feature work, single local environment. Two other branches complete
+the picture: `testing` (the QA environment, one hop before production) and `main` (production). See
 [Branch model & release flow](#branch-model--release-flow) for how a change moves between them.
 
 ---
@@ -153,7 +153,7 @@ and the tool picked to solve it — click through to the real file.
 | **Micrometer** | Metrics instrumentation (+ Prometheus registry) | Every service exposes `/actuator/prometheus` for free — the entire [Observability](#observability) stack builds on this one dependency | every service |
 | **Micrometer&nbsp;Tracing** | Distributed tracing (OTel bridge) | Auto-injects `[traceId,spanId]` into every log line and exports spans over OTLP — a request across 4 services becomes one traceable timeline | `common-security/`, `gateway-service/` |
 | **Pyroscope&nbsp;Agent** | Continuous profiling (Java agent) | Answers "where is the CPU actually going" without attaching a profiler by hand — always-on, low-overhead JFR sampling | see [Observability](#observability) |
-| **spring-cloud-aws** | S3 + Secrets Manager client | `product-media-service`'s file storage backend | `product-media-service/` |
+| **spring-cloud-aws** | S3 client | `product-media-service`'s storage backend — the legacy proxy-through-the-backend upload and the newer direct-to-S3 presigned upload (single-PUT or real multipart, browser talks to S3 directly, see [Patterns demonstrated](#patterns-demonstrated)) both land in a staging bucket first; a Kafka listener content-sniffs the bytes and promotes to the production bucket via `CopyObject` | `product-media-service/` |
 
 ### Frontend
 
@@ -232,7 +232,7 @@ k8s Deployment.
 | `chat-service` | 8094 | MongoDB | Public per-product chat rooms **and** private user-to-user direct messages (JWT-authenticated WebSocket, delivery/read receipts, typing indicators) |
 | `reporting-service` | 8095 | Kafka Streams (materialized state stores) | Consumes every domain event and maintains live aggregates (top products, order revenue, user growth, saga health) for the frontend's reporting dashboard |
 | `product-comment-service` | 8091 | MongoDB | Product comments, ownership-enforced editing |
-| `product-media-service` | 8092 | MongoDB + local disk | Product photos/videos/documents, file upload |
+| `product-media-service` | 8092 | MongoDB + S3 | Product photos/videos/documents; direct-to-S3 upload via presigned URLs (single-PUT or multipart by file size), staged in a separate bucket and magic-byte-validated before promotion to production |
 | `product-review-service` | 8093 | MongoDB | Product ratings/reviews |
 | `common-service` | 8096 | MongoDB | Deployed reference-data service (countries today) shared by other services over REST — not to be confused with the `common-*` compile-time library modules below |
 | `common-security` | — | — | Shared JWT resource-server config, reused by every service |
@@ -292,6 +292,16 @@ is a partial or pragmatic fit rather than textbook.
 - **Aspect-Oriented Programming** — `common-audit`'s `RestCallAuditAspect` captures every REST call's
   request/response with one `@Around` advice, instead of every controller method calling an audit
   helper by hand.
+- **Ports & Adapters (Hexagonal)** — `product-media-service` (`StoragePort`/`S3StorageAdapter`,
+  `PresignedUploadPort`/`S3PresignedUploadAdapter`, `MediaValidationPort`/`S3MediaValidationAdapter`)
+  and `inventory-service` (`StockAlertPort`/`KafkaStockAlertAdapter`) put a narrow interface between
+  service code and the concrete infra (AWS SDK, Kafka producer) behind it, so the adapter can be
+  swapped or mocked without touching business logic — the newer of the two services deliberately
+  copies the older one's shape, per its own commit message.
+- **Strategy** — `inventory-service`'s `ReorderPolicy` interface (`FixedThresholdReorderPolicy`)
+  decides whether a warehouse line "needs restocking" behind a swappable interface, so an
+  alternative policy (percentage of capacity, sales-velocity based, per-category thresholds) can
+  replace it without touching `InventoryServiceImpl`.
 
 **SOLID**
 
@@ -347,6 +357,16 @@ cd frontend && npm install && npm run dev
 ```
 
 Frontend: http://localhost:5173
+
+> **`product-media-service` needs real AWS S3 credentials, every time.** `StoragePort`'s only
+> implementation is `S3StorageAdapter` — there's no local-disk fallback, and no LocalStack in this
+> stack — so `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_S3_BUCKET_NAME`, and
+> `AWS_S3_STAGING_BUCKET_NAME` have no defaults in `application.yaml` and must be exported *before*
+> starting it, or it fails at boot with a placeholder-resolution error (easy to miss — it just shows
+> up as that one service's `logs/product-media-service.log` never reaching `wait_for_url`, or
+> `service.pid` with a dead process behind it). `./start-local.sh` prints a warning up front if any
+> are missing rather than failing the whole run. `AWS_REGION` defaults to `us-east-1`
+> (`config-server/src/main/resources/config-repo/application.yml`) if unset.
 
 > **Startup ordering — matters when you launch services by hand (separate terminals or IDE run
 > configs).** Bring them up in this order, waiting for each stage to be healthy before the next:
@@ -888,10 +908,11 @@ demo/
 │   product-comment-service/, product-media-service/, product-review-service/
 ├── frontend/                # Vue 3 SPA
 ├── docker/                  # Keycloak realms (demo + demo-qa), Grafana/Kibana/Prometheus provisioning
-├── k8s/                     # Kubernetes manifests — prod content on main, QA content on testing
+├── k8s/                     # Kustomize tree: kustomization.yaml -> platform/ (namespaces + infra +
+│                             # monitoring, one copy) + demo/ (app tier); demo-qa/ is testing's thin
+│                             # overlay of demo/ — see k8s/RESTRUCTURE.md
 ├── k8s-argocd/              # ArgoCD Application CRs + ingress, applied once by hand, not GitOps-synced
 ├── docker-compose.yml       # full local stack (prod infra + every service + frontend)
-├── docker-compose.qa.yml    # QA-only infra (Kafka/Redis/Mailpit); MySQL/Mongo/ES/Keycloak are shared
 ├── .github/workflows/       # CI/CD: test -> build & push to GHCR -> bump k8s manifests
 └── pom.xml                  # Maven reactor parent
 ```

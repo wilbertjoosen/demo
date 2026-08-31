@@ -14,7 +14,7 @@ spec:
         - name: ghcr-pull-secret
       containers:
         - name: gateway-service
-          image: ghcr.io/wilbertjoosen/demo-gateway-service:1.0.1-061a4a9
+          image: ghcr.io/wilbertjoosen/demo-gateway-service:1.0.1-604f8c5
           imagePullPolicy: Always
           ports: [{ containerPort: 8080 }]
           envFrom:
