@@ -20,6 +20,9 @@ import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.http.HttpStatus;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -85,8 +88,14 @@ public class OrderServiceImpl implements OrderService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
     }
 
+    // Retries a genuine lost-update conflict (concurrent write to the same order — e.g. a saga
+    // event landing while a user cancels) by re-reading and reapplying, rather than surfacing it
+    // to the caller. Only takes effect on calls that go through the Spring proxy — self-invocation
+    // (cancelAndReleaseStock calling advanceStatus directly) bypasses it, same as @Transactional
+    // already does for that call today.
     @Override
     @Transactional
+    @Retryable(retryFor = ObjectOptimisticLockingFailureException.class, maxAttempts = 3, backoff = @Backoff(delay = 50))
     public void advanceStatus(Long orderId, OrderStatus newStatus) {
         Order order = orderRepository.findById(orderId).orElse(null);
         if (order == null) {
@@ -116,6 +125,7 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional
+    @Retryable(retryFor = ObjectOptimisticLockingFailureException.class, maxAttempts = 3, backoff = @Backoff(delay = 50))
     public OrderView cancelOrder(String keycloakUserId, Long orderId) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
@@ -131,6 +141,7 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional
+    @Retryable(retryFor = ObjectOptimisticLockingFailureException.class, maxAttempts = 3, backoff = @Backoff(delay = 50))
     public OrderView updateShippingAddress(String keycloakUserId, Long orderId, Address shippingAddress) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
@@ -150,6 +161,7 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional
+    @Retryable(retryFor = ObjectOptimisticLockingFailureException.class, maxAttempts = 3, backoff = @Backoff(delay = 50))
     public void delete(Long orderId) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
