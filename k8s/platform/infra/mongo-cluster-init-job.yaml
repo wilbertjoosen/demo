@@ -14,6 +14,16 @@
 #
 # Safe to re-run in full: every step either checks for existing state first or catches the
 # already-done error, same pattern as the original mongo-rs-init Job this one replaces.
+#
+# Incident (2026-08-31): a mass pod restart corrupted the configsvr replica set's own local.*
+# state, so this Job was re-run to recover it. Its addShard step failed for shard1rs (a stale
+# empty database on shard0 collided by name with shard1's real data) but the catch-and-print
+# swallowed it — the Job still reported 1/1 Complete, and every database that actually lived on
+# shard1 became silently invisible via mongos (not deleted, just unrouted) in both demo and
+# demo-qa, for every service, until discovered by chance. `set -e` + rethrowing anything that
+# isn't the specific already-done error, plus the shard-count assertion at the very end, are here
+# so the next occurrence fails this Job loudly (kubectl get jobs -n infra shows it) instead of
+# quietly degrading half the cluster's data.
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -31,6 +41,8 @@ spec:
             - bash
             - -c
             - |
+              set -euo pipefail
+
               wait_for() {
                 until mongosh --host "$1" --port "$2" --quiet --eval "db.runCommand({ping:1})" >/dev/null 2>&1; do
                   echo "waiting for $1:$2..."; sleep 2
@@ -52,7 +64,10 @@ spec:
                     ]
                   });
                   print("configsvr0 initiated");
-                } catch (e) { print("configsvr0 already initiated (or init failed): " + e); }
+                } catch (e) {
+                  if (!String(e).includes("already initialized")) { throw e; }
+                  print("configsvr0 already initiated");
+                }
               '
 
               for host in mongo-shard0-0.mongo-shard0-headless mongo-shard0-1.mongo-shard0-headless; do
@@ -68,7 +83,10 @@ spec:
                     ]
                   });
                   print("shard0rs initiated");
-                } catch (e) { print("shard0rs already initiated (or init failed): " + e); }
+                } catch (e) {
+                  if (!String(e).includes("already initialized")) { throw e; }
+                  print("shard0rs already initiated");
+                }
               '
 
               for host in mongo-shard1-0.mongo-shard1-headless mongo-shard1-1.mongo-shard1-headless; do
@@ -84,7 +102,10 @@ spec:
                     ]
                   });
                   print("shard1rs initiated");
-                } catch (e) { print("shard1rs already initiated (or init failed): " + e); }
+                } catch (e) {
+                  if (!String(e).includes("already initialized")) { throw e; }
+                  print("shard1rs already initiated");
+                }
               '
 
               # mongos itself only comes up once configsvr0 has a primary — give it the same
@@ -92,12 +113,26 @@ spec:
               wait_for mongos.infra.svc.cluster.local 27017
 
               mongosh --host mongos.infra.svc.cluster.local --port 27017 --quiet --eval '
-                function addShardIfMissing(rsName, hosts) {
-                  try { sh.addShard(rsName + "/" + hosts); print(rsName + " added"); }
-                  catch (e) { print(rsName + " already added (or failed): " + e); }
+                // A shard already being a member is silently idempotent (addShard just returns
+                // ok:1, no exception) - so anything this DOES catch is a real failure (e.g. a
+                // stale/empty database on one shard colliding by name with real data on another,
+                // see the 2026-08-31 incident above). Never swallow it.
+                function addShard(rsName, hosts) {
+                  sh.addShard(rsName + "/" + hosts);
+                  print(rsName + " added (or already a member)");
                 }
-                addShardIfMissing("shard0rs", "mongo-shard0-0.mongo-shard0-headless.infra.svc.cluster.local:27018,mongo-shard0-1.mongo-shard0-headless.infra.svc.cluster.local:27018");
-                addShardIfMissing("shard1rs", "mongo-shard1-0.mongo-shard1-headless.infra.svc.cluster.local:27018,mongo-shard1-1.mongo-shard1-headless.infra.svc.cluster.local:27018");
+                addShard("shard0rs", "mongo-shard0-0.mongo-shard0-headless.infra.svc.cluster.local:27018,mongo-shard0-1.mongo-shard0-headless.infra.svc.cluster.local:27018");
+                addShard("shard1rs", "mongo-shard1-0.mongo-shard1-headless.infra.svc.cluster.local:27018,mongo-shard1-1.mongo-shard1-headless.infra.svc.cluster.local:27018");
+
+                // Belt-and-suspenders: even if addShard above somehow failed without throwing,
+                // catch it here rather than let the rest of the script (and the app services
+                // depending on this cluster) silently run against a half-registered topology.
+                const shardCount = db.adminCommand({ listShards: 1 }).shards.length;
+                if (shardCount !== 2) {
+                  throw new Error("Expected 2 registered shards after addShard, found " + shardCount +
+                    " - check for a database name collision between shard0 and shard1 (see the 2026-08-31 incident comment above)");
+                }
+                print("shard count verified: " + shardCount);
 
                 function shardInventory(dbName) {
                   sh.enableSharding(dbName);
@@ -105,7 +140,10 @@ spec:
                   try {
                     sh.shardCollection(dbName + ".inventory", { productId: 1, warehouseId: 1 });
                     print(dbName + ".inventory sharded");
-                  } catch (e) { print(dbName + ".inventory already sharded (or failed): " + e); }
+                  } catch (e) {
+                    if (!String(e).includes("already")) { throw e; }
+                    print(dbName + ".inventory already sharded");
+                  }
                 }
                 function shardOrderView(dbName) {
                   sh.enableSharding(dbName);
@@ -113,7 +151,10 @@ spec:
                   try {
                     sh.shardCollection(dbName + ".order-view", { keycloakUserId: "hashed" });
                     print(dbName + ".order-view sharded");
-                  } catch (e) { print(dbName + ".order-view already sharded (or failed): " + e); }
+                  } catch (e) {
+                    if (!String(e).includes("already")) { throw e; }
+                    print(dbName + ".order-view already sharded");
+                  }
                 }
 
                 // demo (production) and demo-qa each get their own DB names on this same shared
