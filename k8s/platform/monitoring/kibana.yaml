@@ -2,18 +2,20 @@
 # ALREADY-existing in-cluster Elasticsearch (k8s/elasticsearch.yaml, "infra" namespace — the
 # same shared instance both demo and demo-qa write to) via the same cross-namespace FQDN pattern
 # used everywhere else in this split — Kibana itself is just a reader, so it stays in "monitoring"
-# rather than "infra". docker-compose's own Kibana/Elasticsearch stay as-is for the host-JVM/IDE
-# dev flow, same pattern as every other infra piece already moved in-cluster.
+# rather than "infra". This is now the only Kibana in the stack — docker-compose's own Kibana was
+# removed from the host-JVM/IDE dev flow (see docker-compose.yml's comment); Elasticsearch itself
+# stays there for audit-service's local writes, just without a UI in front of it.
 #
 # No PVC — Kibana itself is stateless (its saved objects live in Elasticsearch, not on disk), same
 # reasoning as k8s/mailpit.yaml having no volume.
 #
-# kibana-dashboards ConfigMap below holds all three dashboards docker-compose.yml's own
-# kibana-dashboard-init imports (see its own comment): audit-trail-dashboard.ndjson (combined
-# audit-log* view, both environments together), and the -prod/-qa variants (same panels, each
-# pinned to its own exact index instead of relying on a filter). All three generated verbatim from
+# kibana-dashboards ConfigMap below holds all three dashboards the kibana-dashboard-init Job
+# further down this file imports on every sync: audit-trail-dashboard.ndjson (combined audit-log*
+# view, both environments together), and the -prod/-qa variants (same panels, each pinned to its
+# own exact index instead of relying on a filter). All three generated verbatim from
 # docker/kibana/*.ndjson via `kubectl create configmap --from-file --dry-run=client -o yaml` rather
-# than hand-transcribed, and diffed byte-for-byte against the source files to confirm.
+# than hand-transcribed, and diffed byte-for-byte against the source files to confirm — that source
+# directory is still the one true copy, kept even though docker-compose's own Kibana is gone.
 apiVersion: v1
 data:
   audit-trail-dashboard-prod.ndjson: |
