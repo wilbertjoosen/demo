@@ -793,13 +793,14 @@ Every REST call across every service is captured (who, what, when, request/respo
 secrets redacted) and shipped to Elasticsearch — index `audit-log` for prod, `audit-log-qa` for QA
 (same shared in-cluster ES instance). The admin UI's history icons (Users, Products, Media, Chat)
 show the full change timeline with before/after diffs per field, powered by `audit-service`'s
-`RecordHistoryService`. Three Kibana dashboards cover the same data for ad-hoc querying, available
-both ways: **Kibana (k8s)** points at the in-cluster Elasticsearch — same shared instance both `demo`
-and `demo-qa` write to. **Kibana (host-JVM/compose)** stays as its own separate instance, pointed at
-`docker-compose.yml`'s own dev-only Elasticsearch. Both auto-import the same three dashboards on
-startup: **"Audit Trail"** (both environments together, for cross-environment searching), and
-**"Audit Trail — Production"** / **"Audit Trail — QA"**, each pinned to its own exact index instead
-of relying on a filter.
+`RecordHistoryService`. Three Kibana dashboards cover the same data for ad-hoc querying — the
+in-cluster Kibana, pointed at the same shared Elasticsearch both `demo` and `demo-qa` write to,
+auto-imports them on startup: **"Audit Trail"** (both environments together, for cross-environment
+searching), and **"Audit Trail — Production"** / **"Audit Trail — QA"**, each pinned to its own
+exact index instead of relying on a filter. There's no host-JVM/compose Kibana anymore — Elasticsearch
+itself still runs there for `audit-service`'s local writes (see [Quick start](#quick-start)), just
+without a UI in front of it; query it directly (`curl localhost:9200/audit-log/_search`) or point
+the in-cluster Kibana's Discover view at it manually if you need one locally.
 
 </details>
 
@@ -853,8 +854,7 @@ comment for why it extends `keycloak.v2` via `@import` rather than the more obvi
 | Prometheus (prod + QA) | http://prometheus.demo.localhost:18090 | — |
 | Loki (prod + QA) | http://loki.demo.localhost:18090 | — |
 | Tempo (prod + QA) | http://tempo.demo.localhost:18090 | — |
-| Kibana (host-JVM/compose) | http://localhost:5601 | — |
-| Kibana (k8s, prod + QA) | http://kibana.demo.localhost:18090 | — |
+| Kibana (k8s, prod + QA) | http://kibana.demo.localhost:18090 | — no host-JVM/compose Kibana anymore, see [Observability](#observability) |
 | Pyroscope (prod + QA) | http://pyroscope.demo.localhost:18090 | — continuous profiling, toggle per-env via `PYROSCOPE_AGENT_ENABLED` |
 | Kafka UI | http://localhost:8095 | prod Kafka only — QA's Kafka has no UI wired up |
 | Mailpit (SMTP inbox, prod) | http://localhost:8025 / http://mailpit.demo.localhost:18090 | — also where Grafana alert emails land |

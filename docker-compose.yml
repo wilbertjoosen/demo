@@ -155,35 +155,10 @@ services:
       timeout: 5s
       retries: 10
 
-  kibana:
-    image: docker.elastic.co/kibana/kibana:9.1.0
-    container_name: demo-kibana
-    restart: unless-stopped
-    environment:
-      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
-    ports:
-      - "5601:5601"
-    depends_on:
-      - elasticsearch
-    healthcheck:
-      test: ["CMD-SHELL", "curl -s http://localhost:5601/api/status | grep -q '\"level\":\"available\"'"]
-      interval: 10s
-      timeout: 5s
-      retries: 30
-
-  kibana-dashboard-init:
-    image: curlimages/curl:latest
-    container_name: demo-kibana-dashboard-init
-    restart: "no"
-    depends_on:
-      kibana:
-        condition: service_healthy
-    volumes:
-      - ./docker/kibana:/kibana:ro
-    # audit-trail-dashboard.ndjson is the combined view (audit-log* wildcard, both environments
-    # together); -prod/-qa are the same panels split into two dashboards, each pinned to its own
-    # exact index (audit-log / audit-log-qa) instead of relying on a reader to filter the combined one.
-    entrypoint: ["sh", "-c", "for f in audit-trail-dashboard audit-trail-dashboard-prod audit-trail-dashboard-qa; do curl -s -X POST http://kibana:5601/api/saved_objects/_import?overwrite=true -H 'kbn-xsrf: true' --form file=@/kibana/$$f.ndjson; done"]
+  # Kibana + its dashboard-import sidecar used to run here too — removed from the host-JVM/compose
+  # dev flow (in-cluster Kibana, k8s/platform/monitoring/kibana.yaml, is the only one left).
+  # docker/kibana/*.ndjson stays: it's still the source `kubectl create configmap --from-file`
+  # generates that in-cluster ConfigMap from, not dead now that this service is gone.
 
   # k3d pods no longer reach this container — they now talk to their own in-cluster Redis
   # (k8s/redis.yaml) instead of via host.k3d.internal, matching the switch already made for
