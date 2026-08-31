@@ -14,8 +14,15 @@ import com.example.common.model.ShippingCarrier;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.http.HttpStatus;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -32,6 +39,13 @@ public class OrderServiceImpl implements OrderService {
     private final InventoryServiceClient inventoryServiceClient;
     private final KafkaTemplate<String, Object> kafkaTemplate;
     private final MessageSource messageSource;
+    // order-view is sharded on keycloakUserId (see OrderView's javadoc), not _id — MongoRepository's
+    // save() upserts by filtering on _id alone, which MongoDB rejects on a sharded collection
+    // ("could not extract exact shard key") since that filter can't route the write to a shard.
+    // Every update below goes through MongoTemplate.upsert() instead, with keycloakUserId in the
+    // query so Mongo can target the write; a brand-new OrderView is inserted directly (insert()
+    // writes the whole document, shard key included, so no filter-targeting issue there).
+    private final MongoTemplate mongoTemplate;
 
     private String message(String key, Object... args) {
         return messageSource.getMessage(key, args, LocaleContextHolder.getLocale());
@@ -49,7 +63,7 @@ public class OrderServiceImpl implements OrderService {
         Order order = new Order(
                 keycloakUserId, email, productId, quantity, shippingAddress, paymentMethod, shippingCarrier, OrderStatus.PENDING_PAYMENT);
         order = orderRepository.save(order);
-        orderViewRepository.save(OrderView.from(order));
+        orderViewRepository.insert(OrderView.from(order));
 
         kafkaTemplate.send(Topics.ORDER_EVENTS, DomainEvent.of(EventTypes.ORDER_CREATED, order.getId().toString(), Map.of(
                 "userId", keycloakUserId,
@@ -74,8 +88,14 @@ public class OrderServiceImpl implements OrderService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
     }
 
+    // Retries a genuine lost-update conflict (concurrent write to the same order — e.g. a saga
+    // event landing while a user cancels) by re-reading and reapplying, rather than surfacing it
+    // to the caller. Only takes effect on calls that go through the Spring proxy — self-invocation
+    // (cancelAndReleaseStock calling advanceStatus directly) bypasses it, same as @Transactional
+    // already does for that call today.
     @Override
     @Transactional
+    @Retryable(retryFor = ObjectOptimisticLockingFailureException.class, maxAttempts = 3, backoff = @Backoff(delay = 50))
     public void advanceStatus(Long orderId, OrderStatus newStatus) {
         Order order = orderRepository.findById(orderId).orElse(null);
         if (order == null) {
@@ -84,7 +104,7 @@ public class OrderServiceImpl implements OrderService {
         order.setStatus(newStatus);
         orderViewRepository.findById(orderId.toString()).ifPresent(view -> {
             view.setStatus(newStatus);
-            orderViewRepository.save(view);
+            updateOrderView(view, Update.update("status", newStatus).set("updatedAt", view.getUpdatedAt()));
         });
         kafkaTemplate.send(Topics.ORDER_EVENTS, DomainEvent.of(EventTypes.ORDER_STATUS_CHANGED, orderId.toString(), Map.of(
                 "status", newStatus.name(),
@@ -105,6 +125,7 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional
+    @Retryable(retryFor = ObjectOptimisticLockingFailureException.class, maxAttempts = 3, backoff = @Backoff(delay = 50))
     public OrderView cancelOrder(String keycloakUserId, Long orderId) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
@@ -120,6 +141,7 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional
+    @Retryable(retryFor = ObjectOptimisticLockingFailureException.class, maxAttempts = 3, backoff = @Backoff(delay = 50))
     public OrderView updateShippingAddress(String keycloakUserId, Long orderId, Address shippingAddress) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
@@ -132,20 +154,30 @@ public class OrderServiceImpl implements OrderService {
         order.setShippingAddress(shippingAddress);
         orderViewRepository.findById(orderId.toString()).ifPresent(view -> {
             view.setShippingAddress(shippingAddress);
-            orderViewRepository.save(view);
+            updateOrderView(view, Update.update("shippingAddress", shippingAddress).set("updatedAt", view.getUpdatedAt()));
         });
         return getOrderView(orderId.toString());
     }
 
     @Override
     @Transactional
+    @Retryable(retryFor = ObjectOptimisticLockingFailureException.class, maxAttempts = 3, backoff = @Backoff(delay = 50))
     public void delete(Long orderId) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         order.markDeleted();
         orderViewRepository.findByIdAndDeletedFalse(orderId.toString()).ifPresent(view -> {
             view.markDeleted();
-            orderViewRepository.save(view);
+            updateOrderView(view, Update.update("deleted", true)
+                    .set("deletedAt", view.getDeletedAt())
+                    .set("updatedAt", view.getUpdatedAt()));
         });
+    }
+
+    // See the mongoTemplate field comment: order-view is sharded on keycloakUserId, so the update's
+    // query must include it alongside _id for MongoDB to be able to route the write to a shard.
+    private void updateOrderView(OrderView view, Update update) {
+        Query query = Query.query(Criteria.where("id").is(view.getId()).and("keycloakUserId").is(view.getKeycloakUserId()));
+        mongoTemplate.upsert(query, update, OrderView.class);
     }
 }

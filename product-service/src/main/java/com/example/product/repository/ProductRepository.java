@@ -20,4 +20,7 @@ public interface ProductRepository extends MongoRepository<Product, String> {
     List<Product> findByDeletedFalse();
 
     Optional<Product> findByIdAndDeletedFalse(String id);
+
+    /** Backs the idempotent-create path in ProductServiceImpl — see ProductIndexConfig. */
+    Optional<Product> findBySkuAndDeletedFalse(String sku);
 }
