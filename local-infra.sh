@@ -14,17 +14,16 @@ INFRASTRUCTURE=(
     "redis"
     "vault"
     "vault-init"
-    "kibana"
 )
 
 # Of the above, the ones k8s pods no longer depend on — everything except Mailpit's per-namespace
-# copies (see k8s/configmap-common.yaml's comment) moved in-cluster: Kafka, Redis, MySQL, Keycloak,
-# Vault (k8s/kafka.yaml, k8s/redis.yaml, k8s/mysql.yaml, k8s/keycloak.yaml, k8s/vault.yaml),
-# MongoDB and Elasticsearch (k8s/mongo.yaml, k8s/elasticsearch.yaml), and Kibana
-# (k8s/kibana.yaml). kafka-ui only makes sense once kafka itself is reachable from the host.
-# Grafana/Prometheus/Loki/Promtail/Tempo used to be here too — now fully in-cluster
-# (k8s/grafana.yaml, k8s/prometheus.yaml, k8s/loki.yaml, k8s/promtail-daemonset.yaml,
-# k8s/tempo.yaml) with no docker-compose service left to toggle at all.
+# copies (see k8s/demo/configmap-common.yaml's comment) moved in-cluster: Kafka, Redis, MySQL,
+# Keycloak, Vault (k8s/platform/infra/kafka.yaml, redis.yaml, mysql.yaml, keycloak.yaml,
+# vault.yaml), MongoDB and Elasticsearch (k8s/platform/infra/mongo.yaml, elasticsearch.yaml).
+# kafka-ui only makes sense once kafka itself is reachable from the host.
+# Kibana/Grafana/Prometheus/Loki/Promtail/Tempo used to be here too — now fully in-cluster
+# (k8s/platform/monitoring/kibana.yaml, grafana.yaml, prometheus.yaml, loki.yaml, tempo.yaml,
+# k8s/platform/infra/promtail-daemonset.yaml) with no docker-compose service left to toggle at all.
 DEV_ONLY_INFRASTRUCTURE=(
     "kafka"
     "kafka-ui"
@@ -35,7 +34,6 @@ DEV_ONLY_INFRASTRUCTURE=(
     "vault-init"
     "mongo"
     "elasticsearch"
-    "kibana"
 )
 
 # What a k8s-only workflow (k8s-local.sh's default) actually needs: INFRASTRUCTURE minus
