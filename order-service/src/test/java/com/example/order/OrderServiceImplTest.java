@@ -20,6 +20,9 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.MessageSource;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -51,6 +54,8 @@ class OrderServiceImplTest {
     KafkaTemplate<String, Object> kafkaTemplate;
     @Mock
     MessageSource messageSource;
+    @Mock
+    MongoTemplate mongoTemplate;
 
     OrderServiceImpl orderService;
 
@@ -58,7 +63,8 @@ class OrderServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        orderService = new OrderServiceImpl(orderRepository, orderViewRepository, inventoryServiceClient, kafkaTemplate, messageSource);
+        orderService = new OrderServiceImpl(
+                orderRepository, orderViewRepository, inventoryServiceClient, kafkaTemplate, messageSource, mongoTemplate);
     }
 
     private Order savedOrder(Long id, String keycloakUserId, OrderStatus status) {
@@ -85,7 +91,7 @@ class OrderServiceImplTest {
 
         assertThat(result.getId()).isEqualTo(42L);
         assertThat(result.getStatus()).isEqualTo(OrderStatus.PENDING_PAYMENT);
-        verify(orderViewRepository).save(any(OrderView.class));
+        verify(orderViewRepository).insert(any(OrderView.class));
 
         ArgumentCaptor<com.example.common.events.DomainEvent> eventCaptor =
                 ArgumentCaptor.forClass(com.example.common.events.DomainEvent.class);
@@ -112,7 +118,7 @@ class OrderServiceImplTest {
                 .hasMessageContaining("insufficient stock");
 
         verify(orderRepository, never()).save(any());
-        verify(orderViewRepository, never()).save(any());
+        verify(orderViewRepository, never()).insert(any(OrderView.class));
         verifyNoInteractions(kafkaTemplate);
     }
 
@@ -127,7 +133,7 @@ class OrderServiceImplTest {
 
         assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
         assertThat(view.getStatus()).isEqualTo(OrderStatus.PAID);
-        verify(orderViewRepository).save(view);
+        verify(mongoTemplate).upsert(any(Query.class), any(Update.class), eq(OrderView.class));
 
         ArgumentCaptor<com.example.common.events.DomainEvent> eventCaptor =
                 ArgumentCaptor.forClass(com.example.common.events.DomainEvent.class);
@@ -149,7 +155,7 @@ class OrderServiceImplTest {
         orderService.advanceStatus(999L, OrderStatus.PAID);
 
         verify(orderViewRepository, never()).findById(anyString());
-        verify(orderViewRepository, never()).save(any());
+        verify(mongoTemplate, never()).upsert(any(Query.class), any(Update.class), eq(OrderView.class));
     }
 
     @Test
@@ -251,6 +257,6 @@ class OrderServiceImplTest {
         orderService.delete(1L);
 
         assertThat(view.isDeleted()).isTrue();
-        verify(orderViewRepository, times(1)).save(view);
+        verify(mongoTemplate, times(1)).upsert(any(Query.class), any(Update.class), eq(OrderView.class));
     }
 }
