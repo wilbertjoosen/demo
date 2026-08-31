@@ -26,6 +26,11 @@ data:
 # them approximates the requested traffic split the same way a Service-based router would.
 # replicas: 2 (not 1) so a step actually has something to split between — bumped no further than
 # that to keep the resource footprint close to this project's existing single-replica norm.
+#
+# Temporarily dropped to 1 (see the HPA comment below): on a single local k3d host, running every
+# service's floor above 1 replica was starving the shared node. At 1 replica a canary step can't
+# meaningfully split traffic (nothing to divide between), so canary is effectively a no-op until
+# this is restored to 2 — acceptable trade-off here; revert replicas to 2 to restore it.
 apiVersion: argoproj.io/v1alpha1
 kind: Rollout
 metadata:
@@ -33,7 +38,7 @@ metadata:
   namespace: demo
   labels: { app: order-service, monitored: "true" }
 spec:
-  replicas: 2
+  replicas: 1
   strategy:
     canary:
       steps:
@@ -106,30 +111,34 @@ spec:
   selector: { app: order-service }
   ports: [{ name: http, port: 8084, targetPort: 8084 }]
 ---
-# Same reasoning as gateway-service.yaml's HPA (see there for the full explanation), but
-# minReplicas: 2 not 1 — this Rollout already keeps 2 as its floor specifically so a canary step has
-# something to split between (see the comment above spec.replicas); the HPA has to respect that same
-# floor, not undercut it back to 1. Standard HPA works against a Rollout directly: Argo Rollouts
-# implements the same /scale subresource a Deployment does, exactly so ordinary autoscaling/v2 can
-# target it without any Rollout-specific autoscaling object.
-apiVersion: autoscaling/v2
-kind: HorizontalPodAutoscaler
-metadata:
-  name: order-service
-  namespace: demo
-  labels: { monitored: "true" }
-spec:
-  scaleTargetRef:
-    apiVersion: argoproj.io/v1alpha1
-    kind: Rollout
-    name: order-service
-  minReplicas: 2
-  maxReplicas: 5
-  metrics:
-    - type: Resource
-      resource: { name: cpu, target: { type: Utilization, averageUtilization: 70 } }
-    - type: Resource
-      resource: { name: memory, target: { type: Utilization, averageUtilization: 80 } }
-  behavior:
-    scaleDown:
-      stabilizationWindowSeconds: 300
+# Disabled: see gateway-service.yaml's HPA comment for the full reasoning (memory-driven scaling
+# was pinning every HPA'd service at maxReplicas on this single local k3d host). Kept here
+# (commented, not deleted) as config/history. To re-enable: uncomment the block below (and restore
+# spec.replicas above to 2 first, since this HPA's own minReplicas depends on that floor).
+# # Same reasoning as gateway-service.yaml's HPA (see there for the full explanation), but
+# # minReplicas: 2 not 1 — this Rollout already keeps 2 as its floor specifically so a canary step has
+# # something to split between (see the comment above spec.replicas); the HPA has to respect that same
+# # floor, not undercut it back to 1. Standard HPA works against a Rollout directly: Argo Rollouts
+# # implements the same /scale subresource a Deployment does, exactly so ordinary autoscaling/v2 can
+# # target it without any Rollout-specific autoscaling object.
+# apiVersion: autoscaling/v2
+# kind: HorizontalPodAutoscaler
+# metadata:
+#   name: order-service
+#   namespace: demo
+#   labels: { monitored: "true" }
+# spec:
+#   scaleTargetRef:
+#     apiVersion: argoproj.io/v1alpha1
+#     kind: Rollout
+#     name: order-service
+#   minReplicas: 2
+#   maxReplicas: 5
+#   metrics:
+#     - type: Resource
+#       resource: { name: cpu, target: { type: Utilization, averageUtilization: 70 } }
+#     - type: Resource
+#       resource: { name: memory, target: { type: Utilization, averageUtilization: 80 } }
+#   behavior:
+#     scaleDown:
+#       stabilizationWindowSeconds: 300
