@@ -10,6 +10,7 @@ resources:
   - mongo-shard1.yaml
   - mongo-mongos.yaml
   - mongo-cluster-init-job.yaml
+  - mongo-cluster-self-heal-cronjob.yaml
   - mysql.yaml
   - promtail-daemonset.yaml
   - redis.yaml

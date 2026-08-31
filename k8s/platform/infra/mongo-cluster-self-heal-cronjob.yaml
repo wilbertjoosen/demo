@@ -1,0 +1,177 @@
+# Self-healing check for the sharded Mongo cluster's own metadata, on a timer.
+#
+# mongo-cluster-init-job.yaml only ever re-runs at ArgoCD PostSync — i.e. on an actual deploy.
+# Verified directly (2026-08-31): restarting the whole k3d cluster (`k8s-local.sh restart`, a
+# perfectly normal, non-crash operation — host sleep/wake or a Docker Desktop restart does the
+# same thing) corrupted the configsvr replica set's own state again, and ArgoCD's hard-refresh did
+# NOT re-run the hook, since there was no git drift to reconcile — nothing else changed, so ArgoCD
+# saw nothing to sync. That left every Mongo-backed service silently degraded (in both demo and
+# demo-qa) until someone manually deleted and re-applied the init Job.
+#
+# This CronJob is the actual self-healing mechanism for that case: every 2 minutes it asks mongos
+# how many shards it knows about; if that's not exactly 2, it re-runs the same recovery steps
+# mongo-cluster-init-job.yaml does. Keep the two in sync if either changes — same steps, just
+# triggered on a timer instead of once at deploy time, with bounded (not infinite) waits since a
+# hung run would block every later tick under concurrencyPolicy: Forbid.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: mongo-cluster-self-heal
+  namespace: infra
+spec:
+  schedule: "*/2 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 120
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: mongo-cluster-self-heal
+              image: mongo:7
+              command:
+                - bash
+                - -c
+                - |
+                  set -euo pipefail
+
+                  # Fast path: mongos already sees both shards, nothing to do. A closed cluster
+                  # (mongos itself unreachable) also falls through to recovery below - wait_for
+                  # there bounds how long that's given to resolve on its own first.
+                  shard_count="$(mongosh --host mongos.infra.svc.cluster.local --port 27017 --quiet --eval '
+                    try { print(db.adminCommand({ listShards: 1 }).shards.length) } catch (e) { print(0) }
+                  ' 2>/dev/null || echo 0)"
+
+                  if [ "$shard_count" = "2" ]; then
+                    echo "healthy: mongos reports 2 registered shards"
+                    exit 0
+                  fi
+
+                  echo "unhealthy: mongos reports $shard_count registered shard(s) (want 2) - running recovery"
+
+                  # Bounded retries (not the unbounded `until` mongo-cluster-init-job.yaml uses) -
+                  # this runs on a schedule, so giving up and trying again next tick is fine and
+                  # preferable to a stuck run blocking every later one under concurrencyPolicy: Forbid.
+                  wait_for() {
+                    for _ in $(seq 1 30); do
+                      mongosh --host "$1" --port "$2" --quiet --eval "db.runCommand({ping:1})" >/dev/null 2>&1 && return 0
+                      echo "waiting for $1:$2..."; sleep 2
+                    done
+                    echo "gave up waiting for $1:$2 - will retry next scheduled run"
+                    exit 1
+                  }
+
+                  for host in mongo-configsvr-0.mongo-configsvr-headless mongo-configsvr-1.mongo-configsvr-headless mongo-configsvr-2.mongo-configsvr-headless; do
+                    wait_for "$host" 27019
+                  done
+                  mongosh --host mongo-configsvr-0.mongo-configsvr-headless --port 27019 --quiet --eval '
+                    try {
+                      rs.initiate({
+                        _id: "configsvr0",
+                        configsvr: true,
+                        members: [
+                          { _id: 0, host: "mongo-configsvr-0.mongo-configsvr-headless.infra.svc.cluster.local:27019" },
+                          { _id: 1, host: "mongo-configsvr-1.mongo-configsvr-headless.infra.svc.cluster.local:27019" },
+                          { _id: 2, host: "mongo-configsvr-2.mongo-configsvr-headless.infra.svc.cluster.local:27019" }
+                        ]
+                      });
+                      print("configsvr0 initiated");
+                    } catch (e) {
+                      if (!String(e).includes("already initialized")) { throw e; }
+                      print("configsvr0 already initiated");
+                    }
+                  '
+
+                  for host in mongo-shard0-0.mongo-shard0-headless mongo-shard0-1.mongo-shard0-headless; do
+                    wait_for "$host" 27018
+                  done
+                  mongosh --host mongo-shard0-0.mongo-shard0-headless --port 27018 --quiet --eval '
+                    try {
+                      rs.initiate({
+                        _id: "shard0rs",
+                        members: [
+                          { _id: 0, host: "mongo-shard0-0.mongo-shard0-headless.infra.svc.cluster.local:27018" },
+                          { _id: 1, host: "mongo-shard0-1.mongo-shard0-headless.infra.svc.cluster.local:27018" }
+                        ]
+                      });
+                      print("shard0rs initiated");
+                    } catch (e) {
+                      if (!String(e).includes("already initialized")) { throw e; }
+                      print("shard0rs already initiated");
+                    }
+                  '
+
+                  for host in mongo-shard1-0.mongo-shard1-headless mongo-shard1-1.mongo-shard1-headless; do
+                    wait_for "$host" 27018
+                  done
+                  mongosh --host mongo-shard1-0.mongo-shard1-headless --port 27018 --quiet --eval '
+                    try {
+                      rs.initiate({
+                        _id: "shard1rs",
+                        members: [
+                          { _id: 0, host: "mongo-shard1-0.mongo-shard1-headless.infra.svc.cluster.local:27018" },
+                          { _id: 1, host: "mongo-shard1-1.mongo-shard1-headless.infra.svc.cluster.local:27018" }
+                        ]
+                      });
+                      print("shard1rs initiated");
+                    } catch (e) {
+                      if (!String(e).includes("already initialized")) { throw e; }
+                      print("shard1rs already initiated");
+                    }
+                  '
+
+                  wait_for mongos.infra.svc.cluster.local 27017
+
+                  mongosh --host mongos.infra.svc.cluster.local --port 27017 --quiet --eval '
+                    // Same reasoning as mongo-cluster-init-job.yaml: addShard on an existing
+                    // member is silently idempotent, so anything this catches is a real failure
+                    // (most likely a stale/empty database on one shard colliding by name with
+                    // real data on the other - never swallow it).
+                    function addShard(rsName, hosts) {
+                      sh.addShard(rsName + "/" + hosts);
+                      print(rsName + " added (or already a member)");
+                    }
+                    addShard("shard0rs", "mongo-shard0-0.mongo-shard0-headless.infra.svc.cluster.local:27018,mongo-shard0-1.mongo-shard0-headless.infra.svc.cluster.local:27018");
+                    addShard("shard1rs", "mongo-shard1-0.mongo-shard1-headless.infra.svc.cluster.local:27018,mongo-shard1-1.mongo-shard1-headless.infra.svc.cluster.local:27018");
+
+                    const shardCount = db.adminCommand({ listShards: 1 }).shards.length;
+                    if (shardCount !== 2) {
+                      throw new Error("Expected 2 registered shards after addShard, found " + shardCount +
+                        " - check for a database name collision between shard0 and shard1 (see the incident comment in mongo-cluster-init-job.yaml)");
+                    }
+                    print("shard count verified: " + shardCount);
+
+                    function shardInventory(dbName) {
+                      sh.enableSharding(dbName);
+                      db.getSiblingDB(dbName).inventory.createIndex({ productId: 1, warehouseId: 1 });
+                      try {
+                        sh.shardCollection(dbName + ".inventory", { productId: 1, warehouseId: 1 });
+                        print(dbName + ".inventory sharded");
+                      } catch (e) {
+                        if (!String(e).includes("already")) { throw e; }
+                        print(dbName + ".inventory already sharded");
+                      }
+                    }
+                    function shardOrderView(dbName) {
+                      sh.enableSharding(dbName);
+                      db.getSiblingDB(dbName)["order-view"].createIndex({ keycloakUserId: "hashed" });
+                      try {
+                        sh.shardCollection(dbName + ".order-view", { keycloakUserId: "hashed" });
+                        print(dbName + ".order-view sharded");
+                      } catch (e) {
+                        if (!String(e).includes("already")) { throw e; }
+                        print(dbName + ".order-view already sharded");
+                      }
+                    }
+
+                    shardInventory("inventory");
+                    shardInventory("inventory_qa");
+                    shardOrderView("orders");
+                    shardOrderView("orders_qa");
+                  '
+
+                  echo "recovery complete"
