@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.Caching;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.domain.AuditorAware;
 import org.springframework.data.mongodb.core.FindAndModifyOptions;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -51,7 +52,17 @@ public class ProductServiceImpl implements ProductService {
     @Override
     @CacheEvict(value = CACHE_NAME + "List", allEntries = true)
     public Product create(Product product) {
-        Product saved = productRepository.save(product);
+        Product saved;
+        try {
+            saved = productRepository.save(product);
+        } catch (DuplicateKeyException e) {
+            // Idempotent create: the uniq_sku_active index (ProductIndexConfig) is what actually
+            // enforces this — a retried create (double-click, client timeout-then-retry) lands here
+            // and returns the product that already exists instead of erroring or duplicating it.
+            // No PRODUCT_CREATED event this time: it already fired for the original, successful create.
+            return productRepository.findBySkuAndDeletedFalse(product.getSku())
+                    .orElseThrow(() -> e);
+        }
         kafkaTemplate.send(Topics.PRODUCT_EVENTS, DomainEvent.of(EventTypes.PRODUCT_CREATED, null, Map.of(
                 "productId", saved.getId(),
                 "name", saved.getName(),
