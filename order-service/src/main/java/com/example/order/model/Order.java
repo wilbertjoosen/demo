@@ -101,6 +101,16 @@ public class Order {
 
     private Instant deletedAt;
 
+    /**
+     * OrderSagaListener (via advanceStatus) and direct user actions (cancelOrder,
+     * updateShippingAddress, delete) all do read-modify-write on the same row — without this,
+     * two concurrent writes silently lost-update each other instead of one failing loudly.
+     * Paired with @Retryable on those write paths so a genuine conflict re-reads and retries
+     * rather than surfacing to the caller.
+     */
+    @Version
+    private Long version;
+
     public Order(String keycloakUserId, String email, String productId, int quantity, Address shippingAddress,
                  PaymentMethod paymentMethod, ShippingCarrier shippingCarrier, OrderStatus status) {
         this.keycloakUserId = keycloakUserId;

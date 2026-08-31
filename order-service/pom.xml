@@ -95,6 +95,13 @@
             <artifactId>spring-boot-starter-aspectj</artifactId>
         </dependency>
         <dependency>
+            <!-- @Retryable on OrderServiceImpl's Order update paths, now that Order carries a
+                 @Version column — AOP-based, same as spring-boot-starter-aspectj above provides
+                 the proxying infrastructure @Retryable needs. -->
+            <groupId>org.springframework.retry</groupId>
+            <artifactId>spring-retry</artifactId>
+        </dependency>
+        <dependency>
             <groupId>com.example</groupId>
             <artifactId>common-model</artifactId>
             <version>${project.parent.version}</version>
