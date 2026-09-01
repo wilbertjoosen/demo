@@ -6,16 +6,22 @@ on:
     # (see each job's `if:` below) — that's the "build once". Pushing to main never rebuilds; the
     # promote-to-production job instead copies the exact image tags testing is already running into
     # main's own k8s manifests, so what ships to prod is bit-for-bit what was already validated in
-    # QA, not a fresh build of the same source. develop's own copy of this workflow separately
-    # triggers on develop pushes/PRs for test-only validation — this file doesn't need to.
+    # QA, not a fresh build of the same source. develop isn't listed here: its pre-merge validation
+    # runs on the pull_request trigger below, and a merge into develop needs no build (nothing
+    # deploys from develop).
     branches: [main, testing]
   pull_request:
-    # testing included so a PR into testing gets pre-merge validation (changes/backend-test/
-    # frontend-test) before it triggers testing's own real build-and-push on merge — previously
-    # missing, so PRs like #31 merged with zero CI signal beforehand. build-and-push itself still
-    # only runs on an actual push to testing (see its own `if:` below), so adding this doesn't
-    # start building images from a PR.
-    branches: [main, testing]
+    # Pre-merge validation (changes / backend-test / frontend-test — i.e. `mvnw verify`, so
+    # Checkstyle + SpotBugs + Testcontainers tests all run) for every PR into a long-lived branch:
+    #   - develop: the feature-integration gate. Previously a PR into develop got no CI at all, so
+    #     compile / test / static-analysis breakage only surfaced later on the develop -> testing
+    #     promotion build (e.g. #145, a SpotBugs finding that reached testing).
+    #   - testing / main: validation before the merge triggers testing's real build-and-push, or a
+    #     promotion into main.
+    # build-and-push / build-and-push-frontend / update-manifests stay gated on `push` to
+    # testing/main (see their own `if:`), so a PR into any of these branches never builds an image
+    # or deploys.
+    branches: [main, testing, develop]
   # Manual "rebuild + redeploy everything" — e.g. after a change that doesn't touch any single
   # service's own path (a Dockerfile fix, a versioning-scheme change) but every service still needs
   # picking up, OR a genuine hotfix committed directly to main that has no tested-in-QA artifact to
