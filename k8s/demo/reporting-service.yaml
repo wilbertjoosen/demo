@@ -31,7 +31,7 @@ spec:
         - name: ghcr-pull-secret
       containers:
         - name: reporting-service
-          image: ghcr.io/wilbertjoosen/demo-reporting-service:1.0.2-9dd2a67
+          image: ghcr.io/wilbertjoosen/demo-reporting-service:1.0.2-2c34b0d
           imagePullPolicy: Always
           ports: [{ containerPort: 8095 }]
           envFrom:

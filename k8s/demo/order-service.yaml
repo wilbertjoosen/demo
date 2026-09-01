@@ -53,7 +53,7 @@ spec:
         - name: ghcr-pull-secret
       containers:
         - name: order-service
-          image: ghcr.io/wilbertjoosen/demo-order-service:1.0.1-341c05a
+          image: ghcr.io/wilbertjoosen/demo-order-service:1.0.1-2c34b0d
           imagePullPolicy: Always
           ports: [{ containerPort: 8084 }]
           envFrom:
