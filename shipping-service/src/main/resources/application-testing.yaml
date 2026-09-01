@@ -3,5 +3,5 @@ spring:
     uri: mongodb://${MONGO_HOST:localhost:27017}/${MONGO_DB:shipments}${MONGO_REPLICA_SET_PARAM:}
 
 keycloak:
-  issuer-uri: ${KEYCLOAK_ISSUER_URI:http://keycloak.localhost:8081/realms/demo}
-  jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://keycloak.localhost:8081/realms/demo/protocol/openid-connect/certs}
+  issuer-uri: ${KEYCLOAK_ISSUER_URI:http://keycloak.localhost:8181/realms/demo}
+  jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://keycloak.localhost:8181/realms/demo/protocol/openid-connect/certs}

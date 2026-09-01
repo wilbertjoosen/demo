@@ -6,9 +6,9 @@ spring:
       client:
         provider:
           keycloak-admin:
-            token-uri: ${KEYCLOAK_TOKEN_URI:http://keycloak.localhost:8081/realms/demo/protocol/openid-connect/token}
+            token-uri: ${KEYCLOAK_TOKEN_URI:http://keycloak.localhost:8181/realms/demo/protocol/openid-connect/token}
 
 keycloak:
-  issuer-uri: ${KEYCLOAK_ISSUER_URI:http://keycloak.localhost:8081/realms/demo}
-  jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://keycloak.localhost:8081/realms/demo/protocol/openid-connect/certs}
-  admin-uri: ${KEYCLOAK_ADMIN_URI:http://keycloak.localhost:8081/admin/realms/demo}
+  issuer-uri: ${KEYCLOAK_ISSUER_URI:http://keycloak.localhost:8181/realms/demo}
+  jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://keycloak.localhost:8181/realms/demo/protocol/openid-connect/certs}
+  admin-uri: ${KEYCLOAK_ADMIN_URI:http://keycloak.localhost:8181/admin/realms/demo}
