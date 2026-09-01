@@ -34,6 +34,10 @@ eureka:
   instance:
     hostname: ${EUREKA_INSTANCE_HOSTNAME:localhost}
     prefer-ip-address: false
+    metadata-map:
+      # Public path prefix this service owns at the gateway edge — gateway-service builds its route
+      # table from this metadata (see user-service's application.yaml for the full note).
+      "gateway.paths": /api/reports/**
 
 keycloak:
   issuer-uri: ${KEYCLOAK_ISSUER_URI:http://keycloak.localhost:8081/realms/demo}

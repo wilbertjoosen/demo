@@ -924,8 +924,9 @@ Each backend service module follows the same internal package layout under its b
 including the choreographed-saga participants), `service/` (business logic, external clients).
 Modules with a WebSocket surface (`chat-service`, `notification-service`) add a `websocket/`
 package for handlers/interceptors; `gateway-service` adds a `filter/` package for its servlet
-filter. The `*ServiceApplication` bootstrap class stays directly in the base package, not in any
-sub-package.
+filter and a `routing/` package that builds the route table from Eureka at runtime (each service
+declares the path prefix it owns via `eureka.instance.metadata-map."gateway.paths"`). The
+`*ServiceApplication` bootstrap class stays directly in the base package, not in any sub-package.
 
 ---
 

@@ -20,6 +20,12 @@ eureka:
   instance:
     hostname: ${EUREKA_INSTANCE_HOSTNAME:localhost}
     prefer-ip-address: false
+    metadata-map:
+      # Public path prefix(es) this service owns at the gateway edge — comma-separated, since chat-service
+      # serves two. gateway-service builds its route table from this metadata (see user-service's
+      # application.yaml for the full note). The /ws/chat/** WebSocket is not routed (webmvc gateway has
+      # no WS proxy) — the SPA connects to it directly.
+      "gateway.paths": /api/chat/**,/api/conversations/**
 
 keycloak:
   issuer-uri: ${KEYCLOAK_ISSUER_URI:http://keycloak.localhost:8081/realms/demo}

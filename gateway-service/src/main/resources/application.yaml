@@ -7,157 +7,16 @@ spring:
   config:
     import: optional:configserver:${CONFIG_SERVER_URI:http://localhost:8888}
   cloud:
-    gateway:
-      server:
-        webmvc:
-          routes:
-            - id: user-service
-              uri: lb://user-service
-              predicates:
-                - Path=/api/users/**
-            - id: product-service
-              uri: lb://product-service
-              predicates:
-                - Path=/api/products/**
-            - id: order-service
-              uri: lb://order-service
-              predicates:
-                - Path=/api/orders/**
-            - id: payment-service
-              uri: lb://payment-service
-              predicates:
-                - Path=/api/payments/**
-            - id: shipping-service
-              uri: lb://shipping-service
-              predicates:
-                - Path=/api/shipments/**
-            - id: delivery-service
-              uri: lb://delivery-service
-              predicates:
-                - Path=/api/deliveries/**
-            - id: inventory-service
-              uri: lb://inventory-service
-              predicates:
-                - Path=/api/inventory/**
-            - id: audit-service
-              uri: lb://audit-service
-              predicates:
-                - Path=/api/audit/**
-            - id: product-comment-service
-              uri: lb://product-comment-service
-              predicates:
-                - Path=/api/comments/**
-            - id: product-media-service
-              uri: lb://product-media-service
-              predicates:
-                - Path=/api/media/**
-            - id: product-review-service
-              uri: lb://product-review-service
-              predicates:
-                - Path=/api/reviews/**
-            - id: chat-service
-              uri: lb://chat-service
-              predicates:
-                - Path=/api/chat/**
-            - id: chat-service-conversations
-              uri: lb://chat-service
-              predicates:
-                - Path=/api/conversations/**
-            - id: reporting-service
-              uri: lb://reporting-service
-              predicates:
-                - Path=/api/reports/**
-            - id: common-service
-              uri: lb://common-service
-              predicates:
-                - Path=/api/common/**
-            # Proxies each service's own /v3/api-docs under /docs/<service>/v3/api-docs so one
-            # Swagger UI (this gateway's own) can aggregate all of them — see springdoc.swagger-ui.urls
-            # below. notification-service is excluded: it has no REST controllers (WebSocket-only).
-            - id: user-service-docs
-              uri: lb://user-service
-              predicates:
-                - Path=/docs/user-service/v3/api-docs
-              filters:
-                - SetPath=/v3/api-docs
-            - id: product-service-docs
-              uri: lb://product-service
-              predicates:
-                - Path=/docs/product-service/v3/api-docs
-              filters:
-                - SetPath=/v3/api-docs
-            - id: order-service-docs
-              uri: lb://order-service
-              predicates:
-                - Path=/docs/order-service/v3/api-docs
-              filters:
-                - SetPath=/v3/api-docs
-            - id: payment-service-docs
-              uri: lb://payment-service
-              predicates:
-                - Path=/docs/payment-service/v3/api-docs
-              filters:
-                - SetPath=/v3/api-docs
-            - id: shipping-service-docs
-              uri: lb://shipping-service
-              predicates:
-                - Path=/docs/shipping-service/v3/api-docs
-              filters:
-                - SetPath=/v3/api-docs
-            - id: delivery-service-docs
-              uri: lb://delivery-service
-              predicates:
-                - Path=/docs/delivery-service/v3/api-docs
-              filters:
-                - SetPath=/v3/api-docs
-            - id: inventory-service-docs
-              uri: lb://inventory-service
-              predicates:
-                - Path=/docs/inventory-service/v3/api-docs
-              filters:
-                - SetPath=/v3/api-docs
-            - id: audit-service-docs
-              uri: lb://audit-service
-              predicates:
-                - Path=/docs/audit-service/v3/api-docs
-              filters:
-                - SetPath=/v3/api-docs
-            - id: product-comment-service-docs
-              uri: lb://product-comment-service
-              predicates:
-                - Path=/docs/product-comment-service/v3/api-docs
-              filters:
-                - SetPath=/v3/api-docs
-            - id: product-media-service-docs
-              uri: lb://product-media-service
-              predicates:
-                - Path=/docs/product-media-service/v3/api-docs
-              filters:
-                - SetPath=/v3/api-docs
-            - id: product-review-service-docs
-              uri: lb://product-review-service
-              predicates:
-                - Path=/docs/product-review-service/v3/api-docs
-              filters:
-                - SetPath=/v3/api-docs
-            - id: chat-service-docs
-              uri: lb://chat-service
-              predicates:
-                - Path=/docs/chat-service/v3/api-docs
-              filters:
-                - SetPath=/v3/api-docs
-            - id: reporting-service-docs
-              uri: lb://reporting-service
-              predicates:
-                - Path=/docs/reporting-service/v3/api-docs
-              filters:
-                - SetPath=/v3/api-docs
-            - id: common-service-docs
-              uri: lb://common-service
-              predicates:
-                - Path=/docs/common-service/v3/api-docs
-              filters:
-                - SetPath=/v3/api-docs
+    # No static route table. Routes are built at runtime from the Eureka registry by
+    # com.example.gateway.routing.DiscoveryRouteRefresher: each backend service publishes the public
+    # path prefix(es) it owns as `eureka.instance.metadata-map."gateway.paths"`, and the gateway turns
+    # those into lb://<service-id> proxy routes — plus a /docs/<service-id>/v3/api-docs route per
+    # service (rewritten onto that service's own /v3/api-docs) so this gateway's single Swagger UI can
+    # aggregate them. Adding, removing or re-pathing a service needs no change here. The table is
+    # rebuilt on each Eureka registry refresh; `POST /actuator/refresh` forces it immediately.
+    # Services that publish no gateway.paths metadata (infra, WebSocket-only notification-service) are
+    # deliberately not routed.
+    #
     # Failover: if a route resolves to a service with 2+ instances registered in Eureka and one is
     # down/erroring, the LoadBalancer retries against a *different* instance automatically (enabled
     # by default; retry-on-all-operations is off by default since retrying a POST/PUT across
@@ -173,28 +32,11 @@ spring:
 # WebMVC-native gateway (spring-cloud-gateway-server-webmvc) has no WebSocket-proxying support
 # (verified: no such classes in the jar, unlike the older WebFlux gateway). The SPA connects to both
 # services' WebSocket ports directly instead of through the gateway; only chat-service's REST history
-# endpoint (/api/chat/messages) is routed above.
+# endpoint (/api/chat/messages) is routed, via its gateway.paths metadata.
 
-springdoc:
-  swagger-ui:
-    # Explicit list overrides the default single-doc dropdown with one entry per service, each
-    # fetched through this gateway's own /docs/<service>/v3/api-docs routes above — one Swagger UI
-    # for the whole system instead of 12 separate per-service URLs.
-    urls:
-      - { name: user-service, url: /docs/user-service/v3/api-docs }
-      - { name: product-service, url: /docs/product-service/v3/api-docs }
-      - { name: order-service, url: /docs/order-service/v3/api-docs }
-      - { name: payment-service, url: /docs/payment-service/v3/api-docs }
-      - { name: shipping-service, url: /docs/shipping-service/v3/api-docs }
-      - { name: delivery-service, url: /docs/delivery-service/v3/api-docs }
-      - { name: inventory-service, url: /docs/inventory-service/v3/api-docs }
-      - { name: audit-service, url: /docs/audit-service/v3/api-docs }
-      - { name: product-comment-service, url: /docs/product-comment-service/v3/api-docs }
-      - { name: product-media-service, url: /docs/product-media-service/v3/api-docs }
-      - { name: product-review-service, url: /docs/product-review-service/v3/api-docs }
-      - { name: chat-service, url: /docs/chat-service/v3/api-docs }
-      - { name: reporting-service, url: /docs/reporting-service/v3/api-docs }
-      - { name: common-service, url: /docs/common-service/v3/api-docs }
+# springdoc.swagger-ui.urls (the per-service dropdown for this gateway's aggregated Swagger UI) is not
+# listed here — DiscoveryRouteRefresher populates SwaggerUiConfigProperties.setUrls() on every rebuild
+# with one entry per documented service currently registered in Eureka.
 
 cors:
   # localhost:5173 is the Vite dev server; demo.localhost:18090 is the k3d ingress the built SPA is
@@ -225,6 +67,11 @@ management:
         enabled: true
   endpoints:
     web:
+      exposure:
+        # refresh: POST /actuator/refresh forces DiscoveryRouteRefresher to rebuild the route table
+        # immediately instead of waiting for the next Eureka registry refresh. health/info/prometheus
+        # match what the backend services expose.
+        include: health,info,prometheus,refresh
       # Actuator endpoints are wired by Boot's own autoconfiguration, separate from CorsConfig's
       # WebMvcConfigurer mapping — without this, the SPA's health-check ping to /actuator/health
       # gets a 200 with no CORS headers, which the browser then blocks reading.
