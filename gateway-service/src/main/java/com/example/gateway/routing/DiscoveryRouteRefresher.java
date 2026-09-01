@@ -54,7 +54,7 @@ import static org.springframework.web.servlet.function.RequestPredicates.path;
  * re-pathing a service never touches the gateway.
  */
 @Component
-public class DiscoveryRouteRefresher implements InitializingBean {
+public final class DiscoveryRouteRefresher implements InitializingBean {
 
     static final String PATHS_METADATA_KEY = "gateway.paths";
     static final String PATHS_METADATA_KEY_ALT = "gateway-paths";
@@ -113,6 +113,9 @@ public class DiscoveryRouteRefresher implements InitializingBean {
                     continue;
                 }
                 Map<String, String> metadata = instances.get(0).getMetadata();
+                if (metadata == null) {
+                    continue;
+                }
                 String rawPaths = firstNonBlank(metadata.get(PATHS_METADATA_KEY), metadata.get(PATHS_METADATA_KEY_ALT));
                 if (rawPaths == null) {
                     continue; // explicit opt-in: no gateway.paths metadata -> not exposed through the gateway

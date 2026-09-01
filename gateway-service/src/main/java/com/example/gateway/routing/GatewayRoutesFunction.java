@@ -24,7 +24,7 @@ import org.springframework.web.servlet.function.ServerResponse;
  * refreshable route table behind a stable bean.
  */
 @Component
-public class GatewayRoutesFunction implements RouterFunction<ServerResponse> {
+public final class GatewayRoutesFunction implements RouterFunction<ServerResponse> {
 
     /**
      * Matches nothing — the state before the first registry fetch, and the fallback when no service
