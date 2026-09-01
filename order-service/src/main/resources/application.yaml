@@ -91,7 +91,7 @@ spring:
           inventory-service:
             # token-uri directly (skips OIDC discovery) — needs the internally-resolvable Keycloak
             # address, same internal/external split as keycloak.jwk-set-uri below.
-            token-uri: ${KEYCLOAK_TOKEN_URI:http://keycloak.localhost:8081/realms/demo/protocol/openid-connect/token}
+            token-uri: ${KEYCLOAK_TOKEN_URI:http://keycloak.localhost:8181/realms/demo/protocol/openid-connect/token}
 
 services:
   inventory-service:
@@ -104,10 +104,14 @@ eureka:
   instance:
     hostname: ${EUREKA_INSTANCE_HOSTNAME:localhost}
     prefer-ip-address: false
+    metadata-map:
+      # Public path prefix this service owns at the gateway edge — gateway-service builds its route
+      # table from this metadata (see user-service's application.yaml for the full note).
+      "gateway.paths": /api/orders/**
 
 keycloak:
-  issuer-uri: ${KEYCLOAK_ISSUER_URI:http://keycloak.localhost:8081/realms/demo}
-  jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://keycloak.localhost:8081/realms/demo/protocol/openid-connect/certs}
+  issuer-uri: ${KEYCLOAK_ISSUER_URI:http://keycloak.localhost:8181/realms/demo}
+  jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://keycloak.localhost:8181/realms/demo/protocol/openid-connect/certs}
 
 management:
   endpoint:

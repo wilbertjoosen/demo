@@ -1,21 +1,27 @@
 # Shared by every containerized app service below — addresses use in-network service names
 # (kafka:29092, keycloak's internal port) rather than the localhost:* defaults each service's
 # application.yaml falls back to for the `mvn spring-boot:run` host-JVM dev flow.
-# KEYCLOAK_ISSUER_URI stays external (keycloak.localhost:8081): it must match the `iss` claim of tokens
+# KEYCLOAK_ISSUER_URI stays external (keycloak.localhost:8181): it must match the `iss` claim of tokens
 # issued to the browser-based SPA, regardless of where the validating service itself runs.
 #
-# The hostname is `keycloak.localhost`, not bare `localhost` — deliberately: this container and the
-# k3d/k8s cluster's own in-cluster Keycloak (main's k8s/keycloak.yaml, shared cross-namespace by
-# `demo`/`demo-qa` — see k8s/configmap-common.yaml) both used to answer on literal `localhost:8081`,
-# the exact same port, not just the same domain on different ports. Browser cookies are scoped by
-# domain, not port, so the two instances shared one cookie jar and stomped on each other's
-# `KC_RESTART`/session cookies whenever both were used in the same browser at once — same failure
-# reproduced and fixed this same way on `develop` (there the ports genuinely differed, 8181 vs 8081,
-# but cookie scoping doesn't care). `*.localhost` resolves to loopback with no /etc/hosts entry
-# needed. Scoped to this container only — the k8s-facing Keycloak (k8s/keycloak.yaml,
+# This local-dev Keycloak differs from the k3d/k8s cluster's own in-cluster Keycloak
+# (k8s/platform/infra/keycloak.yaml, shared cross-namespace by `demo`/`demo-qa` — see
+# k8s/configmap-common.yaml) on BOTH hostname and port, for two independent reasons:
+#
+#  - Hostname `keycloak.localhost` (not bare `localhost`): browser cookies are scoped by domain,
+#    not port, so when both instances answered on `localhost` they shared one cookie jar and
+#    stomped on each other's `KC_RESTART`/session cookies whenever both were touched in the same
+#    browser. A distinct domain gives each its own jar. `*.localhost` resolves to loopback with no
+#    /etc/hosts entry needed.
+#  - Port 8181 (the in-cluster one keeps 8081): k3d publishes host port 8081 for its Keycloak
+#    (`k3d cluster create ... -p "8081:8081@loadbalancer"` + hostPort 8081 in keycloak.yaml), so
+#    running the k3d cluster and this compose stack at the same time would collide on host 8081 —
+#    Docker Desktop then starts this container with no port mapping at all. 8181 lets both run
+#    concurrently.
+#
+# Scoped to this container only — the k8s-facing Keycloak (k8s/platform/infra/keycloak.yaml,
 # k8s/configmap-common.yaml, and this README's admin-console docs) deliberately keeps answering on
-# plain `localhost:8081`; that's real, load-bearing, deployed-cluster identity, not something to
-# rename as a side effect of fixing local dev's cookie collision.
+# plain `localhost:8081`; that's real, load-bearing, deployed-cluster identity.
 #
 # MONGO_HOST: single standalone mongod, addressed the same way as everything else in this block
 # (kafka:29092, redis) — a plain in-network compose service name. No replica set here (that's a
@@ -26,7 +32,7 @@ x-app-env: &app-env
   CONFIG_SERVER_URI: http://config-server:8888
   EUREKA_URI: http://eureka-server:8761/eureka
   KAFKA_BOOTSTRAP_SERVERS: kafka:29092
-  KEYCLOAK_ISSUER_URI: http://keycloak.localhost:8081/realms/demo
+  KEYCLOAK_ISSUER_URI: http://keycloak.localhost:8181/realms/demo
   KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/demo/protocol/openid-connect/certs
   MONGO_HOST: mongo:27017
   REDIS_HOST: redis
@@ -126,13 +132,13 @@ services:
       KEYCLOAK_ADMIN_PASSWORD: admin
       # Without a fixed hostname, Keycloak's dev mode derives each token's `iss` claim from
       # whatever Host header the request used to reach it — fine for browser logins (always
-      # keycloak.localhost:8081), but order-service's server-to-server client_credentials call goes through
-      # host.k3d.internal:8081 when running in the k3d cluster, which would mint a token with a
-      # DIFFERENT issuer than what every service's fixed KEYCLOAK_ISSUER_URI expects, and the
-      # receiving service's JwtIssuerValidator rejects it with 401.
-      KC_HOSTNAME: http://keycloak.localhost:8081
+      # keycloak.localhost:8181), but a server-to-server client_credentials call that reaches this
+      # container by any other address would mint a token with a DIFFERENT issuer than every
+      # service's fixed KEYCLOAK_ISSUER_URI expects, and the receiving service's JwtIssuerValidator
+      # rejects it with 401. Pinning KC_HOSTNAME makes `iss` deterministic regardless of caller.
+      KC_HOSTNAME: http://keycloak.localhost:8181
     ports:
-      - "8081:8080"
+      - "8181:8080"
     volumes:
       - ./docker/keycloak:/opt/keycloak/data/import
       - ./docker/keycloak/themes/demo:/opt/keycloak/themes/demo
